@@ -218,7 +218,7 @@
 - 주요 선택은 다음처럼 기록하는 방식이 적합하다.
   - `choice_opened_gate_with_ritual = true`
   - `choice_spared_bound_knight = true`
-  - `choice_used_ash_for_upgrade = true`
+  - `choice_spent_jangwang_for_loadout = true`
 - 엔딩 판정은 단일 플래그가 아니라 축별 누적 우세 판정으로 설계한다.
 
 ## 리스크 메모
