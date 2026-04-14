@@ -120,4 +120,13 @@ namespace Arkeum.Prototype
             return 1;
         }
     }
+
+    public sealed class HubSceneLayout
+    {
+        public DungeonLayout Layout;
+        public Vector2Int PlayerPosition;
+        public Vector2Int StartGatePosition;
+        public Vector2Int UnlockPosition;
+        public Vector2Int UndertakerPosition;
+    }
 }

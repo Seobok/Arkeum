@@ -36,26 +36,26 @@ namespace Arkeum.Prototype
         private void DrawTopBar(PrototypeGameController controller)
         {
             GUILayout.BeginArea(new Rect(12f, 12f, 460f, 140f), panelStyle);
-            GUILayout.Label("Arkeum 1단계 프로토타입", titleStyle);
+            GUILayout.Label("Arkeum Prototype", titleStyle);
 
             if (controller.Phase == GamePhase.InRun)
             {
                 RunState run = controller.Run;
-                GUILayout.Label($"목표: 잿빛 회랑으로 내려가 네 이름에 반응한 잔광을 회수하라.", bodyStyle);
+                GUILayout.Label("Goal: reach the reliquary and return through action-by-action play.", bodyStyle);
                 GUILayout.Label(
-                    $"HP {run.CurrentHp}/{run.MaxHp}  |  혈편 {run.Hyeolpyeon}  |  붕대 {run.BandageCount}  |  응급약 {run.DraughtCount}  |  턴 {run.TurnCount}",
+                    $"HP {run.CurrentHp}/{run.MaxHp}  |  Shards {run.Hyeolpyeon}  |  Bandage {run.BandageCount}  |  Draught {run.DraughtCount}  |  Turn {run.TurnCount}",
                     bodyStyle);
-                GUILayout.Label($"최고 도달 구역: {controller.Profile.highestReachedDepth}  |  이번 런 도달 구역: {run.DepthReached}", bodyStyle);
-                GUILayout.Label("규칙: 행동 후 적이 반응합니다.", accentStyle);
+                GUILayout.Label($"Best depth {controller.Profile.highestReachedDepth}  |  Current depth {run.DepthReached}", bodyStyle);
+                GUILayout.Label("Rule: every action gives enemies a response.", accentStyle);
             }
             else
             {
-                GUILayout.Label("거점: 귀환 제단", bodyStyle);
-                GUILayout.Label($"잔광 {controller.Profile.jangwang}  |  총 회귀 {controller.Profile.totalReturns}  |  최고 도달 구역 {controller.Profile.highestReachedDepth}", bodyStyle);
+                GUILayout.Label("Hub: Return Altar", bodyStyle);
+                GUILayout.Label($"Gleam {controller.Profile.jangwang}  |  Returns {controller.Profile.totalReturns}  |  Best depth {controller.Profile.highestReachedDepth}", bodyStyle);
                 GUILayout.Label(
                     controller.Profile.unlockedStartingBandage
-                        ? "시작 보급: 응고 지혈포 해금됨. 매 런 시작 시 1개 지급."
-                        : $"응고 지혈포 해금 비용: {PrototypeGameController.StartingBandageUnlockCost} 잔광",
+                        ? "Starting bandage unlock: active, runs begin with 1 bandage"
+                        : $"Starting bandage unlock cost: {PrototypeGameController.StartingBandageUnlockCost} gleam",
                     accentStyle);
             }
 
@@ -65,34 +65,31 @@ namespace Arkeum.Prototype
         private void DrawHelp(PrototypeGameController controller)
         {
             GUILayout.BeginArea(new Rect(Screen.width - 330f, 12f, 318f, 215f), panelStyle);
-            GUILayout.Label("조작", titleStyle);
-
+            GUILayout.Label("Controls", titleStyle);
             if (controller.Phase == GamePhase.InRun)
             {
-                GUILayout.Label("방향 입력: 적이 있으면 공격, 없으면 이동", bodyStyle);
-                GUILayout.Label("상호작용: E", bodyStyle);
-                GUILayout.Label("대기: Q", bodyStyle);
-                GUILayout.Label("소모품: 1 붕대 / 2 응급약", bodyStyle);
+                GUILayout.Label("Move keys: attack enemies, interact with front targets, otherwise move", bodyStyle);
+                GUILayout.Label("Wait: Q", bodyStyle);
+                GUILayout.Label("Items: 1 bandage / 2 draught", bodyStyle);
             }
             else
             {
-                GUILayout.Label("이동: 화살표 / WASD", bodyStyle);
-                GUILayout.Label("상호작용: E", bodyStyle);
-                GUILayout.Label("결과창 닫기: Enter", bodyStyle);
+                GUILayout.Label("Move: arrow keys / WASD", bodyStyle);
+                GUILayout.Label("Interact: bump the target in front of you", bodyStyle);
+                GUILayout.Label("Close result: Enter", bodyStyle);
             }
-
             GUILayout.Space(12f);
-            GUILayout.Label("프로토타입 검증 포인트", titleStyle);
-            GUILayout.Label("죽음 이후 회귀 흐름", bodyStyle);
-            GUILayout.Label("행동 단위 리듬", bodyStyle);
-            GUILayout.Label("혈편 소실 / 잔광 유지 감각", bodyStyle);
+            GUILayout.Label("Prototype Checks", titleStyle);
+            GUILayout.Label("Persistent progression after death", bodyStyle);
+            GUILayout.Label("Action-by-action pacing", bodyStyle);
+            GUILayout.Label("Loss vs. persistence tension", bodyStyle);
             GUILayout.EndArea();
         }
 
         private void DrawBottomLog(PrototypeGameController controller)
         {
             GUILayout.BeginArea(new Rect(12f, Screen.height - 148f, Screen.width - 24f, 136f), panelStyle);
-            GUILayout.Label("상태", titleStyle);
+            GUILayout.Label("Status", titleStyle);
             GUILayout.Label(string.IsNullOrEmpty(CurrentMessage) ? "..." : CurrentMessage, bodyStyle);
 
             if (!string.IsNullOrEmpty(DialogueLine))
@@ -104,8 +101,8 @@ namespace Arkeum.Prototype
             if (controller.Phase == GamePhase.InRun)
             {
                 builder.Clear();
-                builder.Append("현재 임시 장비: ");
-                builder.Append(controller.Run.TemporaryWeaponEquipped ? "마모된 톱날 (+1 공격)" : "기본 철검");
+                builder.Append("Current weapon: ");
+                builder.Append(controller.Run.TemporaryWeaponEquipped ? "Worn blade (+1 attack)" : "Default blade");
                 GUILayout.Space(6f);
                 GUILayout.Label(builder.ToString(), bodyStyle);
             }
@@ -116,10 +113,10 @@ namespace Arkeum.Prototype
         private void DrawHubPanel(PrototypeGameController controller)
         {
             GUILayout.BeginArea(new Rect(12f, 168f, 420f, 188f), panelStyle);
-            GUILayout.Label("거점 기능", titleStyle);
-            GUILayout.Label("하강 제단 타일: E로 런 시작", bodyStyle);
-            GUILayout.Label("해금 제단 타일: E로 응고 지혈포 해금", bodyStyle);
-            GUILayout.Label("장례자 타일: E로 대화", bodyStyle);
+            GUILayout.Label("Hub Actions", titleStyle);
+            GUILayout.Label("Bump the start altar to begin a run", bodyStyle);
+            GUILayout.Label("Bump the unlock altar to attempt the starting bandage unlock", bodyStyle);
+            GUILayout.Label("Bump the undertaker to talk", bodyStyle);
             GUILayout.Space(8f);
             GUILayout.Label(controller.GetHubSummary(), bodyStyle);
             GUILayout.EndArea();
@@ -129,25 +126,25 @@ namespace Arkeum.Prototype
         {
             Rect rect = new Rect(Screen.width * 0.5f - 250f, Screen.height * 0.5f - 190f, 500f, 380f);
             GUILayout.BeginArea(rect, panelStyle);
-            GUILayout.Label("런 종료", titleStyle);
+            GUILayout.Label("Run Result", titleStyle);
             GUILayout.Label(controller.GetRunResultHeadline(), accentStyle);
             GUILayout.Space(8f);
 
-            GUILayout.Label("사라진 것", titleStyle);
+            GUILayout.Label("Lost", titleStyle);
             foreach (string line in controller.GetLostResultLines())
             {
                 GUILayout.Label(line, bodyStyle);
             }
 
             GUILayout.Space(8f);
-            GUILayout.Label("남은 것", titleStyle);
+            GUILayout.Label("Kept", titleStyle);
             foreach (string line in controller.GetKeptResultLines())
             {
                 GUILayout.Label(line, bodyStyle);
             }
 
             GUILayout.Space(12f);
-            GUILayout.Label("Enter를 눌러 귀환 제단으로 돌아갑니다.", accentStyle);
+            GUILayout.Label("Press Enter to return to the altar.", accentStyle);
             GUILayout.EndArea();
         }
 
