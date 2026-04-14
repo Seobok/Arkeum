@@ -18,6 +18,7 @@ namespace Arkeum.Prototype
         private PrototypeViewFactory viewFactory;
         private PrototypeHud hud;
         private DungeonLayout layout;
+        private DungeonLayout hubLayout;
         private Camera mainCamera;
         private Transform worldRoot;
         private Transform floorRoot;
@@ -25,6 +26,11 @@ namespace Arkeum.Prototype
         private Transform markerRoot;
 
         private ActorRuntime player;
+        private GameObject hubPlayerView;
+        private Vector2Int hubPlayerPosition;
+        private Vector2Int hubStartGatePosition;
+        private Vector2Int hubUnlockPosition;
+        private Vector2Int hubUndertakerPosition;
         private bool reliquaryClaimed;
         private bool temporaryWeaponCollected;
         private int draughtStock;
@@ -100,21 +106,14 @@ namespace Arkeum.Prototype
                 return;
             }
 
-            if (keyboard.enterKey.wasPressedThisFrame)
+            if (TryHandleHubMovement(keyboard))
             {
-                StartRun();
                 return;
             }
 
-            if (keyboard.uKey.wasPressedThisFrame)
+            if (keyboard.eKey.wasPressedThisFrame)
             {
-                TryUnlockStartingBandage();
-                return;
-            }
-
-            if (keyboard.tKey.wasPressedThisFrame)
-            {
-                AdvanceUndertakerDialogue();
+                TryHubInteract();
             }
         }
 
@@ -126,14 +125,8 @@ namespace Arkeum.Prototype
                 return;
             }
 
-            if (TryHandleMovement(keyboard))
+            if (TryHandleDirectionalActionInRun(keyboard))
             {
-                return;
-            }
-
-            if (keyboard.spaceKey.wasPressedThisFrame)
-            {
-                TryAttack();
                 return;
             }
 
@@ -175,27 +168,30 @@ namespace Arkeum.Prototype
             }
         }
 
-        private bool TryHandleMovement(Keyboard keyboard)
+        private bool TryHandleHubMovement(Keyboard keyboard)
         {
-            Vector2Int direction = Vector2Int.zero;
-            if (keyboard.wKey.wasPressedThisFrame || keyboard.upArrowKey.wasPressedThisFrame)
+            if (!TryGetDirectionalInput(keyboard, out Vector2Int direction))
             {
-                direction = Vector2Int.up;
-            }
-            else if (keyboard.sKey.wasPressedThisFrame || keyboard.downArrowKey.wasPressedThisFrame)
-            {
-                direction = Vector2Int.down;
-            }
-            else if (keyboard.aKey.wasPressedThisFrame || keyboard.leftArrowKey.wasPressedThisFrame)
-            {
-                direction = Vector2Int.left;
-            }
-            else if (keyboard.dKey.wasPressedThisFrame || keyboard.rightArrowKey.wasPressedThisFrame)
-            {
-                direction = Vector2Int.right;
+                return false;
             }
 
-            if (direction == Vector2Int.zero)
+            Vector2Int target = hubPlayerPosition + direction;
+            if (!hubLayout.IsWalkable(target))
+            {
+                SetMessage("거점의 무너진 잔해가 길을 막고 있다.");
+                return true;
+            }
+
+            hubPlayerPosition = target;
+            SyncHubPlayerView();
+            OnHubTileEntered();
+            UpdateCamera();
+            return true;
+        }
+
+        private bool TryHandleDirectionalActionInRun(Keyboard keyboard)
+        {
+            if (!TryGetDirectionalInput(keyboard, out Vector2Int direction))
             {
                 return false;
             }
@@ -207,16 +203,28 @@ namespace Arkeum.Prototype
                 return true;
             }
 
-            if (TryGetEnemyAt(target, out _))
+            if (TryGetEnemyAt(target, out ActorRuntime enemy))
             {
-                SetMessage("적이 길을 막고 있다. 공격하거나 다른 경로를 찾아야 한다.");
+                AttackEnemy(enemy);
                 return true;
             }
 
             player.Position = target;
             SyncActorView(player);
             Run.DepthReached = Mathf.Max(Run.DepthReached, layout.GetDepth(target));
-            SetMessage($"{GetDepthName(Run.DepthReached)} 쪽으로 한 칸 전진했다.");
+            TryAutoPickupAtPlayerPosition();
+            if (player.Position == layout.ReliquaryPosition)
+            {
+                SetMessage("심부의 잔광이 발밑에서 떨린다. `E`로 회수할 수 있다.");
+            }
+            else if (player.Position == layout.MerchantPosition)
+            {
+                SetMessage("혈편 상인이 낮게 웃는다. `E`를 눌러 거래할 수 있다.");
+            }
+            else
+            {
+                SetMessage($"{GetDepthName(Run.DepthReached)} 쪽으로 한 칸 전진했다.");
+            }
             ConsumeTurn(null);
             return true;
         }
@@ -262,9 +270,11 @@ namespace Arkeum.Prototype
             player = null;
             enemies.Clear();
             ClearSpawnedViews();
+            BuildHub();
             SetMessage(message);
             hud.DialogueLine = GetUndertakerGreeting();
             EnsureCamera();
+            UpdateCamera();
         }
 
         private void EndRun(RunEndReason reason)
@@ -362,15 +372,8 @@ namespace Arkeum.Prototype
             return "장례자: 회귀가 익숙해질수록 더 위험하지. 익숙함은 늘 네 일부를 가져간다.";
         }
 
-        private void TryAttack()
+        private void AttackEnemy(ActorRuntime target)
         {
-            ActorRuntime target = FindAdjacentEnemy();
-            if (target == null)
-            {
-                SetMessage("닿는 거리의 적이 없다.");
-                return;
-            }
-
             int damage = Mathf.Max(1, Run.EffectiveAttack - target.Defense);
             target.Hp -= damage;
             SetMessage($"{target.DisplayName}에게 {damage} 피해를 입혔다.");
@@ -397,19 +400,6 @@ namespace Arkeum.Prototype
                 SetMessage("네 이름에 반응한 잔광을 회수했다. 회랑의 맥박이 잠시 잦아든다.");
                 EndRun(RunEndReason.DepthClear);
                 return;
-            }
-
-            for (int i = 0; i < layout.TemporaryWeaponSpawns.Count; i++)
-            {
-                if (player.Position == layout.TemporaryWeaponSpawns[i] && !temporaryWeaponCollected)
-                {
-                    temporaryWeaponCollected = true;
-                    Run.TemporaryWeaponEquipped = true;
-                    Run.AttackBonus = 1;
-                    SetMessage("마모된 톱날을 주워 들었다. 이번 런 동안 공격력이 1 증가한다.");
-                    ConsumeTurn(null);
-                    return;
-                }
             }
 
             SetMessage("상호작용할 대상이 없다.");
@@ -572,6 +562,36 @@ namespace Arkeum.Prototype
             return null;
         }
 
+        private bool TryGetDirectionalInput(Keyboard keyboard, out Vector2Int direction)
+        {
+            direction = Vector2Int.zero;
+            if (keyboard.wKey.wasPressedThisFrame || keyboard.upArrowKey.wasPressedThisFrame)
+            {
+                direction = Vector2Int.up;
+                return true;
+            }
+
+            if (keyboard.sKey.wasPressedThisFrame || keyboard.downArrowKey.wasPressedThisFrame)
+            {
+                direction = Vector2Int.down;
+                return true;
+            }
+
+            if (keyboard.aKey.wasPressedThisFrame || keyboard.leftArrowKey.wasPressedThisFrame)
+            {
+                direction = Vector2Int.left;
+                return true;
+            }
+
+            if (keyboard.dKey.wasPressedThisFrame || keyboard.rightArrowKey.wasPressedThisFrame)
+            {
+                direction = Vector2Int.right;
+                return true;
+            }
+
+            return false;
+        }
+
         private bool TryGetEnemyAt(Vector2Int cell, out ActorRuntime enemyAtCell)
         {
             for (int i = 0; i < enemies.Count; i++)
@@ -642,6 +662,20 @@ namespace Arkeum.Prototype
             GameObject reliquary = viewFactory.CreateActor(actorRoot, "Reliquary", layout.ReliquaryPosition, new Color(0.93f, 0.72f, 0.28f), 16);
             reliquary.transform.localScale = new Vector3(0.6f, 0.6f, 1f);
             spawnedViews.Add(reliquary);
+        }
+
+        private void BuildHub()
+        {
+            hubLayout = new DungeonLayout();
+            hubStartGatePosition = new Vector2Int(-2, 0);
+            hubUnlockPosition = new Vector2Int(0, 2);
+            hubUndertakerPosition = new Vector2Int(2, 0);
+            hubPlayerPosition = new Vector2Int(0, 0);
+
+            AddRoom(hubLayout, -3, -2, 3, 2, 0);
+            DrawHubLayout();
+            hubPlayerView = viewFactory.CreateActor(actorRoot, "HubPlayer", hubPlayerPosition, new Color(0.91f, 0.86f, 0.78f), 20);
+            spawnedViews.Add(hubPlayerView);
         }
 
         private void AddEnemy(string name, ActorKind kind, BrainType brain, Vector2Int position, int hp, int attack, int defense, int interval, int reward, Color color)
@@ -734,6 +768,30 @@ namespace Arkeum.Prototype
             spawnedViews.Add(viewFactory.CreateCell(markerRoot, target.ReliquaryPosition, new Color(0.76f, 0.65f, 0.17f), "ReliquaryMarker", 2));
         }
 
+        private void DrawHubLayout()
+        {
+            for (int x = -3; x <= 3; x++)
+            {
+                for (int y = -2; y <= 2; y++)
+                {
+                    Vector2Int cell = new Vector2Int(x, y);
+                    if (!hubLayout.IsWalkable(cell))
+                    {
+                        continue;
+                    }
+
+                    spawnedViews.Add(viewFactory.CreateCell(floorRoot, cell, new Color(0.10f, 0.09f, 0.11f), $"HubFloor_{x}_{y}", 0));
+                }
+            }
+
+            spawnedViews.Add(viewFactory.CreateCell(markerRoot, hubStartGatePosition, new Color(0.62f, 0.29f, 0.22f), "HubStartGate", 2));
+            spawnedViews.Add(viewFactory.CreateCell(markerRoot, hubUnlockPosition, new Color(0.84f, 0.73f, 0.28f), "HubUnlock", 2));
+            spawnedViews.Add(viewFactory.CreateCell(markerRoot, hubUndertakerPosition, new Color(0.19f, 0.55f, 0.51f), "HubUndertaker", 2));
+
+            GameObject undertaker = viewFactory.CreateActor(actorRoot, "Undertaker", hubUndertakerPosition, new Color(0.19f, 0.55f, 0.51f), 10);
+            spawnedViews.Add(undertaker);
+        }
+
         private void EnsureCamera()
         {
             mainCamera = Camera.main;
@@ -758,9 +816,16 @@ namespace Arkeum.Prototype
                 return;
             }
 
-            Vector3 target = player != null
-                ? new Vector3(player.Position.x, player.Position.y, -10f)
-                : new Vector3(0f, 0f, -10f);
+            Vector3 target;
+            if (Phase != GamePhase.Hub && player != null)
+            {
+                target = new Vector3(player.Position.x, player.Position.y, -10f);
+            }
+            else
+            {
+                target = new Vector3(hubPlayerPosition.x, hubPlayerPosition.y, -10f);
+            }
+
             mainCamera.transform.position = Vector3.Lerp(mainCamera.transform.position, target, 0.2f);
         }
 
@@ -796,6 +861,14 @@ namespace Arkeum.Prototype
             }
         }
 
+        private void SyncHubPlayerView()
+        {
+            if (hubPlayerView != null)
+            {
+                hubPlayerView.transform.position = new Vector3(hubPlayerPosition.x, hubPlayerPosition.y, -0.1f);
+            }
+        }
+
         private bool IsAdjacentOrStanding(Vector2Int a, Vector2Int b)
         {
             return a == b || Manhattan(a, b) == 1;
@@ -814,6 +887,69 @@ namespace Arkeum.Prototype
         private void SetMessage(string message)
         {
             hud.CurrentMessage = message;
+        }
+
+        private void OnHubTileEntered()
+        {
+            if (hubPlayerPosition == hubStartGatePosition)
+            {
+                SetMessage("하강 제단이 열려 있다. `E`를 눌러 잿빛 회랑으로 내려간다.");
+                return;
+            }
+
+            if (hubPlayerPosition == hubUnlockPosition)
+            {
+                SetMessage(Profile.unlockedStartingBandage
+                    ? "응고 지혈포 해금이 제단에 새겨져 있다."
+                    : $"응고 지혈포 해금 제단이다. `E`를 눌러 {StartingBandageUnlockCost} 잔광을 바칠 수 있다.");
+                return;
+            }
+
+            if (hubPlayerPosition == hubUndertakerPosition)
+            {
+                SetMessage("장례자가 고개를 든다. `E`를 눌러 말을 건넬 수 있다.");
+                return;
+            }
+
+            SetMessage("귀환 제단의 잔불이 조용히 흔들린다.");
+        }
+
+        private void TryHubInteract()
+        {
+            if (hubPlayerPosition == hubStartGatePosition)
+            {
+                StartRun();
+                return;
+            }
+
+            if (hubPlayerPosition == hubUnlockPosition)
+            {
+                TryUnlockStartingBandage();
+                return;
+            }
+
+            if (hubPlayerPosition == hubUndertakerPosition)
+            {
+                AdvanceUndertakerDialogue();
+                return;
+            }
+
+            SetMessage("여기서는 특별히 할 수 있는 일이 없다.");
+        }
+
+        private void TryAutoPickupAtPlayerPosition()
+        {
+            for (int i = 0; i < layout.TemporaryWeaponSpawns.Count; i++)
+            {
+                if (player.Position == layout.TemporaryWeaponSpawns[i] && !temporaryWeaponCollected)
+                {
+                    temporaryWeaponCollected = true;
+                    Run.TemporaryWeaponEquipped = true;
+                    Run.AttackBonus = 1;
+                    SetMessage("마모된 톱날을 자동으로 주워 들었다. 이번 런 동안 공격력이 1 증가한다.");
+                    return;
+                }
+            }
         }
 
         private void SeedDialogue()

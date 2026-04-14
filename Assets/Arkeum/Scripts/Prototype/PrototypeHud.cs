@@ -69,17 +69,15 @@ namespace Arkeum.Prototype
 
             if (controller.Phase == GamePhase.InRun)
             {
-                GUILayout.Label("이동: 화살표 / WASD", bodyStyle);
-                GUILayout.Label("공격: Space", bodyStyle);
+                GUILayout.Label("방향 입력: 적이 있으면 공격, 없으면 이동", bodyStyle);
                 GUILayout.Label("상호작용: E", bodyStyle);
                 GUILayout.Label("대기: Q", bodyStyle);
                 GUILayout.Label("소모품: 1 붕대 / 2 응급약", bodyStyle);
             }
             else
             {
-                GUILayout.Label("런 시작: Enter", bodyStyle);
-                GUILayout.Label("해금 구매: U", bodyStyle);
-                GUILayout.Label("장례자 대화: T", bodyStyle);
+                GUILayout.Label("이동: 화살표 / WASD", bodyStyle);
+                GUILayout.Label("상호작용: E", bodyStyle);
                 GUILayout.Label("결과창 닫기: Enter", bodyStyle);
             }
 
@@ -119,9 +117,9 @@ namespace Arkeum.Prototype
         {
             GUILayout.BeginArea(new Rect(12f, 168f, 420f, 188f), panelStyle);
             GUILayout.Label("거점 기능", titleStyle);
-            GUILayout.Label("Enter: 잿빛 회랑 진입", bodyStyle);
-            GUILayout.Label("U: 잔광으로 응고 지혈포 해금", bodyStyle);
-            GUILayout.Label("T: 장례자와 대화", bodyStyle);
+            GUILayout.Label("하강 제단 타일: E로 런 시작", bodyStyle);
+            GUILayout.Label("해금 제단 타일: E로 응고 지혈포 해금", bodyStyle);
+            GUILayout.Label("장례자 타일: E로 대화", bodyStyle);
             GUILayout.Space(8f);
             GUILayout.Label(controller.GetHubSummary(), bodyStyle);
             GUILayout.EndArea();
