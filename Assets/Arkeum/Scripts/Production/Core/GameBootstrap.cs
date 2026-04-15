@@ -20,6 +20,9 @@ namespace Arkeum.Production.Core
         [SerializeField] private GameDirector gameDirector;
         [SerializeField] private WorldPresenter worldPresenter;
         [SerializeField] private HudPresenter hudPresenter;
+        [Header("Map Assets")]
+        [SerializeField] private MapAsset runMapAsset;
+        [SerializeField] private MapAsset hubMapAsset;
 
         private void Reset()
         {
@@ -64,7 +67,7 @@ namespace Arkeum.Production.Core
             InteractionResolver interactionResolver = new InteractionResolver();
             InteractionSystem interactionSystem = new InteractionSystem(interactionResolver);
             TileOccupancyService tileOccupancyService = new TileOccupancyService();
-            MapGenerator mapGenerator = new MapGenerator();
+            MapGenerator mapGenerator = new MapGenerator(runMapAsset, hubMapAsset);
             MapService mapService = new MapService(mapGenerator, tileOccupancyService);
             UnlockService unlockService = new UnlockService();
             QuestService questService = new QuestService();

@@ -2,8 +2,22 @@ namespace Arkeum.Production.Gameplay.Map
 {
     public sealed class MapGenerator
     {
+        private readonly MapAsset runMapAsset;
+        private readonly MapAsset hubMapAsset;
+
+        public MapGenerator(MapAsset runMapAsset, MapAsset hubMapAsset)
+        {
+            this.runMapAsset = runMapAsset;
+            this.hubMapAsset = hubMapAsset;
+        }
+
         public MapDefinition CreateRunMap()
         {
+            if (TryCreateFromAsset(runMapAsset, out MapDefinition assetMap))
+            {
+                return assetMap;
+            }
+
             MapDefinition map = new MapDefinition
             {
                 PlayerSpawn = new UnityEngine.Vector2Int(0, 0),
@@ -22,6 +36,11 @@ namespace Arkeum.Production.Gameplay.Map
 
         public MapDefinition CreateHubMap()
         {
+            if (TryCreateFromAsset(hubMapAsset, out MapDefinition assetMap))
+            {
+                return assetMap;
+            }
+
             MapDefinition map = new MapDefinition
             {
                 PlayerSpawn = new UnityEngine.Vector2Int(0, 0),
@@ -55,6 +74,44 @@ namespace Arkeum.Production.Gameplay.Map
                 map.WalkableCells.Add(cell);
                 map.DepthByCell[cell] = depth;
             }
+        }
+
+        private static bool TryCreateFromAsset(MapAsset asset, out MapDefinition map)
+        {
+            if (asset == null)
+            {
+                map = null;
+                return false;
+            }
+
+            map = new MapDefinition
+            {
+                PlayerSpawn = asset.PlayerSpawn,
+                MerchantPosition = asset.MerchantPosition,
+                ReliquaryPosition = asset.ReliquaryPosition,
+                StartAltarPosition = asset.StartAltarPosition,
+                UnlockAltarPosition = asset.UnlockAltarPosition,
+                UndertakerPosition = asset.UndertakerPosition,
+            };
+
+            for (int i = 0; i < asset.TemporaryWeaponSpawns.Count; i++)
+            {
+                map.TemporaryWeaponSpawns.Add(asset.TemporaryWeaponSpawns[i]);
+            }
+
+            for (int i = 0; i < asset.Cells.Count; i++)
+            {
+                MapCellData cell = asset.Cells[i];
+                if (cell == null || !cell.Walkable)
+                {
+                    continue;
+                }
+
+                map.WalkableCells.Add(cell.Position);
+                map.DepthByCell[cell.Position] = cell.Depth;
+            }
+
+            return map.WalkableCells.Count > 0;
         }
     }
 }
