@@ -1356,3 +1356,626 @@
 ### 가장 정확한 한 문장 해석
 
 현재의 `Depth`는 "이 cell이 맵 내에서 얼마나 깊은 구역에 속하는가"를 나타내는 값이고, 이를 이용해 플레이어의 최고 도달 깊이와 구역 연출을 계산하는 구조다.
+
+## Q13. `GameDirector` 스크립트의 역할은 뭐라고 정의할 수 있을까?
+
+가장 정확하게 말하면 `GameDirector`는 "게임의 상위 흐름을 조율하는 상태 기반 오케스트레이터"다.
+
+즉 이 클래스는:
+- 전투 계산을 직접 담당하지도 않고
+- 맵 생성 세부 구현을 직접 담당하지도 않고
+- UI를 직접 그리지도 않지만
+
+게임이 지금 어떤 상태에 있고, 그 상태에서 어떤 시스템을 호출해야 하는지를 결정하는 중심 제어기 역할을 한다.
+
+### 왜 그렇게 정의할 수 있나
+
+`Update()`를 보면 `CurrentState`에 따라:
+- 허브 입력 처리
+- 런 입력 처리
+- 결과 화면 입력 처리
+
+를 분기한다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:30), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:37)
+
+즉 `GameDirector`는 "무슨 규칙으로 싸울지"보다, "지금 어떤 상태니까 어떤 흐름을 실행할지"를 결정하는 클래스다.
+
+### 실제 책임을 풀어쓰면
+
+1. 게임 상태 전환 관리
+
+대표적으로 이 클래스는:
+- 시작 상태 설정
+- 허브 진입
+- 런 준비
+- 런 시작
+- 런 결과 표시
+
+를 관리한다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:51), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:60), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:77), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:83), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:116)
+
+즉 상태 머신의 상위 제어자 역할이 핵심이다.
+
+2. 여러 시스템 연결 및 호출 순서 조율
+
+`GameDirector`는 `ServiceRegistry`를 통해:
+- `MapService`
+- `InteractionSystem`
+- `ProgressionService`
+- `WorldPresenter`
+- `HudPresenter`
+- `RunController`
+
+등을 묶어서 사용한다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:26)
+
+중요한 점은, 이 클래스가 각 시스템 내부 로직을 구현하지는 않는다는 것이다. 대신:
+- 언제 맵을 로드할지
+- 언제 액터를 세팅할지
+- 언제 HUD를 바인딩할지
+- 언제 결과를 계산할지
+
+를 순서대로 조합한다.
+
+즉 "서비스를 만든 클래스"라기보다 "서비스들을 순서 있게 엮어 게임 흐름으로 만드는 클래스"다.
+
+3. 상태별 입력 진입점
+
+허브 입력은 `UpdateHubInput()`, 런 입력은 `UpdateRunInput()`, 결과 입력은 `UpdateRunResultInput()`으로 나뉜다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:138), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:171), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:212)
+
+따라서 `GameDirector`는 입력을 세밀하게 해석하는 클래스라기보다, "현재 상태에서 어느 입력 루틴으로 들어갈지"를 정하는 상위 진입점이다.
+
+4. Presentation과 Gameplay 사이 연결
+
+예를 들어 런이 시작되면:
+- 맵 로드
+- 액터 구성
+- 런 상태 생성
+- `RunController.Begin()`
+- `WorldPresenter.BindRun()`
+- `HudPresenter.BindRun()`
+
+같은 흐름을 한 번에 연결한다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:83)
+
+즉 `GameDirector`는 gameplay 결과를 presentation에 반영하도록 이어주는 조정자 역할도 한다.
+
+5. 런 전체 수명주기 관리
+
+한 판이 시작되고 끝날 때의 큰 생명주기를 관리한다.
+
+예:
+- 새 프로필로 초기화
+- 허브 진입
+- 런 시작
+- 런 종료 보상 적용
+- 결과 화면 노출
+- 다시 허브 복귀
+
+이 수명주기 전체를 한 클래스에서 조율한다는 점에서, 단순 입력 처리기나 단순 매니저보다 역할이 더 분명하다.
+
+### 반대로 `GameDirector`의 역할이 아닌 것
+
+이걸 같이 보면 역할 정의가 더 정확해진다.
+
+`GameDirector`가 직접 하지 않는 것:
+- 전투 데미지 계산: `CombatSystem`
+- 적 턴 계산: `EnemyTurnSystem`
+- 세부 런 행동 처리: `RunController`
+- 입력 방향 해석: `InputReader`
+- 맵 생성: `MapGenerator`
+- HUD 그리기: `HudPresenter`
+- 월드 렌더링: `WorldPresenter`
+
+즉 `GameDirector`는 "모든 것을 직접 하는 관리자"가 아니라, "각 하위 시스템을 상태에 맞게 호출하는 상위 조율자"다.
+
+### 한 줄 정의 후보
+
+가장 추천하는 정의:
+
+`GameDirector`는 허브, 런, 결과 화면 사이의 상태 전환과 각 상태에서 필요한 시스템 호출 순서를 조율하는 게임 상위 흐름 제어기다.
+
+조금 더 짧게 말하면:
+
+`GameDirector`는 게임의 상태 머신이자 상위 오케스트레이터다.
+
+### 구조적으로 보면
+
+현재 아키텍처에서 역할 계층은 대략 이렇게 읽힌다.
+
+- `GameBootstrap`: 서비스 생성과 초기 연결
+- `GameDirector`: 상위 상태/흐름 조율
+- `RunController`: 런 내부 규칙 진행
+- 개별 시스템들: 전투, 상호작용, 맵, 진행도 등 세부 처리
+- Presenters: 화면 반영
+
+이 관점에서 보면 `GameDirector`는 "게임 전체의 상위 레벨 유스케이스를 실행하는 컨트롤러"라고도 정의할 수 있다.
+
+### 주의할 점
+
+현재 코드에서는 `GameDirector`가 상호작용 배치, 액터 생성 같은 구체 작업도 조금 안고 있다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:221), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:249), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:273)
+
+그래서 완전히 순수한 오케스트레이터라고 보기는 어렵고, 일부 조립 책임까지 함께 가진 상태다.
+
+즉 현재는:
+- 이상적인 역할: 상위 흐름 조율자
+- 실제 구현: 상위 흐름 조율 + 일부 런/허브 조립 작업
+
+으로 보는 게 가장 현실적이다.
+
+### 가장 정확한 한 문장 정리
+
+`GameDirector`는 게임의 현재 상태를 관리하고, 허브/런/결과 화면의 전환 과정에서 필요한 gameplay와 presentation 시스템을 순서대로 조율하는 상위 흐름 제어기다.
+
+## Q14. `SceneInteractableMarker`를 Hub일 때와 Run일 때로 분리해둔 이유가 뭘까?
+
+코드 기준으로 보면, 이건 "허브용 마커 클래스"와 "런용 마커 클래스"를 따로 만든 게 아니라, 하나의 마커에 "허브에서 쓸지 / 런에서 쓸지" 플래그를 둔 구조다.
+
+즉 의도는:
+- 같은 `SceneInteractableMarker` 컴포넌트를 재사용하면서
+- 현재 게임 상태에 따라 필요한 마커만 골라 쓰기 위해서다
+
+### 근거
+
+`SceneInteractableMarker`는 `useInHub`, `useInRun` 두 플래그를 가진다. [SceneInteractableMarker.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Gameplay/Interaction/SceneInteractableMarker.cs:8)
+
+그리고 `GameDirector.FindSceneInteractableMarkers(bool isHub)`는:
+- 허브면 `UseInHub == true`
+- 런이면 `UseInRun == true`
+
+인 마커만 골라낸다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:393)
+
+이 마커들은 다시:
+- 위치를 맵 데이터에 반영할 때도 쓰이고
+- 실제 상호작용 목록을 만들 때도 쓰인다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:360), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:261), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:285)
+
+### 왜 굳이 이렇게 했을까
+
+1. 같은 씬 배치 방식을 허브와 런에서 공통으로 쓰기 위해서다.
+
+이 구조에서는 디자이너나 개발자가 씬에 marker를 배치해 두고:
+- 이건 허브에서만 쓰기
+- 이건 런에서만 쓰기
+- 이건 둘 다 쓰기
+
+를 인스펙터 체크박스로 조절할 수 있다.
+
+즉 클래스나 로직을 두 벌 만들지 않고, 하나의 편집 방식으로 두 상태를 모두 커버하려는 의도다.
+
+2. 맵 데이터와 씬 배치 사이를 느슨하게 연결하려는 의도다.
+
+`GameDirector`는 기본 `MapDefinition` 안의 위치값을 가지고 시작하지만, 씬에 마커가 있으면 그 위치로 덮어쓴다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:360)
+
+이때 허브와 런이 서로 다른 위치 세트를 가져야 하므로, "지금 찾은 marker가 어느 상태에 속하는가"를 구분할 필요가 있다.
+
+즉 이 플래그는 단순 시각용이 아니라, 런타임에 맵 데이터 오버라이드 범위를 정하는 역할도 한다.
+
+3. 완전히 다른 클래스 두 개를 만들 필요가 없기 때문이다.
+
+예를 들어 굳이 나누면 이런 식이 된다.
+- `HubInteractableMarker`
+- `RunInteractableMarker`
+
+하지만 현재 두 클래스가 가져야 할 데이터는 거의 같다.
+- `InteractableType`
+- `GridPosition`
+- 상태별 사용 여부
+
+그렇다면 타입을 쪼개기보다 플래그로 제어하는 편이 더 단순하다.
+
+4. 같은 마커를 양쪽에서 재사용할 여지를 남기기 위해서다.
+
+지금은 허브/런의 상호작용 타입이 다를 수 있지만, 구조상으로는 어떤 마커는 둘 다에서 유효할 수도 있다.
+
+예:
+- 테스트용 공통 상호작용 포인트
+- 상태에 따라 같은 위치에서 다른 의미를 가질 수 있는 오브젝트
+- 허브/런 전환 후에도 유지되는 연출용 기준점
+
+이럴 때 `useInHub`, `useInRun`을 둘 다 켜 두면 하나의 마커를 공용으로 쓸 수 있다.
+
+### 실제 코드 흐름으로 보면
+
+허브 진입 시:
+- `ApplySceneInteractablePositions(isHub: true)`
+- `BuildHubInteractables()`
+
+런 시작 시:
+- `ApplySceneInteractablePositions(isHub: false)`
+- `BuildRunInteractables()`
+
+가 호출된다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:74), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:76), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:97), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:99)
+
+즉 같은 "marker 검색" 메커니즘을 두 상태에서 공통으로 쓰되, 필터만 바꾸는 구조다.
+
+이건 꽤 실용적인 패턴이다.
+- 편집 방식은 하나
+- 사용 조건만 상태별로 다름
+
+### 장점
+
+- 허브/런 모두 같은 컴포넌트로 관리 가능
+- 씬에서 배치 후 체크박스로 제어 가능
+- 위치 덮어쓰기와 상호작용 생성 로직을 공통화할 수 있음
+- 필요하면 한 마커를 양쪽 상태에서 공유 가능
+
+### 한계
+
+이 구조는 단순할 때는 좋지만, 상태별 규칙이 크게 달라지면 한계가 있다.
+
+예를 들어 나중에:
+- 허브 마커만 필요한 속성
+- 런 마커만 필요한 속성
+- 상태별로 완전히 다른 동작 데이터
+
+가 많아지면, 단순 `useInHub` / `useInRun` 플래그만으로는 부족해질 수 있다.
+
+그때는:
+- marker 데이터를 더 세분화하거나
+- 타입별 전용 컴포넌트로 나누는 쪽
+
+이 더 나아질 수 있다.
+
+### 가장 정확한 한 문장 정리
+
+`SceneInteractableMarker`를 Hub/Run으로 나눠 둔 이유는, 같은 마커 배치 시스템을 재사용하면서 현재 게임 상태에 맞는 상호작용 위치와 오브젝트만 선택적으로 활성화하기 위해서다.
+
+## Q15. 좀 더 자세하게 설명해줘. 그냥 플래그를 안 쓰고 인터렉션을 하면 문제가 발생해?
+
+짧게 답하면:
+- 네, 현재 구조에서는 플래그 없이 모든 marker를 항상 읽으면 실제로 문제가 생길 수 있다
+- 특히 허브와 런이 같은 씬/같은 marker 검색 로직을 공유하는 구조라서 더 그렇다
+
+핵심은 `SceneInteractableMarker`가 단순 표시용이 아니라:
+- 맵 위치를 덮어쓰는 데도 쓰이고
+- 실제 상호작용 목록을 만드는 데도 쓰인다는 점이다
+
+즉 플래그가 없으면 "보이면 상호작용된다" 수준의 문제가 아니라, 아예 허브/런용 데이터가 서로 섞일 수 있다.
+
+### 현재 흐름을 먼저 보면
+
+허브에 들어갈 때:
+- `ApplySceneInteractablePositions(isHub: true)`
+- `BuildHubInteractables()`
+
+런을 시작할 때:
+- `ApplySceneInteractablePositions(isHub: false)`
+- `BuildRunInteractables()`
+
+가 호출된다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:74), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:76), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:97), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:99)
+
+그리고 이 둘은 공통으로 `FindSceneInteractableMarkers(isHub)`를 호출해서 marker를 찾는다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:393)
+
+즉 플래그는 "찾을 marker 집합"을 나누는 필터 역할이다.
+
+### 플래그가 없으면 어떤 문제가 생기나
+
+#### 1. 허브용 marker가 런에도 섞일 수 있다
+
+예를 들어 씬에 이런 marker들이 있다고 하자.
+- `StartAltar`
+- `UnlockAltar`
+- `Undertaker`
+- `Merchant`
+- `Reliquary`
+
+이 중 앞의 3개는 허브용이고, 뒤의 2개는 런용이다.
+
+플래그 없이 전부 읽으면 런 시작 시에도 허브용 marker를 같이 읽게 된다.
+
+그러면 `ApplySceneInteractablePositions(isHub: false)`에서:
+- 허브에서만 의미 있어야 할 위치값까지 현재 맵에 덮어쓸 수 있다
+
+그리고 `BuildRunInteractables()`에서도:
+- 런에서 필요 없는 marker가 상호작용 목록에 포함될 수 있다
+
+즉 문제는 단순히 "사용 안 할 marker가 좀 더 들어간다" 수준이 아니라, 현재 상태의 맵 정의 자체가 오염될 수 있다는 점이다.
+
+#### 2. 런용 marker가 허브에도 섞일 수 있다
+
+반대로 허브 진입 시에도 런용 marker가 같이 읽히면:
+- `MerchantPosition`
+- `ReliquaryPosition`
+
+같은 런 전용 위치가 허브 맵 데이터에 반영될 수 있다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:378), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:381)
+
+현재 허브에서는 이 값들을 직접 적극적으로 쓰지 않을 수는 있다. 하지만 구조상 허브 맵에 런 전용 데이터가 섞이는 것은 좋지 않다.
+
+이건 "지금 당장 버그가 난다"보다 "상태별 데이터 경계가 무너진다"는 문제다.
+
+#### 3. 상호작용 목록이 상태와 무관하게 섞인다
+
+`BuildHubInteractables()`와 `BuildRunInteractables()`는 marker를 기반으로 `GridInteractable` 목록을 만든다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:261), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:285)
+
+플래그가 없으면:
+- 허브에서 Merchant/Reliquary marker가 목록에 들어갈 수 있고
+- 런에서 StartAltar/UnlockAltar/Undertaker marker가 목록에 들어갈 수 있다
+
+그러면 현재 상태에서 의미 없는 오브젝트가 상호작용 대상으로 등록된다.
+
+이건 나중에 이런 식의 버그로 이어질 수 있다.
+- 허브에서 런 전용 오브젝트와 충돌
+- 런에서 허브용 오브젝트와 상호작용 시도
+- 메시지나 동작이 현재 상태와 맞지 않게 실행
+
+#### 4. fallback 로직을 깨뜨릴 수 있다
+
+현재 `BuildRunInteractables()`와 `BuildHubInteractables()`는:
+- scene marker가 하나라도 있으면 그것을 우선 사용하고
+- 없으면 기본 위치값으로 fallback 한다
+
+는 구조다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:264), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:288)
+
+여기서 플래그 없이 "상태와 상관없는 marker"가 몇 개라도 잡히면:
+- 사실상 해당 상태용 marker가 없는 상황인데도
+- marker가 있는 것으로 간주되어 fallback이 막힐 수 있다
+
+이게 꽤 중요하다.
+
+예를 들어 허브용 marker는 없고 런용 marker만 씬에 있는데, 플래그가 없으면 허브에서도 "scene marker가 있다"고 판단해 버릴 수 있다. 그러면 원래 써야 할 기본 허브 배치가 무시될 수 있다.
+
+즉 플래그는 단순 필터가 아니라 fallback 판단을 정확하게 만드는 장치이기도 하다.
+
+#### 5. 같은 타입이라도 상태마다 의미가 다를 수 있다
+
+중요한 점은 "같은 marker 타입이면 어디서든 써도 되는 것 아니냐"가 아니라는 것이다.
+
+예를 들어 `InteractableType.StartAltar`는 허브에서만 `StartRun()`을 의미한다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:393), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:409)
+
+반대로 `Merchant`나 `Reliquary`는 런에서만 의미가 있다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:261)
+
+즉 같은 "상호작용 marker 시스템"을 공유하더라도, 그 marker가 어느 상태에서 유효한지는 별도 정보가 필요하다. 그 역할을 하는 것이 `useInHub` / `useInRun` 플래그다.
+
+### 플래그 없이도 할 수는 없는가
+
+할 수는 있다. 다만 다른 방식으로 상태 구분을 해야 한다.
+
+예를 들면:
+- 허브 씬과 런 씬을 완전히 분리
+- 허브용 marker 컴포넌트와 런용 marker 컴포넌트를 분리
+- marker를 상태별 부모 오브젝트 아래 배치해서 계층으로 필터링
+- 타입 자체를 허브 전용 / 런 전용으로 더 세분화
+
+즉 플래그가 꼭 유일한 방법은 아니다.
+
+하지만 현재 구조처럼:
+- 같은 `SceneInteractableMarker` 타입을 쓰고
+- `FindObjectsByType<SceneInteractableMarker>()`로 전부 수집한 뒤
+- 그중 일부만 쓰는 방식이면
+
+플래그 같은 필터 정보가 거의 필수다.
+
+### 왜 지금 구조에서 특히 중요한가
+
+현재 구현은 "씬에 있는 marker를 읽어서 맵 데이터와 상호작용 데이터를 동시에 구성"하는 패턴이다.
+
+즉 marker는 단순 장식이 아니라 런타임 구성 데이터다.
+
+그래서 플래그가 없으면:
+- 허브와 런의 데이터 경계가 흐려지고
+- fallback가 틀어질 수 있고
+- 상태에 맞지 않는 상호작용이 등록되며
+- 나중에 씬 배치가 조금만 복잡해져도 디버깅이 어려워진다
+
+### 가장 현실적인 정리
+
+질문에 직접 답하면:
+
+"플래그를 안 쓰고 인터렉션을 하면 문제가 발생해?"
+- 네, 현재 구조에서는 충분히 발생할 수 있다
+- 특히 marker가 위치 오버라이드와 상호작용 등록 둘 다에 쓰이기 때문에 더 그렇다
+
+"어떤 문제?"
+- 허브/런용 marker 데이터가 서로 섞임
+- 상태에 맞지 않는 상호작용이 등록됨
+- fallback 배치가 깨짐
+- 씬 배치가 복잡해질수록 예측이 어려워짐
+
+가장 짧은 한 문장 정리:
+- 현재 구조에서 플래그는 단순 편의 기능이 아니라, 허브와 런의 marker 데이터를 섞이지 않게 하는 안전장치다.
+
+## Q16. 현재 구조에서 만약 런의 구조가 바뀐다면 문제가 생기지 않을까? 현재는 프로토 타입이라 한층을 내려가면 회랑으로 다시 돌아오지만 원 기획에서는 한층을 내려가면 그다음층이 나와야해. 죽기 전까지는 회랑으로 돌아갈 수 없는 구조야. 그러면 층마다 플래그를 만들어야 하는거야?
+
+짧게 답하면:
+- 네, 현재 구조는 "허브 vs 런" 정도의 2상태 전제에 강하게 맞춰져 있어서 다층 구조로 가면 한계가 드러난다
+- 하지만 해결책이 "층마다 플래그 추가"는 아니다
+
+즉 문제 인식은 맞고, 해법은 플래그 확장이 아니라 구조 변경 쪽이 맞다.
+
+### 왜 현재 구조가 한계에 부딪히나
+
+현재 marker 구조는:
+- `useInHub`
+- `useInRun`
+
+두 플래그만 가지고 있다. [SceneInteractableMarker.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Gameplay/Interaction/SceneInteractableMarker.cs:8)
+
+그리고 `GameDirector`도 상태를 크게:
+- `Hub`
+- `InRun`
+- `RunResult`
+
+같은 상위 단계로 나눈다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:37)
+
+즉 현재 아키텍처는 "허브냐 아니냐" 수준의 분기에는 잘 맞지만,
+"런 내부에 여러 층이 있고 각 층이 서로 다른 구성/배치를 가진다"는 구조에는 직접 맞지 않는다.
+
+지금은 런 전체가 사실상 하나의 맵 묶음처럼 취급된다.
+- `LoadRunMap()`
+- 런용 interactable 세팅
+- reliquary 회수 후 종료
+
+라는 흐름으로 끝난다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:85), [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:88)
+
+그러니 원 기획처럼:
+- 1층
+- 2층
+- 3층
+- 죽기 전까지 허브 복귀 없음
+
+이 되면, 현재의 "런 하나" 안에 여러 floor lifecycle이 들어와야 한다.
+
+### 그럼 층마다 플래그를 만들면 되나
+
+권장하지 않는다.
+
+예를 들어 이런 식이 되기 쉽다.
+- `useInHub`
+- `useInRunFloor1`
+- `useInRunFloor2`
+- `useInRunFloor3`
+- ...
+
+이건 금방 망가지는 구조다.
+
+이유:
+
+1. 상태가 늘어날수록 marker가 데이터 폭탄이 된다
+
+marker 하나마다 층 수만큼 체크박스를 들고 있어야 한다. 층이 늘거나 줄면 모든 marker 정의가 흔들린다.
+
+2. "어느 층에서 쓰는가"를 bool 집합으로 표현하는 건 정보 구조가 좋지 않다
+
+층 번호는 본질적으로:
+- 0
+- 1
+- 2
+- 3
+
+처럼 값 하나로 표현할 수 있는 정보다.
+
+그런데 bool 여러 개로 쪼개면:
+- 중복 체크 가능
+- 모순 가능
+- 실수 가능
+
+이 커진다.
+
+3. 층별 전용 규칙이 늘수록 더 버티기 어렵다
+
+나중에 층마다 달라질 수 있는 건 단순 사용 여부만이 아니다.
+- 등장 오브젝트
+- 상호작용 타입
+- 적 배치
+- 시각 연출
+- 맵 규칙
+- 배경음
+
+즉 결국 "층은 별도 데이터 단위"가 되어야지, marker의 체크박스 옵션으로 감당할 문제가 아니다.
+
+### 더 자연스러운 방향은 무엇인가
+
+런 내부에 "현재 층" 개념을 따로 두는 쪽이 맞다.
+
+즉 구조를 이렇게 바꾸는 게 자연스럽다.
+
+- 허브 여부는 상위 게임 상태로 관리
+- 런 내부 floor index / floor id는 `RunState`나 별도 floor state로 관리
+- marker/맵/배치는 현재 층 데이터에 따라 로드
+
+이렇게 되면 marker도 "Hub냐 Run이냐" 플래그보다,
+"이 marker는 어느 floor definition에 속하는가"
+로 관리하는 쪽이 맞다.
+
+### 구체적으로는 어떤 식이 좋나
+
+#### 방향 1. 층마다 맵 데이터를 분리
+
+가장 단순하고 튼튼한 방식이다.
+
+예:
+- `Floor1MapAsset`
+- `Floor2MapAsset`
+- `Floor3MapAsset`
+
+혹은
+- `RunFloorDefinition[]`
+
+처럼 런 내부 층 데이터를 따로 둔다.
+
+그러면 각 층은:
+- 자체 walkable cell
+- 자체 interactable 위치
+- 자체 적 배치
+- 자체 depth/테마
+
+를 가진다.
+
+이 경우 marker도 굳이 한 씬에서 bool 필터링할 필요가 줄어든다. 아예 floor asset 자체에 속하는 데이터로 넣는 편이 낫다.
+
+#### 방향 2. marker에 floor id 하나를 둔다
+
+정말 scene marker 방식을 유지하고 싶다면 bool 여러 개보다 이쪽이 낫다.
+
+예:
+- `Scope = Hub`
+- `Scope = Run`
+- `FloorIndex = 0, 1, 2 ...`
+
+혹은
+- `MarkerContext = Hub / Floor`
+- `FloorId = 2`
+
+처럼 "소속 층"을 값 하나로 표현하는 방식이다.
+
+이 방식은 bool 나열보다 훨씬 낫지만, 층 구성이 커질수록 결국 asset 중심 구조가 더 좋아질 가능성이 높다.
+
+#### 방향 3. 층 전환을 `RunController`/`GameDirector`가 별도 처리
+
+원 기획처럼 층을 내려가면:
+- 런은 계속 유지되고
+- 현재 floor만 교체되며
+- 플레이어 상태와 런 자원은 유지
+
+되어야 한다.
+
+그럼 필요한 것은 "허브 복귀"가 아니라 "다음 floor 로드"다.
+
+즉 현재의:
+- `StartRun()`
+- `ShowRunResult()`
+- `EnterHub()`
+
+중간에
+- `AdvanceToNextFloor()`
+
+같은 lifecycle이 들어가야 한다.
+
+이건 marker 플래그 문제 이전에, 런 수명주기 구조가 바뀌어야 한다는 뜻이다.
+
+### 현재 코드에서 어디가 특히 바뀌어야 하나
+
+1. `GameDirector`
+- 지금은 런 하나를 하나의 맵으로 본다
+- 다층 구조면 "런 내부 floor 전환"을 관리해야 한다
+
+2. `RunState`
+- 현재는 `DepthReached` 정도만 있지만
+- 실제 `CurrentFloorIndex`나 `VisitedFloors` 같은 상태가 필요할 수 있다
+
+3. `MapService`
+- 현재 맵 하나만 들고 있다
+- floor 교체를 지원해야 한다
+
+4. interactable/actor 배치
+- 층 진입 시마다 다시 구성해야 한다
+
+즉 핵심 문제는 marker 플래그 수가 아니라, "런 내부 floor lifecycle"을 현재 구조가 아직 직접 표현하지 못한다는 점이다.
+
+### 가장 정확한 정리
+
+질문에 직접 답하면:
+
+"현재 구조에서 런 구조가 바뀌면 문제가 생기지 않을까?"
+- 맞다
+- 지금 구조는 단층 프로토타입에 더 잘 맞는다
+
+"그러면 층마다 플래그를 만들어야 하는 거야?"
+- 아니다
+- 그건 임시방편이고 구조적으로 좋지 않다
+
+"그럼 어떻게 해야 해?"
+- 층을 marker 플래그가 아니라 별도 floor 데이터/상태로 승격해야 한다
+- 허브/런은 상위 상태
+- floor는 런 내부 상태
+
+로 나누는 게 맞다
+
+가장 짧은 한 문장 정리:
+- 원 기획처럼 다층 런으로 갈 거면, 층은 체크박스 집합으로 표현할 게 아니라 런 내부의 독립된 데이터와 상태로 표현해야 한다.

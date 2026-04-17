@@ -4,6 +4,7 @@ namespace Arkeum.Production.Gameplay.Interaction
 {
     public sealed class SceneInteractableMarker : MonoBehaviour
     {
+        //TODO :: 현재는 HUB/RUN 의 이분법으로 구조가 작성되어있지만 추후 변경되어야함.
         [SerializeField] private InteractableType interactableType = InteractableType.None;
         [SerializeField] private bool useInHub = true;
         [SerializeField] private bool useInRun = true;

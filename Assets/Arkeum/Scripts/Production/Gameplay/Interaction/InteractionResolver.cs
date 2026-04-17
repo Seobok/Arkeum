@@ -6,7 +6,7 @@ namespace Arkeum.Production.Gameplay.Interaction
     {
         public bool Resolve(IInteractable interactable, ActorEntity actor)
         {
-            if (interactable == null || actor == null)
+            if (interactable == null)
             {
                 return false;
             }

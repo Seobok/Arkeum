@@ -54,7 +54,18 @@ namespace Arkeum.Production.Core
             ActiveProfile = profile;
             CurrentState = startingState;
             SeedDialogue();
-            EnterHub("The return altar receives you once more.");
+
+            switch(startingState)
+            {
+                case GameState.Hub:
+                    EnterHub("The return altar receives you once more.");
+                    break;
+                case GameState.InRun:
+                    StartRun();
+                    break;
+                case GameState.RunResult: 
+                    break;
+            }
         }
 
         public void EnterHub(string message = null)
