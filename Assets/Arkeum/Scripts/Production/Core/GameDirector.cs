@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using Arkeum.Production.Gameplay.Actors;
 using Arkeum.Production.Gameplay.Interaction;
@@ -98,8 +98,9 @@ namespace Arkeum.Production.Core
             RunState runState = runController.CreateRunState(ActiveProfile);
             ActorEntity player = Services.ActorRepository.Player;
             runState.Player = player;
-            player.CurrentHp = runState.CurrentHp;
-            player.Stats.MaxHp = runState.MaxHp;
+            //TODO :: 추후에는 다른 파일에서 값을 읽어올 수 있도록, 데이터를 관리하는 파일을 생성해야 함.
+            player.CurrentHp = 12;
+            player.Stats.MaxHp = 12;
             player.Stats.AttackPower = runState.EffectiveAttack;
             runController.Begin(runState);
 

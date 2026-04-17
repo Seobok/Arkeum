@@ -1,4 +1,4 @@
-namespace Arkeum.Production.Gameplay.Progression
+﻿namespace Arkeum.Production.Gameplay.Progression
 {
     public sealed class UnlockService
     {

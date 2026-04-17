@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text;
 using Arkeum.Production.Core;
 using Arkeum.Production.Gameplay.Run;
@@ -95,10 +95,10 @@ namespace Arkeum.Production.Presentation.UI
             GUILayout.BeginArea(new Rect(12f, 12f, 500f, 150f), panelStyle);
             GUILayout.Label("Arkeum Production Preview", titleStyle);
 
-            if (gameDirector.CurrentState == GameState.InRun && boundRun != null)
+            if (gameDirector.CurrentState == GameState.InRun && boundRun != null && boundRun.Player != null)
             {
                 GUILayout.Label(
-                    $"HP {boundRun.CurrentHp}/{boundRun.MaxHp}  |  Shards {boundRun.BloodShards}  |  Bandage {boundRun.BandageCount}  |  Draught {boundRun.DraughtCount}  |  Turn {boundRun.TurnCount}",
+                    $"HP {boundRun.Player.CurrentHp}/{boundRun.Player.MaxHp}  |  Shards {boundRun.BloodShards}  |  Bandage {boundRun.BandageCount}  |  Draught {boundRun.DraughtCount}  |  Turn {boundRun.TurnCount}",
                     bodyStyle);
                 GUILayout.Label($"Depth {boundRun.DepthReached}  |  Temporary weapon {(boundRun.TemporaryWeaponEquipped ? "Equipped" : "None")}", bodyStyle);
                 GUILayout.Label("Rule: every action gives enemies a response.", accentStyle);

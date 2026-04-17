@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 namespace Arkeum.Production.Gameplay.Actors
 {
@@ -8,6 +8,6 @@ namespace Arkeum.Production.Gameplay.Actors
         public int MaxHp = 1;
         public int AttackPower = 1;
         public int Defense;
-        public int ActionInterval = 1;
+        public int ActionInterval = 1;      // 행동 주기
     }
 }

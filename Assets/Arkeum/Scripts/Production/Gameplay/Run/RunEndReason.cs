@@ -1,4 +1,4 @@
-namespace Arkeum.Production.Gameplay.Run
+﻿namespace Arkeum.Production.Gameplay.Run
 {
     public enum RunEndReason
     {

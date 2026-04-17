@@ -1,4 +1,4 @@
-using Arkeum.Production.Gameplay.Actors;
+﻿using Arkeum.Production.Gameplay.Actors;
 using Arkeum.Production.Gameplay.Combat;
 using Arkeum.Production.Gameplay.Interaction;
 using Arkeum.Production.Gameplay.Map;
@@ -38,11 +38,6 @@ namespace Arkeum.Production.Gameplay.Run
         public void Begin(RunState runState)
         {
             CurrentRun = runState;
-            if (CurrentRun?.Player != null)
-            {
-                CurrentRun.CurrentHp = CurrentRun.Player.CurrentHp;
-                CurrentRun.MaxHp = CurrentRun.Player.Stats.MaxHp;
-            }
         }
 
         public RunState CreateRunState(SaveProfile profile)
@@ -53,8 +48,6 @@ namespace Arkeum.Production.Gameplay.Run
                 RunIndex = (profile?.TotalReturns ?? 0) + 1,
                 TurnCount = 0,
                 DepthReached = 1,
-                CurrentHp = 12,
-                MaxHp = 12,
                 BloodShards = 0,
                 BandageCount = startingBandage,
                 DraughtCount = 0,
@@ -115,21 +108,25 @@ namespace Arkeum.Production.Gameplay.Run
                 return false;
             }
 
+            if (CurrentRun.Player == null)
+            {
+                return false;
+            }
+
             if (CurrentRun.BandageCount <= 0)
             {
                 SetMessage("No bandages remain.");
                 return false;
             }
 
-            if (CurrentRun.CurrentHp >= CurrentRun.MaxHp)
+            if (CurrentRun.Player.CurrentHp >= CurrentRun.Player.MaxHp)
             {
                 SetMessage("You are already at full health.");
                 return false;
             }
 
             CurrentRun.BandageCount -= 1;
-            CurrentRun.CurrentHp = Mathf.Min(CurrentRun.MaxHp, CurrentRun.CurrentHp + 4);
-            CurrentRun.Player.CurrentHp = CurrentRun.CurrentHp;
+            CurrentRun.Player.CurrentHp = Mathf.Min(CurrentRun.Player.MaxHp, CurrentRun.Player.CurrentHp + 4);
             SetMessage("You bind your wounds.");
             ConsumeTurn();
             return true;
@@ -142,21 +139,25 @@ namespace Arkeum.Production.Gameplay.Run
                 return false;
             }
 
+            if (CurrentRun.Player == null)
+            {
+                return false;
+            }
+
             if (CurrentRun.DraughtCount <= 0)
             {
                 SetMessage("No draughts remain.");
                 return false;
             }
 
-            if (CurrentRun.CurrentHp >= CurrentRun.MaxHp)
+            if (CurrentRun.Player.CurrentHp >= CurrentRun.Player.MaxHp)
             {
                 SetMessage("You are already at full health.");
                 return false;
             }
 
             CurrentRun.DraughtCount -= 1;
-            CurrentRun.CurrentHp = Mathf.Min(CurrentRun.MaxHp, CurrentRun.CurrentHp + 6);
-            CurrentRun.Player.CurrentHp = CurrentRun.CurrentHp;
+            CurrentRun.Player.CurrentHp = Mathf.Min(CurrentRun.Player.MaxHp, CurrentRun.Player.CurrentHp + 6);
             SetMessage("The draught forces your wounds closed.");
             ConsumeTurn();
             return true;
@@ -187,6 +188,7 @@ namespace Arkeum.Production.Gameplay.Run
         {
             if (interactionSystem.TryGetInteractableAt(targetCell, out IInteractable interactable))
             {
+                // TODO :: InteractionResolver로 이동해야 함
                 switch (interactable.InteractableType)
                 {
                     case InteractableType.Merchant:
@@ -248,8 +250,8 @@ namespace Arkeum.Production.Gameplay.Run
         {
             turnSystem.ConsumePlayerAction(CurrentRun);
             enemyTurnSystem.ResolveEnemyTurn(CurrentRun, actorRepository.GetAliveEnemies(), mapService, actorRepository);
-            CurrentRun.CurrentHp = CurrentRun.Player.CurrentHp;
-            if (CurrentRun.CurrentHp <= 0 && CurrentRun.EndReason == RunEndReason.None)
+            CurrentRun.Player.CurrentHp = CurrentRun.Player.CurrentHp;
+            if (CurrentRun.Player.CurrentHp <= 0 && CurrentRun.EndReason == RunEndReason.None)
             {
                 EndRun(RunEndReason.Death);
                 SetMessage("Death is not the end, only the start of reckoning.");

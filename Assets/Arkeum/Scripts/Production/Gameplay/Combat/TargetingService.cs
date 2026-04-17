@@ -1,9 +1,12 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace Arkeum.Production.Gameplay.Combat
 {
     public sealed class TargetingService
     {
+        // TODO ::
+        // 구현상 무조건 x먼저 이동후 y를 이동하도록 설계되어 있음.
+        // 이는 모든 Enemey가 똑같이 이동한다면 이상해 보일 수 있음.
         public Vector2Int GetNextStep(Vector2Int from, Vector2Int to)
         {
             Vector2Int delta = to - from;

@@ -1,4 +1,4 @@
-namespace Arkeum.Production.Gameplay.Interaction
+﻿namespace Arkeum.Production.Gameplay.Interaction
 {
     public enum InteractableType
     {

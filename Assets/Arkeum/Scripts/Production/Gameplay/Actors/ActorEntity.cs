@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 namespace Arkeum.Production.Gameplay.Actors
@@ -12,6 +12,7 @@ namespace Arkeum.Production.Gameplay.Actors
         public Vector2Int GridPosition;
         public ActorStats Stats = new ActorStats();
         public int CurrentHp = 1;
+        public int MaxHp = 1;
         public bool IsEnemy;
         public int BloodReward;
 

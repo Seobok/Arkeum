@@ -1,4 +1,4 @@
-namespace Arkeum.Production.Gameplay.Map
+﻿namespace Arkeum.Production.Gameplay.Map
 {
     public sealed class MapGenerator
     {

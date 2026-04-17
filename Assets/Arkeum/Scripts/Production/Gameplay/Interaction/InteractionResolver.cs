@@ -1,4 +1,4 @@
-using Arkeum.Production.Gameplay.Actors;
+﻿using Arkeum.Production.Gameplay.Actors;
 
 namespace Arkeum.Production.Gameplay.Interaction
 {

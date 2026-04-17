@@ -1,4 +1,4 @@
-namespace Arkeum.Production.Gameplay.Actors
+﻿namespace Arkeum.Production.Gameplay.Actors
 {
     public enum BrainType
     {

@@ -1,4 +1,4 @@
-using Arkeum.Production.Gameplay.Combat;
+﻿using Arkeum.Production.Gameplay.Combat;
 using Arkeum.Production.Gameplay.Actors;
 using Arkeum.Production.Gameplay.Interaction;
 using Arkeum.Production.Gameplay.Map;

@@ -1,4 +1,4 @@
-namespace Arkeum.Production.Core
+﻿namespace Arkeum.Production.Core
 {
     public enum GameState
     {

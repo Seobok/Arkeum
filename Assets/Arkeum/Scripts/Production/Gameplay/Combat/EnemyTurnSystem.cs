@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Arkeum.Production.Gameplay.Actors;
 using Arkeum.Production.Gameplay.Map;
 using Arkeum.Production.Gameplay.Run;
@@ -19,6 +19,7 @@ namespace Arkeum.Production.Gameplay.Combat
 
         public void ResolveEnemyTurn(RunState runState, IReadOnlyList<ActorEntity> enemies, MapService mapService, ActorRepository actorRepository)
         {
+            // Player Validation
             if (runState?.Player == null)
             {
                 return;
@@ -27,21 +28,24 @@ namespace Arkeum.Production.Gameplay.Combat
             for (int i = 0; i < enemies.Count; i++)
             {
                 ActorEntity enemy = enemies[i];
+                // Enemy Validation
                 if (!enemy.IsAlive)
                 {
                     continue;
                 }
 
+                // Enemy는 자기 행동 주기에 맞는 턴에만 행동 가능
                 if (enemy.Stats.ActionInterval > 1 && runState.TurnCount % enemy.Stats.ActionInterval != 0)
                 {
                     continue;
                 }
 
+                // Enemy와 Player가 붙어 있다면 공격 시도
+                // TODO :: 추후 Enemy의 공격범위가 한칸이 아니게 되면 수정 필요
                 if (Manhattan(enemy.GridPosition, runState.Player.GridPosition) == 1)
                 {
                     combatSystem.ResolveEnemyAttack(enemy, runState.Player);
-                    runState.CurrentHp = runState.Player.CurrentHp;
-                    if (runState.CurrentHp <= 0)
+                    if (runState.Player.CurrentHp <= 0)
                     {
                         return;
                     }
