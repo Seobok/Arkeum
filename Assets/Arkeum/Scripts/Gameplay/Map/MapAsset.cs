@@ -16,6 +16,7 @@ namespace Arkeum.Production.Gameplay.Map
         public Vector2Int UndertakerPosition;
         public List<Vector2Int> TemporaryWeaponSpawns = new List<Vector2Int>();
         public List<MapCellData> Cells = new List<MapCellData>();
+        public List<MapDoorData> Doors = new List<MapDoorData>();
 
         public bool TryGetCell(Vector2Int position, out MapCellData cell)
         {
@@ -58,6 +59,66 @@ namespace Arkeum.Production.Gameplay.Map
                     Cells.RemoveAt(i);
                 }
             }
+
+            RemoveDoorsAt(position);
         }
+
+        public bool TryGetDoor(Vector2Int position, DoorDirection direction, out MapDoorData door)
+        {
+            for (int i = 0; i < Doors.Count; i++)
+            {
+                if (Doors[i].Position == position && Doors[i].Direction == direction)
+                {
+                    door = Doors[i];
+                    return true;
+                }
+            }
+
+            door = null;
+            return false;
+        }
+
+        public void SetDoor(Vector2Int position, DoorDirection direction)
+        {
+            if (TryGetDoor(position, direction, out _))
+            {
+                return;
+            }
+
+            Doors.Add(new MapDoorData
+            {
+                Position = position,
+                Direction = direction,
+            });
+        }
+
+        public void RemoveDoor(Vector2Int position, DoorDirection direction)
+        {
+            for (int i = Doors.Count - 1; i >= 0; i--)
+            {
+                if (Doors[i].Position == position && Doors[i].Direction == direction)
+                {
+                    Doors.RemoveAt(i);
+                }
+            }
+        }
+
+        public void RemoveDoorsAt(Vector2Int position)
+        {
+            for (int i = Doors.Count - 1; i >= 0; i--)
+            {
+                if (Doors[i].Position == position)
+                {
+                    Doors.RemoveAt(i);
+                }
+            }
+        }
+    }
+
+    [System.Serializable]
+    public sealed class MapDoorData
+    {
+        public Vector2Int Position;
+        public DoorDirection Direction;
     }
 }

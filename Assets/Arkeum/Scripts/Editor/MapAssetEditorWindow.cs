@@ -19,11 +19,13 @@ namespace Arkeum.Editor
         private static readonly Color StartColor = new Color(0.62f, 0.29f, 0.22f);
         private static readonly Color UnlockColor = new Color(0.84f, 0.73f, 0.28f);
         private static readonly Color UndertakerColor = new Color(0.19f, 0.55f, 0.51f);
+        private static readonly Color DoorColor = new Color(0.22f, 0.5f, 0.84f);
 
         private MapTool selectedTool = MapTool.Walkable;
         private MapAsset selectedAsset;
         private Vector2 scrollPosition;
         private int brushDepth = 1;
+        private DoorDirection selectedDoorDirection = DoorDirection.Right;
 
         [MenuItem("Arkeum/Map Editor")]
         private static void OpenWindow()
@@ -67,6 +69,10 @@ namespace Arkeum.Editor
                 selectedTool = (MapTool)EditorGUILayout.EnumPopup(selectedTool, EditorStyles.toolbarPopup, GUILayout.Width(140f));
                 brushDepth = EditorGUILayout.IntField(brushDepth, GUILayout.Width(40f));
                 brushDepth = Mathf.Max(0, brushDepth);
+                if (selectedTool == MapTool.Door)
+                {
+                    selectedDoorDirection = (DoorDirection)EditorGUILayout.EnumPopup(selectedDoorDirection, EditorStyles.toolbarPopup, GUILayout.Width(84f));
+                }
 
                 GUILayout.FlexibleSpace();
                 if (GUILayout.Button("Frame Cells", EditorStyles.toolbarButton, GUILayout.Width(80f)))
@@ -94,7 +100,7 @@ namespace Arkeum.Editor
         {
             EditorGUILayout.LabelField("Brushes", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Walkable/Erase edits terrain. Depth applies to Walkable. Marker brushes place unique points or toggle weapon spawns.",
+                "Walkable/Erase edits terrain. Depth applies to Walkable. Door stores explicit room exits for dungeon generation.",
                 MessageType.None);
         }
 
@@ -175,6 +181,8 @@ namespace Arkeum.Editor
             {
                 DrawMarker(cellRect, true, "W", WeaponColor);
             }
+
+            DrawDoorMarkers(cell, cellRect);
         }
 
         private void HandleCellInput(Vector2Int cell, Rect cellRect)
@@ -216,6 +224,14 @@ namespace Arkeum.Editor
                     RemoveMarkerIfMatches(ref selectedAsset.UnlockAltarPosition, cell);
                     RemoveMarkerIfMatches(ref selectedAsset.UndertakerPosition, cell);
                     selectedAsset.TemporaryWeaponSpawns.RemoveAll(position => position == cell);
+                    selectedAsset.RemoveDoorsAt(cell);
+                    break;
+                case MapTool.Door:
+                    EnsureWalkable(cell);
+                    selectedAsset.SetDoor(cell, selectedDoorDirection);
+                    break;
+                case MapTool.DoorErase:
+                    selectedAsset.RemoveDoorsAt(cell);
                     break;
                 case MapTool.PlayerSpawn:
                     selectedAsset.PlayerSpawn = cell;
@@ -343,6 +359,26 @@ namespace Arkeum.Editor
                 }
             }
 
+            if (asset.Doors.Count == 0)
+            {
+                issues.Add("No doors are defined. Dungeon room placement uses explicit MapAsset doors.");
+            }
+
+            for (int i = 0; i < asset.Doors.Count; i++)
+            {
+                MapDoorData door = asset.Doors[i];
+                if (door == null)
+                {
+                    issues.Add($"Door {i} is empty.");
+                    continue;
+                }
+
+                if (!IsWalkable(asset, door.Position))
+                {
+                    issues.Add($"Door {door.Direction} at {door.Position} is not on a walkable cell.");
+                }
+            }
+
             return issues;
         }
 
@@ -447,6 +483,53 @@ namespace Arkeum.Editor
             GUI.Label(markerRect, label, CenteredMiniLabel());
         }
 
+        private void DrawDoorMarkers(Vector2Int cell, Rect cellRect)
+        {
+            for (int i = 0; i < selectedAsset.Doors.Count; i++)
+            {
+                MapDoorData door = selectedAsset.Doors[i];
+                if (door == null || door.Position != cell)
+                {
+                    continue;
+                }
+
+                Rect markerRect = GetDoorMarkerRect(cellRect, door.Direction);
+                EditorGUI.DrawRect(markerRect, DoorColor);
+                GUI.Label(markerRect, GetDoorLabel(door.Direction), CenteredMiniLabel());
+            }
+        }
+
+        private static Rect GetDoorMarkerRect(Rect cellRect, DoorDirection direction)
+        {
+            const float size = 12f;
+            switch (direction)
+            {
+                case DoorDirection.Up:
+                    return new Rect(cellRect.center.x - size * 0.5f, cellRect.y + 2f, size, size);
+                case DoorDirection.Down:
+                    return new Rect(cellRect.center.x - size * 0.5f, cellRect.yMax - size - 2f, size, size);
+                case DoorDirection.Left:
+                    return new Rect(cellRect.x + 2f, cellRect.center.y - size * 0.5f, size, size);
+                default:
+                    return new Rect(cellRect.xMax - size - 2f, cellRect.center.y - size * 0.5f, size, size);
+            }
+        }
+
+        private static string GetDoorLabel(DoorDirection direction)
+        {
+            switch (direction)
+            {
+                case DoorDirection.Up:
+                    return "U";
+                case DoorDirection.Down:
+                    return "D";
+                case DoorDirection.Left:
+                    return "L";
+                default:
+                    return "R";
+            }
+        }
+
         private void MarkDirty()
         {
             EditorUtility.SetDirty(selectedAsset);
@@ -457,6 +540,8 @@ namespace Arkeum.Editor
         {
             Walkable,
             Erase,
+            Door,
+            DoorErase,
             PlayerSpawn,
             Merchant,
             Reliquary,

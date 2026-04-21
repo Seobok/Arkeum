@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e741c53b728848c4d8f4c42943db6029, type: 3}
+  m_Name: RunDefinition
+  m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Gameplay.Run.RunDefinition
+  floors:
+  - FloorIndex: 0
+    MapAsset: {fileID: 11400000, guid: 5454b70dab147d04aa66c5421932c83a, type: 2}
+    MinimumRoomCount: 6
+    RoomGap: 5
+    PlacementAttempts: 300
+    RandomSeed: 173
+    EnemySpawns: []

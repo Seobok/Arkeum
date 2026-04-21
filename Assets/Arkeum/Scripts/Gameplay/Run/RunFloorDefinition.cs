@@ -9,6 +9,10 @@ namespace Arkeum.Production.Gameplay.Run
     {
         public int FloorIndex = 1;
         public MapAsset MapAsset;
+        public int MinimumRoomCount = 6;
+        public int RoomGap = 5;
+        public int PlacementAttempts = 300;
+        public int RandomSeed = 173;
         public List<EnemySpawnDefinition> EnemySpawns = new List<EnemySpawnDefinition>();
     }
 }
