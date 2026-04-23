@@ -35,9 +35,9 @@
   - 근거: `RunController.Wait`
 - [x] 아이템 사용이 1행동으로 처리된다.
   - 근거: `RunController.UseBandage`, `RunController.UseDraught`
-- [ ] 조정 필요: 입력 액션 맵 기반이 아니라 `Keyboard.current` 직접 입력 방식이다.
-  - 현재 구현: `InputReader`
-  - 결정 필요: Phase 1에서는 유지할지, Unity Input System 액션 맵으로 옮길지 결정한다.
+- [x] 조정 완료: 입력 액션 맵 기반으로 전환했다.
+  - 현재 구현: `InputReader`, `InputSystem_Actions.inputactions`
+  - 결정: Phase 1에서 Unity Input System 액션 맵으로 옮겼다.
 
 ## 3. 전투
 - [x] 근접 공격 1종 중심 전투가 구현되어 있다.

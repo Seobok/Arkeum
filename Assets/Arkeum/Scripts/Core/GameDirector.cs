@@ -5,7 +5,6 @@ using Arkeum.Production.Gameplay.Map;
 using Arkeum.Production.Gameplay.Progression;
 using Arkeum.Production.Gameplay.Run;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace Arkeum.Production.Core
 {
@@ -154,13 +153,7 @@ namespace Arkeum.Production.Core
 
         private void UpdateHubInput()
         {
-            Keyboard keyboard = Keyboard.current;
-            if (keyboard == null)
-            {
-                return;
-            }
-
-            if (!Services.InputReader.TryGetMoveDirection(keyboard, out Vector2Int direction))
+            if (!Services.InputReader.TryGetMoveDirection(out Vector2Int direction))
             {
                 return;
             }
@@ -187,27 +180,26 @@ namespace Arkeum.Production.Core
 
         private void UpdateRunInput()
         {
-            Keyboard keyboard = Keyboard.current;
-            if (keyboard == null || CurrentRunController == null)
+            if (CurrentRunController == null)
             {
                 return;
             }
 
             bool handled = false;
-            if (Services.InputReader.TryGetMoveDirection(keyboard, out Vector2Int direction))
+            if (Services.InputReader.TryGetMoveDirection(out Vector2Int direction))
             {
                 handled = CurrentRunController.TryHandlePlayerAction(direction);
             }
-            else if (keyboard.qKey.wasPressedThisFrame)
+            else if (Services.InputReader.WasWaitPressed())
             {
                 CurrentRunController.Wait();
                 handled = true;
             }
-            else if (keyboard.digit1Key.wasPressedThisFrame)
+            else if (Services.InputReader.WasUseBandagePressed())
             {
                 handled = CurrentRunController.UseBandage();
             }
-            else if (keyboard.digit2Key.wasPressedThisFrame)
+            else if (Services.InputReader.WasUseDraughtPressed())
             {
                 handled = CurrentRunController.UseDraught();
             }
@@ -228,8 +220,7 @@ namespace Arkeum.Production.Core
 
         private void UpdateRunResultInput()
         {
-            Keyboard keyboard = Keyboard.current;
-            if (keyboard != null && keyboard.enterKey.wasPressedThisFrame)
+            if (Services.InputReader.WasConfirmPressed())
             {
                 EnterHub("The echo of return fades, and you stand before the altar again.");
             }

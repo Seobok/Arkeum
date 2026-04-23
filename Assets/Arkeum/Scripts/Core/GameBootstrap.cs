@@ -8,6 +8,7 @@ using Arkeum.Production.Infrastructure.Input;
 using Arkeum.Production.Presentation.UI;
 using Arkeum.Production.Presentation.World;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Arkeum.Production.Core
 {
@@ -20,6 +21,7 @@ namespace Arkeum.Production.Core
         [SerializeField] private GameDirector gameDirector;
         [SerializeField] private WorldPresenter worldPresenter;
         [SerializeField] private HudPresenter hudPresenter;
+        [SerializeField] private InputActionAsset inputActions;
         [Header("Map Assets")]
         [SerializeField] private MapAsset runMapAsset;
         [SerializeField] private MapAsset hubMapAsset;
@@ -58,7 +60,7 @@ namespace Arkeum.Production.Core
 
         private ServiceRegistry BuildServices()
         {
-            InputReader inputReader = new InputReader();
+            InputReader inputReader = new InputReader(inputActions);
             TurnSystem turnSystem = new TurnSystem();
             DamageResolver damageResolver = new DamageResolver();
             CombatSystem combatSystem = new CombatSystem(damageResolver);

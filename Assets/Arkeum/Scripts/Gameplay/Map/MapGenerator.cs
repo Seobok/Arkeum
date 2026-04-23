@@ -30,9 +30,9 @@ namespace Arkeum.Production.Gameplay.Map
                 ? floorDefinition.MapAsset
                 : runMapAsset;
 
-            RoomTemplate roomTemplate = CreateRoomTemplate(floorMapAsset);
+            RoomTemplateSet roomTemplates = CreateRoomTemplates(floorDefinition, floorMapAsset);
             DungeonGenerationSettings settings = DungeonGenerationSettings.From(floorDefinition, floor);
-            MapDefinition map = CreateDungeonMap(roomTemplate, settings);
+            MapDefinition map = CreateDungeonMap(roomTemplates, settings);
             map.RunFloor = floor;
             return map;
         }
@@ -57,7 +57,7 @@ namespace Arkeum.Production.Gameplay.Map
             return map;
         }
 
-        private static MapDefinition CreateDungeonMap(RoomTemplate roomTemplate, DungeonGenerationSettings settings)
+        private static MapDefinition CreateDungeonMap(RoomTemplateSet roomTemplates, DungeonGenerationSettings settings)
         {
             System.Random random = new System.Random(settings.RandomSeed + settings.Floor * 97);
             MapDefinition map = new MapDefinition
@@ -69,10 +69,8 @@ namespace Arkeum.Production.Gameplay.Map
             List<PlacedRoom> rooms = new List<PlacedRoom>();
             HashSet<Vector2Int> occupiedRoomCells = new HashSet<Vector2Int>();
             HashSet<Vector2Int> occupiedGridPositions = new HashSet<Vector2Int>();
-            int gridStepX = roomTemplate.Width + settings.RoomGap;
-            int gridStepY = roomTemplate.Height + settings.RoomGap;
 
-            PlacedRoom startRoom = CreatePlacedRoom(0, roomTemplate, Vector2Int.zero, Vector2Int.zero);
+            PlacedRoom startRoom = CreatePlacedRoom(0, roomTemplates.StartRoom, Vector2Int.zero, Vector2Int.zero);
             rooms.Add(startRoom);
             occupiedGridPositions.Add(Vector2Int.zero);
             AddPlacedRoom(map, startRoom, occupiedRoomCells);
@@ -91,8 +89,9 @@ namespace Arkeum.Production.Gameplay.Map
                     continue;
                 }
 
-                Vector2Int candidateOrigin = new Vector2Int(candidateGrid.x * gridStepX, candidateGrid.y * gridStepY);
-                PlacedRoom candidate = CreatePlacedRoom(rooms.Count, roomTemplate, candidateOrigin, candidateGrid);
+                RoomTemplate candidateTemplate = roomTemplates.Rooms[random.Next(roomTemplates.Rooms.Count)];
+                Vector2Int candidateOrigin = CalculateCandidateOrigin(parent, candidateTemplate, direction, settings.RoomGap);
+                PlacedRoom candidate = CreatePlacedRoom(rooms.Count, candidateTemplate, candidateOrigin, candidateGrid);
 
                 if (OverlapsAnyRoom(candidate, rooms))
                 {
@@ -124,14 +123,14 @@ namespace Arkeum.Production.Gameplay.Map
 
             if (rooms.Count < settings.MinimumRoomCount)
             {
-                return CreateFallbackDungeonMap(roomTemplate, settings);
+                return CreateFallbackDungeonMap(roomTemplates, settings);
             }
 
             ApplyRunMarkers(map, rooms);
             return map;
         }
 
-        private static MapDefinition CreateFallbackDungeonMap(RoomTemplate roomTemplate, DungeonGenerationSettings settings)
+        private static MapDefinition CreateFallbackDungeonMap(RoomTemplateSet roomTemplates, DungeonGenerationSettings settings)
         {
             MapDefinition map = new MapDefinition
             {
@@ -141,14 +140,18 @@ namespace Arkeum.Production.Gameplay.Map
 
             List<PlacedRoom> rooms = new List<PlacedRoom>();
             HashSet<Vector2Int> occupiedRoomCells = new HashSet<Vector2Int>();
-            int gridStepX = roomTemplate.Width + settings.RoomGap;
+            int nextMinX = 0;
 
             for (int i = 0; i < settings.MinimumRoomCount; i++)
             {
-                Vector2Int origin = new Vector2Int(i * gridStepX, 0);
+                RoomTemplate roomTemplate = i == 0
+                    ? roomTemplates.StartRoom
+                    : roomTemplates.Rooms[(i - 1) % roomTemplates.Rooms.Count];
+                Vector2Int origin = new Vector2Int(nextMinX - roomTemplate.Min.x, 0);
                 PlacedRoom room = CreatePlacedRoom(i, roomTemplate, origin, new Vector2Int(i, 0));
                 rooms.Add(room);
                 AddPlacedRoom(map, room, occupiedRoomCells);
+                nextMinX = room.Definition.Max.x + settings.RoomGap + 1;
 
                 if (i == 0)
                 {
@@ -169,6 +172,58 @@ namespace Arkeum.Production.Gameplay.Map
 
             ApplyRunMarkers(map, rooms);
             return map;
+        }
+
+        private static RoomTemplateSet CreateRoomTemplates(RunFloorDefinition floorDefinition, MapAsset startRoomAsset)
+        {
+            RoomTemplate startRoom = CreateRoomTemplate(startRoomAsset);
+            List<MapAsset> roomAssets = new List<MapAsset>();
+
+            if (floorDefinition != null && floorDefinition.RoomAssets != null)
+            {
+                for (int i = 0; i < floorDefinition.RoomAssets.Count; i++)
+                {
+                    AddUniqueAsset(roomAssets, floorDefinition.RoomAssets[i]);
+                }
+            }
+
+            List<RoomTemplate> rooms = new List<RoomTemplate>();
+            for (int i = 0; i < roomAssets.Count; i++)
+            {
+                rooms.Add(CreateRoomTemplate(roomAssets[i]));
+            }
+
+            if (rooms.Count == 0)
+            {
+                rooms.Add(startRoom);
+            }
+
+            return new RoomTemplateSet(startRoom, rooms);
+        }
+
+        private static void AddUniqueAsset(List<MapAsset> assets, MapAsset asset)
+        {
+            if (asset == null || assets.Contains(asset))
+            {
+                return;
+            }
+
+            assets.Add(asset);
+        }
+
+        private static Vector2Int CalculateCandidateOrigin(PlacedRoom parent, RoomTemplate candidateTemplate, DoorDirection direction, int roomGap)
+        {
+            switch (direction)
+            {
+                case DoorDirection.Up:
+                    return new Vector2Int(parent.Definition.Origin.x, parent.Definition.Max.y + roomGap + 1 - candidateTemplate.Min.y);
+                case DoorDirection.Down:
+                    return new Vector2Int(parent.Definition.Origin.x, parent.Definition.Min.y - roomGap - 1 - candidateTemplate.Max.y);
+                case DoorDirection.Left:
+                    return new Vector2Int(parent.Definition.Min.x - roomGap - 1 - candidateTemplate.Max.x, parent.Definition.Origin.y);
+                default:
+                    return new Vector2Int(parent.Definition.Max.x + roomGap + 1 - candidateTemplate.Min.x, parent.Definition.Origin.y);
+            }
         }
 
         private static RoomTemplate CreateRoomTemplate(MapAsset asset)
@@ -697,6 +752,18 @@ namespace Arkeum.Production.Gameplay.Map
 
                 Width = Max.x - Min.x + 1;
                 Height = Max.y - Min.y + 1;
+            }
+        }
+
+        private sealed class RoomTemplateSet
+        {
+            public readonly RoomTemplate StartRoom;
+            public readonly List<RoomTemplate> Rooms;
+
+            public RoomTemplateSet(RoomTemplate startRoom, List<RoomTemplate> rooms)
+            {
+                StartRoom = startRoom;
+                Rooms = rooms;
             }
         }
 

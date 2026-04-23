@@ -375,6 +375,7 @@ MonoBehaviour:
   gameDirector: {fileID: 1366012100}
   worldPresenter: {fileID: 1366012099}
   hudPresenter: {fileID: 1366012098}
+  inputActions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
 --- !u!114 &1366012098
 MonoBehaviour:
   m_ObjectHideFlags: 0

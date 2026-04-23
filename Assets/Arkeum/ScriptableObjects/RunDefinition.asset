@@ -15,6 +15,16 @@ MonoBehaviour:
   floors:
   - FloorIndex: 0
     MapAsset: {fileID: 11400000, guid: 5454b70dab147d04aa66c5421932c83a, type: 2}
+    RoomAssets:
+    - {fileID: 0}
+    MinimumRoomCount: 6
+    RoomGap: 5
+    PlacementAttempts: 300
+    RandomSeed: 173
+    EnemySpawns: []
+  - FloorIndex: 0
+    MapAsset: {fileID: 11400000, guid: 5454b70dab147d04aa66c5421932c83a, type: 2}
+    RoomAssets: []
     MinimumRoomCount: 6
     RoomGap: 5
     PlacementAttempts: 300

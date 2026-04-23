@@ -9,6 +9,7 @@ namespace Arkeum.Production.Gameplay.Run
     {
         public int FloorIndex = 1;
         public MapAsset MapAsset;
+        public List<MapAsset> RoomAssets = new List<MapAsset>();
         public int MinimumRoomCount = 6;
         public int RoomGap = 5;
         public int PlacementAttempts = 300;
