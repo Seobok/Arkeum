@@ -21,6 +21,7 @@ namespace Arkeum.Production.Presentation.World
         public MapDefinition CurrentMap { get; private set; }
         public RunState CurrentRun { get; private set; }
         public Vector2Int HubPlayerPosition { get; private set; }
+        public bool ShowEnemyPreparedTargetMarkers { get; private set; } = true;
 
         public void Initialize()
         {
@@ -62,6 +63,7 @@ namespace Arkeum.Production.Presentation.World
             DrawMap(CurrentMap);
             if (CurrentRun != null && actorRepository != null)
             {
+                DrawEnemyPreparedTargetMarkers();
                 DrawRunActors();
                 FocusCamera(CurrentRun.Player != null ? CurrentRun.Player.GridPosition : CurrentMap.PlayerSpawn);
                 return;
@@ -75,6 +77,11 @@ namespace Arkeum.Production.Presentation.World
         public void UpdateHubPlayerPosition(Vector2Int hubPlayerPosition)
         {
             HubPlayerPosition = hubPlayerPosition;
+        }
+
+        public void SetShowEnemyPreparedTargetMarkers(bool show)
+        {
+            ShowEnemyPreparedTargetMarkers = show;
         }
 
         private void DrawMap(MapDefinition map)
@@ -142,6 +149,44 @@ namespace Arkeum.Production.Presentation.World
                 }
 
                 spawnedViews.Add(viewFactory.CreateActor(actorRoot, actor.DisplayName, actor.GridPosition, color, sortingOrder));
+            }
+        }
+
+        private void DrawEnemyPreparedTargetMarkers()
+        {
+            if (!ShowEnemyPreparedTargetMarkers)
+            {
+                return;
+            }
+
+            IReadOnlyList<ActorEntity> actors = actorRepository.Actors;
+            for (int i = 0; i < actors.Count; i++)
+            {
+                ActorEntity actor = actors[i];
+                if (actor == null ||
+                    !actor.IsEnemy ||
+                    !actor.IsAlive ||
+                    !actor.HasPendingEnemyTargetCell)
+                {
+                    continue;
+                }
+
+                Color color;
+                switch (actor.PendingEnemyAction)
+                {
+                    case EnemyActionType.Attack:
+                        color = new Color(0.82f, 0.16f, 0.13f);
+                        break;
+                    case EnemyActionType.WanderMove:
+                    case EnemyActionType.ChaseMove:
+                        color = new Color(0.18f, 0.68f, 0.26f);
+                        break;
+                    default:
+                        continue;
+                }
+
+                string markerName = $"Pending_{actor.PendingEnemyAction}_{actor.Id}";
+                spawnedViews.Add(viewFactory.CreateCell(markerRoot, actor.PendingEnemyTargetCell, color, markerName, 6));
             }
         }
 

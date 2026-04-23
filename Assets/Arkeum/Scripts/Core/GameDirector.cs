@@ -437,6 +437,7 @@ namespace Arkeum.Production.Core
 
             EnemyDefinition enemyDefinition = spawnDefinition.EnemyDefinition;
             ActorStats stats = enemyDefinition.Stats.Clone();
+            ApplyLegacyEnemyTiming(stats);
             return new ActorEntity
             {
                 Id = $"{enemyDefinition.EnemyId}_{index}",
@@ -478,8 +479,29 @@ namespace Arkeum.Production.Core
                     AttackPower = attack,
                     Defense = defense,
                     ActionInterval = interval,
+                    AttackPreparationTurns = Mathf.Max(0, interval - 1),
+                    MovePreparationTurns = Mathf.Max(0, interval - 1),
                 },
             };
+        }
+
+        private static void ApplyLegacyEnemyTiming(ActorStats stats)
+        {
+            if (stats == null || stats.ActionInterval <= 1)
+            {
+                return;
+            }
+
+            int preparationTurns = stats.ActionInterval - 1;
+            if (stats.AttackPreparationTurns == 0)
+            {
+                stats.AttackPreparationTurns = preparationTurns;
+            }
+
+            if (stats.MovePreparationTurns == 0)
+            {
+                stats.MovePreparationTurns = preparationTurns;
+            }
         }
     }
 }

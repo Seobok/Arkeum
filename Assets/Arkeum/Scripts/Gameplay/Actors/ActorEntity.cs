@@ -16,6 +16,12 @@ namespace Arkeum.Production.Gameplay.Actors
         public int CurrentHp = 1;
         public bool IsEnemy;
         public int BloodReward;
+        public string TargetActorId;
+        public EnemyActionType PendingEnemyAction = EnemyActionType.None;
+        public int PendingEnemyActionTurns;
+        public bool HasPendingEnemyTargetCell;
+        public Vector2Int PendingEnemyTargetCell;
+        public Vector2Int PendingEnemyFacingDirection = Vector2Int.up;
 
         public bool IsAlive => CurrentHp > 0;
         public bool IsPlayer => !IsEnemy;

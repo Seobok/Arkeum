@@ -128,6 +128,7 @@ namespace Arkeum.Production.Presentation.UI
                 GUILayout.Label("Move keys: attack, interact, or move", bodyStyle);
                 GUILayout.Label("Wait: Q", bodyStyle);
                 GUILayout.Label("Items: 1 bandage / 2 draught", bodyStyle);
+                DrawRunOptions();
             }
             else if (gameDirector.CurrentState == GameState.RunResult)
             {
@@ -143,6 +144,26 @@ namespace Arkeum.Production.Presentation.UI
             GUILayout.Label("State", titleStyle);
             GUILayout.Label(gameDirector.CurrentState.ToString(), bodyStyle);
             GUILayout.EndArea();
+        }
+
+        private void DrawRunOptions()
+        {
+            if (gameDirector.Services?.WorldPresenter == null)
+            {
+                return;
+            }
+
+            GUILayout.Space(8f);
+            GUILayout.Label("Options", titleStyle);
+            bool showPreparedTargetMarkers = GUILayout.Toggle(
+                gameDirector.Services.WorldPresenter.ShowEnemyPreparedTargetMarkers,
+                "Prepared target tiles",
+                bodyStyle);
+            if (showPreparedTargetMarkers != gameDirector.Services.WorldPresenter.ShowEnemyPreparedTargetMarkers)
+            {
+                gameDirector.Services.WorldPresenter.SetShowEnemyPreparedTargetMarkers(showPreparedTargetMarkers);
+                gameDirector.Services.WorldPresenter.Refresh();
+            }
         }
 
         private void DrawBottomLog()
