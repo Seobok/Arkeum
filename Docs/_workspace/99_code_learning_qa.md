@@ -27,7 +27,7 @@
 
 3. 프로토타입에서 프로덕션 구조로 옮기며 책임을 분리하려는 흐름과 맞는다.
 
-마이그레이션 문서에서 `PrototypeInputReader`를 `Infrastructure/Input/InputReader`로 옮긴다고 명시되어 있다. 즉 입력은 게임 규칙 본체가 아니라 인프라 계층으로 취급하겠다는 방향이다. [03_phase1_prototype_to_production_migration.md](/D:/Unity/Arkeum/Docs/_workspace/09_phase1/03_phase1_prototype_to_production_migration.md:161)
+마이그레이션 문서에서 `PrototypeInputReader`를 `Infrastructure/Input/InputReader`로 옮긴다고 명시되어 있다. 즉 입력은 게임 규칙 본체가 아니라 인프라 계층으로 취급하겠다는 방향이다. [03_phase1_prototype_to_production_migration.md](/D:/Unity/Arkeum/Docs/_workspace/phase1/03_phase1_prototype_to_production_migration.md:161)
 
 4. 나중에 입력 구현을 바꾸기 쉽게 만들려는 의도다.
 
@@ -79,7 +79,7 @@
 
 예를 들어 `Q`는 런 상태에서는 대기이지만, 허브에서는 아무 의미가 없고, 결과 화면에서도 의미가 없다. `Enter`도 결과 화면에서만 유효하다. 만약 `InputReader`가 이런 것까지 한 번에 판단하려면 결국 "지금 허브인지, 런인지, 결과 화면인지"를 알아야 한다.
 
-그 순간 `InputReader`는 단순히 키를 읽는 인프라 객체가 아니라, 게임 상태 규칙을 일부 아는 객체가 된다. 그건 현재 계층 분리 의도와 어긋난다. `GameDirector`는 상태를 관리하는 쪽이고, `InputReader`는 인프라로 분리되어 있기 때문이다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:37), [03_phase1_prototype_to_production_migration.md](/D:/Unity/Arkeum/Docs/_workspace/09_phase1/03_phase1_prototype_to_production_migration.md:161)
+그 순간 `InputReader`는 단순히 키를 읽는 인프라 객체가 아니라, 게임 상태 규칙을 일부 아는 객체가 된다. 그건 현재 계층 분리 의도와 어긋난다. `GameDirector`는 상태를 관리하는 쪽이고, `InputReader`는 인프라로 분리되어 있기 때문이다. [GameDirector.cs](/D:/Unity/Arkeum/Assets/Arkeum/Scripts/Production/Core/GameDirector.cs:37), [03_phase1_prototype_to_production_migration.md](/D:/Unity/Arkeum/Docs/_workspace/phase1/03_phase1_prototype_to_production_migration.md:161)
 
 2. 입력 해석과 입력 의미가 섞일 수 있다.
 
@@ -335,7 +335,7 @@
 
 5. 마이그레이션 설계 의도와 맞는다.
 
-프로덕션 구조 문서에서도 `TurnSystem`은 `RunController`와 별도 책임으로 분리된 구성요소로 적혀 있다. 즉 처음부터 "턴 규칙은 별도 시스템"으로 보겠다는 설계다. [03_phase1_prototype_to_production_migration.md](/D:/Unity/Arkeum/Docs/_workspace/09_phase1/03_phase1_prototype_to_production_migration.md:282), [03_phase1_prototype_to_production_migration.md](/D:/Unity/Arkeum/Docs/_workspace/09_phase1/03_phase1_prototype_to_production_migration.md:285)
+프로덕션 구조 문서에서도 `TurnSystem`은 `RunController`와 별도 책임으로 분리된 구성요소로 적혀 있다. 즉 처음부터 "턴 규칙은 별도 시스템"으로 보겠다는 설계다. [03_phase1_prototype_to_production_migration.md](/D:/Unity/Arkeum/Docs/_workspace/phase1/03_phase1_prototype_to_production_migration.md:282), [03_phase1_prototype_to_production_migration.md](/D:/Unity/Arkeum/Docs/_workspace/phase1/03_phase1_prototype_to_production_migration.md:285)
 
 ### 그럼 현재 시점에서는 과한 분리 아닌가
 
