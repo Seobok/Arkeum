@@ -121,7 +121,7 @@ namespace Arkeum.Production.Core
 
             PrepareRun(runController);
             Services.WorldPresenter.SetActorRepository(Services.ActorRepository);
-            Services.WorldPresenter.BindRun(runState);
+            Services.WorldPresenter.BindRun(runState, Services.MapService.CurrentMap);
             Services.WorldPresenter.Refresh();
             Services.HudPresenter.BindRun(runState);
             Services.HudPresenter.SetDialogue(string.Empty);
@@ -253,14 +253,16 @@ namespace Arkeum.Production.Core
             {
                 for (int i = 0; i < floorDefinition.EnemySpawns.Count; i++)
                 {
-                    actors.Add(CreateEnemy(floorDefinition.EnemySpawns[i], i));
+                    ActorEntity enemy = CreateEnemy(floorDefinition.EnemySpawns[i], i);
+                    if (enemy != null)
+                    {
+                        actors.Add(enemy);
+                    }
                 }
             }
             else
             {
-                actors.Add(CreateEnemy("ash_crawler_a", "Ash Crawler", BrainType.Chaser, new Vector2Int(4, 0), 5, 2, 0, 1, 1));
-                actors.Add(CreateEnemy("ash_crawler_b", "Ash Crawler", BrainType.Chaser, new Vector2Int(7, 1), 5, 2, 0, 1, 1));
-                actors.Add(CreateEnemy("iron_warden", "Iron Warden", BrainType.HeavyChaser, new Vector2Int(12, 0), 9, 4, 1, 2, 2));
+                Debug.Log("[GameDirector] No run enemy spawns configured. Only the player will be spawned.");
             }
 
             Services.ActorRepository.SetActors(actors);
@@ -283,11 +285,18 @@ namespace Arkeum.Production.Core
                 return;
             }
 
-            Services.InteractionSystem.SetInteractables(new[]
+            List<IInteractable> runInteractables = new List<IInteractable>();
+            if (map.MerchantPosition != Vector2Int.zero)
             {
-                new GridInteractable(InteractableType.Merchant, map.MerchantPosition, _ => { }),
-                new GridInteractable(InteractableType.Reliquary, map.ReliquaryPosition, _ => { }),
-            });
+                runInteractables.Add(new GridInteractable(InteractableType.Merchant, map.MerchantPosition, _ => { }));
+            }
+
+            if (map.ReliquaryPosition != Vector2Int.zero)
+            {
+                runInteractables.Add(new GridInteractable(InteractableType.Reliquary, map.ReliquaryPosition, _ => { }));
+            }
+
+            Services.InteractionSystem.SetInteractables(runInteractables);
         }
 
         private void BuildHubInteractables()
@@ -423,7 +432,8 @@ namespace Arkeum.Production.Core
         {
             if (spawnDefinition == null || spawnDefinition.EnemyDefinition == null)
             {
-                return CreateEnemy($"missing_enemy_{index}", "Missing Enemy", BrainType.Chaser, Vector2Int.zero, 1, 1, 0, 1, 0);
+                Debug.LogWarning($"[GameDirector] Skipping invalid enemy spawn at index={index}.");
+                return null;
             }
 
             EnemyDefinition enemyDefinition = spawnDefinition.EnemyDefinition;
@@ -441,38 +451,6 @@ namespace Arkeum.Production.Core
                 BloodReward = enemyDefinition.BloodReward,
                 EnemyDefinition = enemyDefinition,
                 Stats = stats,
-            };
-        }
-
-        private static ActorEntity CreateEnemy(
-            string id,
-            string name,
-            BrainType brainType,
-            Vector2Int position,
-            int hp,
-            int attack,
-            int defense,
-            int interval,
-            int bloodReward)
-        {
-            return new ActorEntity
-            {
-                Id = id,
-                DisplayName = name,
-                BrainType = brainType,
-                GridPosition = position,
-                CurrentHp = hp,
-                IsEnemy = true,
-                BloodReward = bloodReward,
-                Stats = new ActorStats
-                {
-                    MaxHp = hp,
-                    AttackPower = attack,
-                    Defense = defense,
-                    ActionInterval = interval,
-                    AttackPreparationTurns = Mathf.Max(0, interval - 1),
-                    MovePreparationTurns = Mathf.Max(0, interval - 1),
-                },
             };
         }
 

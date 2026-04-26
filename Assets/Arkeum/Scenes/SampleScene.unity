@@ -376,6 +376,9 @@ MonoBehaviour:
   worldPresenter: {fileID: 1366012099}
   hudPresenter: {fileID: 1366012098}
   inputActions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
+  runMapAsset: {fileID: 0}
+  hubMapAsset: {fileID: 11400000, guid: dc578972a8f16d24cb7fc098d0b7ab89, type: 2}
+  runDefinition: {fileID: 11400000, guid: 8b536f969ad437c4c97ddbfd6d3e49c4, type: 2}
 --- !u!114 &1366012098
 MonoBehaviour:
   m_ObjectHideFlags: 0

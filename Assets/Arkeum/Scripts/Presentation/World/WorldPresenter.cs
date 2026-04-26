@@ -41,9 +41,15 @@ namespace Arkeum.Production.Presentation.World
             HubPlayerPosition = hubPlayerPosition;
         }
 
-        public void BindRun(RunState runState)
+        public void BindRun(RunState runState, MapDefinition mapDefinition)
         {
             CurrentRun = runState;
+            CurrentMap = mapDefinition;
+            Debug.Log(
+                $"[WorldPresenter] BindRun mapCells={(mapDefinition != null ? mapDefinition.WalkableCells.Count : 0)}, " +
+                $"rooms={(mapDefinition != null ? mapDefinition.Rooms.Count : 0)}, " +
+                $"corridors={(mapDefinition != null ? mapDefinition.Corridors.Count : 0)}, " +
+                $"player={(runState?.Player != null ? runState.Player.GridPosition.ToString() : "null")}");
         }
 
         public void Refresh()
@@ -60,6 +66,9 @@ namespace Arkeum.Production.Presentation.World
                 return;
             }
 
+            Debug.Log(
+                $"[WorldPresenter] Refresh state={(CurrentRun != null ? "Run" : "Hub")}, " +
+                $"mapCells={CurrentMap.WalkableCells.Count}, rooms={CurrentMap.Rooms.Count}, corridors={CurrentMap.Corridors.Count}");
             DrawMap(CurrentMap);
             if (CurrentRun != null && actorRepository != null)
             {
@@ -99,9 +108,13 @@ namespace Arkeum.Production.Presentation.World
                 spawnedViews.Add(viewFactory.CreateCell(markerRoot, map.TemporaryWeaponSpawns[i], new Color(0.75f, 0.43f, 0.18f), $"Weapon_{i}", 4));
             }
 
-            if (map.MerchantPosition != Vector2Int.zero || map.ReliquaryPosition != Vector2Int.zero)
+            if (map.MerchantPosition != Vector2Int.zero)
             {
                 spawnedViews.Add(viewFactory.CreateCell(markerRoot, map.MerchantPosition, new Color(0.1f, 0.4f, 0.37f), "MerchantMarker", 3));
+            }
+
+            if (map.ReliquaryPosition != Vector2Int.zero)
+            {
                 spawnedViews.Add(viewFactory.CreateCell(markerRoot, map.ReliquaryPosition, new Color(0.76f, 0.65f, 0.17f), "ReliquaryMarker", 2));
             }
         }

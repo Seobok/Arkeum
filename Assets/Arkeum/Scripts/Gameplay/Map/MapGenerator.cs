@@ -30,6 +30,12 @@ namespace Arkeum.Production.Gameplay.Map
                 ? floorDefinition.MapAsset
                 : runMapAsset;
 
+            Debug.Log(
+                $"[MapGenerator] CreateRunMap floor={floor}, fallbackFloor={fallbackFloor}, " +
+                $"floorDefinition={(floorDefinition != null ? "set" : "null")}, " +
+                $"floorMapAsset={DescribeAsset(floorMapAsset)}, runMapAsset={DescribeAsset(runMapAsset)}, " +
+                $"roomAssetCount={(floorDefinition != null && floorDefinition.RoomAssets != null ? floorDefinition.RoomAssets.Count : 0)}");
+
             RoomTemplateSet roomTemplates = CreateRoomTemplates(floorDefinition, floorMapAsset);
             DungeonGenerationSettings settings = DungeonGenerationSettings.From(floorDefinition, floor);
             MapDefinition map = CreateDungeonMap(roomTemplates, settings);
@@ -41,8 +47,11 @@ namespace Arkeum.Production.Gameplay.Map
         {
             if (TryCreateFromAsset(hubMapAsset, out MapDefinition assetMap))
             {
+                Debug.Log($"[MapGenerator] CreateHubMap loaded from asset={DescribeAsset(hubMapAsset)} cells={assetMap.WalkableCells.Count}");
                 return assetMap;
             }
+
+            Debug.LogWarning($"[MapGenerator] CreateHubMap using built-in fallback. hubMapAsset={DescribeAsset(hubMapAsset)}");
 
             MapDefinition map = new MapDefinition
             {
@@ -75,6 +84,11 @@ namespace Arkeum.Production.Gameplay.Map
             occupiedGridPositions.Add(Vector2Int.zero);
             AddPlacedRoom(map, startRoom, occupiedRoomCells);
 
+            int occupiedGridRejects = 0;
+            int overlapRejects = 0;
+            int doorRejects = 0;
+            int corridorBuildRejects = 0;
+            int corridorValidityRejects = 0;
             int attempts = 0;
             while (rooms.Count < settings.MinimumRoomCount && attempts < settings.PlacementAttempts)
             {
@@ -86,6 +100,7 @@ namespace Arkeum.Production.Gameplay.Map
 
                 if (occupiedGridPositions.Contains(candidateGrid))
                 {
+                    occupiedGridRejects++;
                     continue;
                 }
 
@@ -95,21 +110,25 @@ namespace Arkeum.Production.Gameplay.Map
 
                 if (OverlapsAnyRoom(candidate, rooms))
                 {
+                    overlapRejects++;
                     continue;
                 }
 
                 if (!TryBuildDoorConnection(parent, candidate, out DoorConnection connection))
                 {
+                    doorRejects++;
                     continue;
                 }
 
                 if (!TryBuildCorridorCells(connection.FromDoor.Position, connection.FromDoor.Direction, connection.ToDoor.Position, connection.ToDoor.Direction, out List<Vector2Int> corridorCells))
                 {
+                    corridorBuildRejects++;
                     continue;
                 }
 
                 if (!IsCorridorValid(corridorCells, connection.FromDoor.Position, connection.ToDoor.Position, occupiedRoomCells, candidate.CellSet))
                 {
+                    corridorValidityRejects++;
                     continue;
                 }
 
@@ -121,12 +140,22 @@ namespace Arkeum.Production.Gameplay.Map
                 AddCorridor(map, parent.Id, candidate.Id, connection, corridorCells, settings.Floor);
             }
 
+            Debug.Log(
+                $"[MapGenerator] Dungeon placement summary floor={settings.Floor}, rooms={rooms.Count}/{settings.MinimumRoomCount}, " +
+                $"attempts={attempts}/{settings.PlacementAttempts}, cells={map.WalkableCells.Count}, corridors={map.Corridors.Count}, " +
+                $"rejects occupiedGrid={occupiedGridRejects}, overlap={overlapRejects}, missingDoor={doorRejects}, " +
+                $"corridorBuild={corridorBuildRejects}, corridorInvalid={corridorValidityRejects}");
+
             if (rooms.Count < settings.MinimumRoomCount)
             {
+                Debug.LogWarning(
+                    $"[MapGenerator] Dungeon placement failed to reach minimum room count. " +
+                    $"Using fallback map. rooms={rooms.Count}, minimum={settings.MinimumRoomCount}");
                 return CreateFallbackDungeonMap(roomTemplates, settings);
             }
 
             ApplyRunMarkers(map, rooms);
+            Debug.Log($"[MapGenerator] Dungeon generated floor={settings.Floor}, rooms={map.Rooms.Count}, corridors={map.Corridors.Count}, cells={map.WalkableCells.Count}");
             return map;
         }
 
@@ -171,6 +200,7 @@ namespace Arkeum.Production.Gameplay.Map
             }
 
             ApplyRunMarkers(map, rooms);
+            Debug.LogWarning($"[MapGenerator] Fallback dungeon generated floor={settings.Floor}, rooms={map.Rooms.Count}, corridors={map.Corridors.Count}, cells={map.WalkableCells.Count}");
             return map;
         }
 
@@ -197,6 +227,10 @@ namespace Arkeum.Production.Gameplay.Map
             {
                 rooms.Add(startRoom);
             }
+
+            Debug.Log(
+                $"[MapGenerator] Room templates ready. startAsset={DescribeAsset(startRoomAsset)}, " +
+                $"startCells={startRoom.Cells.Count}, startDoors={startRoom.Doors.Count}, roomTemplates={rooms.Count}");
 
             return new RoomTemplateSet(startRoom, rooms);
         }
@@ -231,6 +265,7 @@ namespace Arkeum.Production.Gameplay.Map
             List<TemplateCell> cells = new List<TemplateCell>();
             List<TemplateDoor> doors = new List<TemplateDoor>();
             Vector2Int origin = asset != null ? asset.PlayerSpawn : Vector2Int.zero;
+            int ignoredDoors = 0;
 
             if (asset != null)
             {
@@ -259,6 +294,7 @@ namespace Arkeum.Production.Gameplay.Map
                     Vector2Int position = door.Position - origin;
                     if (!walkablePositions.Contains(position))
                     {
+                        ignoredDoors++;
                         continue;
                     }
 
@@ -268,6 +304,7 @@ namespace Arkeum.Production.Gameplay.Map
 
             if (cells.Count == 0)
             {
+                Debug.LogWarning($"[MapGenerator] MapAsset has no walkable cells. Using default room template. asset={DescribeAsset(asset)}");
                 for (int x = -3; x <= 3; x++)
                 {
                     for (int y = -2; y <= 2; y++)
@@ -279,7 +316,12 @@ namespace Arkeum.Production.Gameplay.Map
 
             if (doors.Count == 0)
             {
+                Debug.LogWarning($"[MapGenerator] Room template has no valid doors. Adding default doors. asset={DescribeAsset(asset)}, ignoredDoors={ignoredDoors}");
                 AddDefaultDoors(cells, doors);
+            }
+            else if (ignoredDoors > 0)
+            {
+                Debug.LogWarning($"[MapGenerator] Ignored doors outside walkable cells. asset={DescribeAsset(asset)}, ignoredDoors={ignoredDoors}, validDoors={doors.Count}");
             }
 
             return new RoomTemplate(cells, doors);
@@ -512,20 +554,6 @@ namespace Arkeum.Production.Gameplay.Map
         private static void ApplyRunMarkers(MapDefinition map, IReadOnlyList<PlacedRoom> rooms)
         {
             map.PlayerSpawn = Vector2Int.zero;
-            if (rooms.Count > 2)
-            {
-                map.TemporaryWeaponSpawns.Add(rooms[2].Definition.Origin);
-            }
-
-            if (rooms.Count > 3)
-            {
-                map.MerchantPosition = rooms[3].Definition.Origin;
-            }
-
-            if (rooms.Count > 0)
-            {
-                map.ReliquaryPosition = rooms[rooms.Count - 1].Definition.Origin;
-            }
         }
 
         private static bool OverlapsAnyRoom(PlacedRoom candidate, IReadOnlyList<PlacedRoom> rooms)
@@ -648,6 +676,16 @@ namespace Arkeum.Production.Gameplay.Map
             }
 
             return map.WalkableCells.Count > 0;
+        }
+
+        private static string DescribeAsset(MapAsset asset)
+        {
+            if (asset == null)
+            {
+                return "null";
+            }
+
+            return $"{asset.name}(cells={asset.Cells.Count}, doors={asset.Doors.Count}, spawn={asset.PlayerSpawn})";
         }
 
         private static DoorDirection DirectionToward(Vector2Int from, Vector2Int to)

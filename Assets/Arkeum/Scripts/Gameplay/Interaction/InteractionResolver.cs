@@ -33,11 +33,13 @@ namespace Arkeum.Production.Gameplay.Interaction
             InteractableType interactableType = interactable?.InteractableType ?? InteractableType.None;
             if (interactableType == InteractableType.None && mapDefinition != null)
             {
-                if (targetCell == mapDefinition.MerchantPosition)
+                if (mapDefinition.MerchantPosition != Vector2Int.zero &&
+                    targetCell == mapDefinition.MerchantPosition)
                 {
                     interactableType = InteractableType.Merchant;
                 }
-                else if (targetCell == mapDefinition.ReliquaryPosition)
+                else if (mapDefinition.ReliquaryPosition != Vector2Int.zero &&
+                         targetCell == mapDefinition.ReliquaryPosition)
                 {
                     interactableType = InteractableType.Reliquary;
                 }

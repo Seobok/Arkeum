@@ -17,11 +17,16 @@ namespace Arkeum.Production.Gameplay.Run
                 RunFloorDefinition floor = floors[i];
                 if (floor != null && floor.FloorIndex == floorIndex)
                 {
+                    Debug.Log($"[RunDefinition] Found floor. requestedFloor={floorIndex}, configuredFloorCount={floors.Count}");
                     return floor;
                 }
             }
 
-            return floors.Count > 0 ? floors[0] : null;
+            Debug.LogWarning(
+                $"[RunDefinition] FloorIndex {floorIndex} was not found. " +
+                $"Run-specific floor settings will not be applied. configuredFloorCount={floors.Count}");
+
+            return null;
         }
     }
 }

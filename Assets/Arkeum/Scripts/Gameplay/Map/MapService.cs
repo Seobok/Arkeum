@@ -28,12 +28,16 @@ namespace Arkeum.Production.Gameplay.Map
         public void LoadRunFloor(RunFloorDefinition floorDefinition, int fallbackFloor)
         {
             CurrentRunFloor = floorDefinition;
+            Debug.Log(
+                $"[MapService] LoadRunFloor requested fallbackFloor={fallbackFloor}, " +
+                $"floorDefinition={(floorDefinition != null ? floorDefinition.FloorIndex.ToString() : "null")}");
             SetCurrentMap(mapGenerator.CreateRunMap(floorDefinition, fallbackFloor));
         }
 
         public void LoadHubMap()
         {
             CurrentRunFloor = null;
+            Debug.Log("[MapService] LoadHubMap requested.");
             SetCurrentMap(mapGenerator.CreateHubMap());
         }
 
@@ -71,6 +75,7 @@ namespace Arkeum.Production.Gameplay.Map
 
             if (mapDefinition == null)
             {
+                Debug.LogError("[MapService] SetCurrentMap received null map.");
                 return;
             }
 
@@ -83,6 +88,12 @@ namespace Arkeum.Production.Gameplay.Map
             {
                 depthByCell[pair.Key] = pair.Value;
             }
+
+            Debug.Log(
+                $"[MapService] Current map set. floor={mapDefinition.RunFloor}, " +
+                $"walkableCells={walkableCells.Count}, depthCells={depthByCell.Count}, " +
+                $"rooms={mapDefinition.Rooms.Count}, corridors={mapDefinition.Corridors.Count}, " +
+                $"playerSpawn={mapDefinition.PlayerSpawn}, merchant={mapDefinition.MerchantPosition}, reliquary={mapDefinition.ReliquaryPosition}");
         }
     }
 }

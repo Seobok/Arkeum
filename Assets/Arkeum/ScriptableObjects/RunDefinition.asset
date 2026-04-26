@@ -13,18 +13,15 @@ MonoBehaviour:
   m_Name: RunDefinition
   m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Gameplay.Run.RunDefinition
   floors:
-  - FloorIndex: 0
+  - FloorIndex: 1
     MapAsset: {fileID: 11400000, guid: 5454b70dab147d04aa66c5421932c83a, type: 2}
     RoomAssets:
-    - {fileID: 0}
-    MinimumRoomCount: 6
-    RoomGap: 5
-    PlacementAttempts: 300
-    RandomSeed: 173
-    EnemySpawns: []
-  - FloorIndex: 0
-    MapAsset: {fileID: 11400000, guid: 5454b70dab147d04aa66c5421932c83a, type: 2}
-    RoomAssets: []
+    - {fileID: 11400000, guid: 104e5945f003e114cb4592bae96646eb, type: 2}
+    - {fileID: 11400000, guid: 7def39af45454704facd44e1608316c6, type: 2}
+    - {fileID: 11400000, guid: 23ede4de7ed5a604a91a79c1e49a9e98, type: 2}
+    - {fileID: 11400000, guid: 28d62fec35b38554ea0165982557a35a, type: 2}
+    - {fileID: 11400000, guid: 7ffcdb1fb0637c943976a6ce4a4457c5, type: 2}
+    - {fileID: 11400000, guid: 58b1416f9c8509d449a16657b43ab5fd, type: 2}
     MinimumRoomCount: 6
     RoomGap: 5
     PlacementAttempts: 300
