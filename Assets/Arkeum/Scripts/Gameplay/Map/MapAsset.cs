@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Arkeum.Production.Gameplay.Run;
 using UnityEngine;
 
 namespace Arkeum.Production.Gameplay.Map
@@ -15,6 +16,7 @@ namespace Arkeum.Production.Gameplay.Map
         public Vector2Int UnlockAltarPosition;
         public Vector2Int UndertakerPosition;
         public List<Vector2Int> TemporaryWeaponSpawns = new List<Vector2Int>();
+        public List<EnemySpawnDefinition> EnemySpawns = new List<EnemySpawnDefinition>();
         public List<MapCellData> Cells = new List<MapCellData>();
         public List<MapDoorData> Doors = new List<MapDoorData>();
 

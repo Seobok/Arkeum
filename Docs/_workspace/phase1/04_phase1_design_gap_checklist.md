@@ -48,9 +48,9 @@
   - 근거: `Mathf.Max(1, attackPower - defense)`
 - [x] 적 처치 보상이 런 내 자원으로 반영된다.
   - 근거: `RunController.TryHandlePlayerAction`
-- [ ] 조정 필요: 적 AI가 최초 설계보다 복잡하다.
+- [x] 조정 완료: 적 AI가 최초 설계보다 복잡하지만 현재 기준으로 유지한다.
   - 현재 구현: Behavior Tree, 준비 턴, 공격 패턴, 표적 타일 표시
-  - 결정 필요: Phase 1 검증용으로 유지할지, 문서 기준의 단순 추적 AI로 축소할지 결정한다.
+  - 결정: 현재 구현 복잡도를 Phase 1 기준으로 인정하고 유지한다.
 
 ## 4. 적과 NPC
 - [x] 적 추적과 공격이 구현되어 있다.
@@ -75,8 +75,8 @@
   - 근거: `InteractionResolver.TryBuyDraught`
 - [x] 거점에서 영구 자원으로 시작 회복 아이템 해금을 할 수 있다.
   - 근거: `ProgressionService.TryUnlockStartingBandage`
-- [ ] 조정 필요: 최초 설계 용어 `응고 지혈포`가 현재 구현에서는 `StartingBandage`로 되어 있다.
-  - 결정 필요: 코드 명명까지 세계관 용어에 맞출지, UI/문서에서만 맞출지 결정한다.
+- [x] 조정 완료: 최초 설계 용어 `응고 지혈포`가 현재 구현에서는 `StartingBandage`로 되어 있다.
+  - 결정: 코드 명명은 유지하고, UI/문서 표기에서 설계 용어를 맞춘다.
 - [ ] 미완료: 아이템 효과가 `ItemDefinition`/`EffectDefinition` 데이터로 분리되어 있지 않다.
   - 현재 구현: `RunController.UseBandage`, `RunController.UseDraught`에 직접 수치 포함
 - [ ] 미완료: 무기 타입 데이터가 별도 `WeaponDefinition`으로 분리되어 있지 않다.
@@ -91,8 +91,8 @@
   - 근거: `ProgressionService.GetUndertakerGreeting`, `ProgressionService.SeedDialogue`
 - [x] 해금 전/후 상태 문구가 구현되어 있다.
   - 근거: `GameDirector.UpdateHubLocationMessage`, `HudPresenter.DrawTopBar`
-- [ ] 조정 필요: 설계안은 메뉴 허브에 가까운 거점을 상정했지만 현재는 격자 이동 거점이다.
-  - 결정 필요: 현재 방식이 조작 학습에 유리하므로 유지할지, 메뉴 허브로 단순화할지 결정한다.
+- [x] 조정 완료: 설계안은 메뉴 허브에 가까운 거점을 상정했지만 현재는 격자 이동 거점이다.
+  - 결정: 거점의 격자 이동은 현재 기획상 맞으므로 유지한다.
 
 ## 7. 저장과 진행도
 - [x] `ProfileSave`에 해당하는 `SaveProfile` 데이터 타입이 있다.
@@ -128,12 +128,12 @@
   - 필요 작업: `Gleam`, `Blood shards`, `Bandage`, `Draught` 등의 표기 정책 결정
 
 ## 9. 씬, 프리팹, 에셋 구조
-- [ ] 조정 필요: 최초 설계의 `Bootstrap`, `Hub`, `Dungeon_TestA` 씬 구성이 아니라 `SampleScene` 하나만 존재한다.
+- [x] 조정 완료: 최초 설계의 `Bootstrap`, `Hub`, `Dungeon_TestA` 씬 구성이 아니라 `SampleScene` 하나만 존재한다.
   - 현재 확인: `Assets/Arkeum/Scenes/SampleScene.unity`
-  - 결정 필요: 단일 씬 상태 전환을 유지할지, 설계안대로 씬을 분리할지 결정한다.
-- [ ] 조정 필요: 최초 설계는 수제 테스트 구역 1~2개였지만 현재는 절차 생성 성격의 던전 생성기가 있다.
+  - 결정: 현재 단일 씬 상태 전환 구조대로 진행한다.
+- [x] 조정 완료: 최초 설계는 수제 테스트 구역 1~2개였지만 현재는 절차 생성 성격의 던전 생성기가 있다.
   - 근거: `MapGenerator.CreateDungeonMap`
-  - 결정 필요: Phase 1에서 절차 생성 유지 여부 결정
+  - 결정: 수제 테스트 구역은 절차 생성 성격의 던전 생성기로 교체한 것으로 보고 현재 구조를 유지한다.
 - [x] `MapAsset`과 `RunDefinition` ScriptableObject 구조가 있다.
   - 근거: `MapAsset`, `RunDefinition`
 - [ ] 미완료: `Actors`, `Items`, `Weapons`, `Encounters`, `Progression` 하위 ScriptableObject 에셋 구성이 아직 부족하다.
@@ -142,13 +142,13 @@
   - 필요 작업: 프리팹 기반 표현 계층으로 옮길 범위 결정
 
 ## 10. 설계 대비 초과 구현 또는 방향 차이
-- [ ] 조정 필요: `Prototype` 단계를 넘어 Production 계층 분리가 상당 부분 진행되어 있다.
+- [x] 조정 완료: `Prototype` 단계를 넘어 Production 계층 분리가 상당 부분 진행되어 있다.
   - 현재 구조: `Core`, `Gameplay`, `Presentation`, `Infrastructure`
-  - 결정 필요: `03_phase1_prototype_to_production_migration.md`를 현재 코드 기준으로 갱신한다.
-- [ ] 조정 필요: Behavior Tree와 공격 패턴이 Phase 1 최초 설계보다 앞서 구현되어 있다.
-  - 결정 필요: 테스트 가능한 복잡도로 유지할지, 문서의 Phase 1 범위를 갱신할지 결정한다.
-- [ ] 조정 필요: 절차 생성 맵이 Phase 1 확정안의 `수제 테스트 구역`과 충돌한다.
-  - 결정 필요: 최초 설계를 수정할지, 구현을 수제 맵 기반으로 되돌릴지 결정한다.
+  - 결정: 기존 기획보다 개발이 더 진행된 상태로 보고 현재 구조대로 진행한다.
+- [x] 조정 완료: Behavior Tree와 공격 패턴이 Phase 1 최초 설계보다 앞서 구현되어 있다.
+  - 결정: 기존 기획보다 개발이 더 진행된 상태로 보고 현재 구현을 유지한다.
+- [x] 조정 완료: 절차 생성 맵이 Phase 1 확정안의 `수제 테스트 구역`과 충돌한다.
+  - 결정: 수제 테스트 구역은 절차 생성 성격의 던전 생성기로 교체한 것으로 보고 현재 구현을 유지한다.
 
 ## 11. 우선순위 제안
 
@@ -156,7 +156,7 @@
 - [ ] JSON 기반 `SaveService` 구현
 - [ ] 런 종료와 해금 구매 시점에 프로필 저장 호출
 - [ ] 실행 시작 시 저장된 프로필 로드
-- [ ] 현재 단일 씬/절차 생성/OnGUI를 Phase 1에서 유지할지 문서로 확정
+- [ ] `OnGUI` HUD를 Phase 1에서 유지할지 문서로 확정
 
 ### P1: 데이터 분리와 제작 안정성
 - [ ] `EnemyDefinition` 에셋 생성 및 런 스폰 연결 상태 점검
@@ -171,8 +171,8 @@
 - [ ] 프리팹 기반 Actor/Tile/UI 표현으로 이관할 범위 결정
 
 ## 12. 다음 점검 질문
-- [ ] Phase 1은 현재 구현처럼 `단일 씬 + 상태 전환`으로 확정할 것인가?
-- [ ] Phase 1에서 절차 생성 맵을 유지할 것인가, 수제 테스트 맵으로 되돌릴 것인가?
+- [x] Phase 1은 현재 구현처럼 `단일 씬 + 상태 전환`으로 확정할 것인가?
+- [x] Phase 1에서 절차 생성 맵을 유지할 것인가, 수제 테스트 맵으로 되돌릴 것인가?
 - [ ] `OnGUI` HUD를 Phase 1 완료 조건으로 인정할 것인가?
-- [ ] `응고 지혈포`, `혈편`, `잔광` 등 한국어 세계관 용어를 코드 명명에도 반영할 것인가?
+- [x] `응고 지혈포`, `혈편`, `잔광` 등 한국어 세계관 용어를 코드 명명에도 반영할 것인가?
 - [ ] 저장 시스템을 Phase 1 완료의 필수 조건으로 둘 것인가?

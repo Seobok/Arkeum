@@ -8,7 +8,6 @@ namespace Arkeum.Production.Gameplay.Actors
     {
         public string Id;
         public string DisplayName;
-        public BrainType BrainType;
         public Vector2Int GridPosition;
         public Vector2Int FacingDirection = Vector2Int.up;
         public ActorStats Stats = new ActorStats();

@@ -121,10 +121,21 @@ namespace Arkeum.Production.Presentation.World
 
         private void DrawHubMarkers()
         {
-            spawnedViews.Add(viewFactory.CreateCell(markerRoot, CurrentMap.StartAltarPosition, new Color(0.62f, 0.29f, 0.22f), "HubStartGate", 2));
-            spawnedViews.Add(viewFactory.CreateCell(markerRoot, CurrentMap.UnlockAltarPosition, new Color(0.84f, 0.73f, 0.28f), "HubUnlock", 2));
-            spawnedViews.Add(viewFactory.CreateCell(markerRoot, CurrentMap.UndertakerPosition, new Color(0.19f, 0.55f, 0.51f), "HubUndertaker", 2));
-            spawnedViews.Add(viewFactory.CreateActor(actorRoot, "Undertaker", CurrentMap.UndertakerPosition, new Color(0.19f, 0.55f, 0.51f), 10));
+            if (IsMarkerEnabled(CurrentMap.StartAltarPosition))
+            {
+                spawnedViews.Add(viewFactory.CreateCell(markerRoot, CurrentMap.StartAltarPosition, new Color(0.62f, 0.29f, 0.22f), "HubStartGate", 2));
+            }
+
+            if (IsMarkerEnabled(CurrentMap.UnlockAltarPosition))
+            {
+                spawnedViews.Add(viewFactory.CreateCell(markerRoot, CurrentMap.UnlockAltarPosition, new Color(0.84f, 0.73f, 0.28f), "HubUnlock", 2));
+            }
+
+            if (IsMarkerEnabled(CurrentMap.UndertakerPosition))
+            {
+                spawnedViews.Add(viewFactory.CreateCell(markerRoot, CurrentMap.UndertakerPosition, new Color(0.19f, 0.55f, 0.51f), "HubUndertaker", 2));
+                spawnedViews.Add(viewFactory.CreateActor(actorRoot, "Undertaker", CurrentMap.UndertakerPosition, new Color(0.19f, 0.55f, 0.51f), 10));
+            }
         }
 
         private void DrawHubPlayer()
@@ -149,11 +160,6 @@ namespace Arkeum.Production.Presentation.World
                 {
                     color = new Color(0.91f, 0.86f, 0.78f);
                     sortingOrder = 20;
-                }
-                else if (actor.BrainType == BrainType.HeavyChaser)
-                {
-                    color = new Color(0.42f, 0.48f, 0.52f);
-                    sortingOrder = 10;
                 }
                 else
                 {
@@ -184,23 +190,57 @@ namespace Arkeum.Production.Presentation.World
                     continue;
                 }
 
-                Color color;
                 switch (actor.PendingEnemyAction)
                 {
                     case EnemyActionType.Attack:
-                        color = new Color(0.82f, 0.16f, 0.13f);
+                        DrawEnemyPreparedAttackMarkers(actor);
                         break;
                     case EnemyActionType.WanderMove:
                     case EnemyActionType.ChaseMove:
-                        color = new Color(0.18f, 0.68f, 0.26f);
+                        DrawEnemyPreparedMoveMarker(actor);
                         break;
                     default:
                         continue;
                 }
-
-                string markerName = $"Pending_{actor.PendingEnemyAction}_{actor.Id}";
-                spawnedViews.Add(viewFactory.CreateCell(markerRoot, actor.PendingEnemyTargetCell, color, markerName, 6));
             }
+        }
+
+        private void DrawEnemyPreparedAttackMarkers(ActorEntity actor)
+        {
+            Color color = new Color(0.82f, 0.16f, 0.13f);
+            EnemyAttackPatternDefinition attackPattern = actor.EnemyDefinition != null
+                ? actor.EnemyDefinition.AttackPattern
+                : null;
+
+            if (attackPattern == null)
+            {
+                string fallbackMarkerName = $"Pending_{actor.PendingEnemyAction}_{actor.Id}";
+                spawnedViews.Add(viewFactory.CreateCell(markerRoot, actor.PendingEnemyTargetCell, color, fallbackMarkerName, 6));
+                return;
+            }
+
+            HashSet<Vector2Int> markedCells = new HashSet<Vector2Int>();
+            for (int i = 0; i < attackPattern.Offsets.Count; i++)
+            {
+                Vector2Int offset = EnemyAttackPatternDefinition.RotateOffset(
+                    attackPattern.Offsets[i],
+                    actor.PendingEnemyFacingDirection);
+                Vector2Int markerCell = actor.GridPosition + offset;
+                if (!markedCells.Add(markerCell))
+                {
+                    continue;
+                }
+
+                string markerName = $"Pending_{actor.PendingEnemyAction}_{actor.Id}_{markerCell.x}_{markerCell.y}";
+                spawnedViews.Add(viewFactory.CreateCell(markerRoot, markerCell, color, markerName, 6));
+            }
+        }
+
+        private void DrawEnemyPreparedMoveMarker(ActorEntity actor)
+        {
+            Color color = new Color(0.18f, 0.68f, 0.26f);
+            string markerName = $"Pending_{actor.PendingEnemyAction}_{actor.Id}";
+            spawnedViews.Add(viewFactory.CreateCell(markerRoot, actor.PendingEnemyTargetCell, color, markerName, 6));
         }
 
         private void EnsureCamera()
@@ -250,6 +290,11 @@ namespace Arkeum.Production.Presentation.World
             }
 
             spawnedViews.Clear();
+        }
+
+        private static bool IsMarkerEnabled(Vector2Int position)
+        {
+            return position != Vector2Int.zero;
         }
     }
 }

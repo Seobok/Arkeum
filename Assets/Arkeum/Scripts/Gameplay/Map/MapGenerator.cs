@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Arkeum.Production.Gameplay.Actors;
 using Arkeum.Production.Gameplay.Run;
 using UnityEngine;
 
@@ -7,13 +8,11 @@ namespace Arkeum.Production.Gameplay.Map
 {
     public sealed class MapGenerator
     {
-        private readonly MapAsset runMapAsset;
         private readonly MapAsset hubMapAsset;
         private readonly RunDefinition runDefinition;
 
-        public MapGenerator(MapAsset runMapAsset, MapAsset hubMapAsset, RunDefinition runDefinition)
+        public MapGenerator(MapAsset hubMapAsset, RunDefinition runDefinition)
         {
-            this.runMapAsset = runMapAsset;
             this.hubMapAsset = hubMapAsset;
             this.runDefinition = runDefinition;
         }
@@ -26,14 +25,18 @@ namespace Arkeum.Production.Gameplay.Map
         public MapDefinition CreateRunMap(RunFloorDefinition floorDefinition, int fallbackFloor)
         {
             int floor = floorDefinition != null ? floorDefinition.FloorIndex : fallbackFloor;
-            MapAsset floorMapAsset = floorDefinition != null && floorDefinition.MapAsset != null
-                ? floorDefinition.MapAsset
-                : runMapAsset;
+            if(floorDefinition == null || floorDefinition.MapAsset == null)
+            {
+                Debug.LogError("[MapGenerator] Failed to CreateRunMap. RunFloorDefinition is inValid");
+                return null;
+            }
+
+            MapAsset floorMapAsset = floorDefinition.MapAsset;
 
             Debug.Log(
                 $"[MapGenerator] CreateRunMap floor={floor}, fallbackFloor={fallbackFloor}, " +
                 $"floorDefinition={(floorDefinition != null ? "set" : "null")}, " +
-                $"floorMapAsset={DescribeAsset(floorMapAsset)}, runMapAsset={DescribeAsset(runMapAsset)}, " +
+                $"floorMapAsset={DescribeAsset(floorMapAsset)}, " +
                 $"roomAssetCount={(floorDefinition != null && floorDefinition.RoomAssets != null ? floorDefinition.RoomAssets.Count : 0)}");
 
             RoomTemplateSet roomTemplates = CreateRoomTemplates(floorDefinition, floorMapAsset);
@@ -68,7 +71,7 @@ namespace Arkeum.Production.Gameplay.Map
 
         private static MapDefinition CreateDungeonMap(RoomTemplateSet roomTemplates, DungeonGenerationSettings settings)
         {
-            System.Random random = new System.Random(settings.RandomSeed + settings.Floor * 97);
+            System.Random random = new System.Random();
             MapDefinition map = new MapDefinition
             {
                 RunFloor = settings.Floor,
@@ -264,6 +267,7 @@ namespace Arkeum.Production.Gameplay.Map
         {
             List<TemplateCell> cells = new List<TemplateCell>();
             List<TemplateDoor> doors = new List<TemplateDoor>();
+            List<TemplateEnemySpawn> enemySpawns = new List<TemplateEnemySpawn>();
             Vector2Int origin = asset != null ? asset.PlayerSpawn : Vector2Int.zero;
             int ignoredDoors = 0;
 
@@ -300,6 +304,17 @@ namespace Arkeum.Production.Gameplay.Map
 
                     doors.Add(new TemplateDoor(position, door.Direction));
                 }
+
+                for (int i = 0; i < asset.EnemySpawns.Count; i++)
+                {
+                    EnemySpawnDefinition enemySpawn = asset.EnemySpawns[i];
+                    if (enemySpawn == null || enemySpawn.EnemyDefinition == null)
+                    {
+                        continue;
+                    }
+
+                    enemySpawns.Add(new TemplateEnemySpawn(enemySpawn.EnemyDefinition, enemySpawn.Position - origin));
+                }
             }
 
             if (cells.Count == 0)
@@ -324,7 +339,7 @@ namespace Arkeum.Production.Gameplay.Map
                 Debug.LogWarning($"[MapGenerator] Ignored doors outside walkable cells. asset={DescribeAsset(asset)}, ignoredDoors={ignoredDoors}, validDoors={doors.Count}");
             }
 
-            return new RoomTemplate(cells, doors);
+            return new RoomTemplate(cells, doors, enemySpawns);
         }
 
         private static PlacedRoom CreatePlacedRoom(int id, RoomTemplate template, Vector2Int origin, Vector2Int gridPosition)
@@ -340,6 +355,7 @@ namespace Arkeum.Production.Gameplay.Map
             Dictionary<Vector2Int, int> depthByCell = new Dictionary<Vector2Int, int>();
             HashSet<Vector2Int> cellSet = new HashSet<Vector2Int>();
             List<DungeonDoorDefinition> doorCandidates = new List<DungeonDoorDefinition>();
+            List<EnemySpawnDefinition> enemySpawns = new List<EnemySpawnDefinition>();
             for (int i = 0; i < template.Cells.Count; i++)
             {
                 TemplateCell templateCell = template.Cells[i];
@@ -359,7 +375,17 @@ namespace Arkeum.Production.Gameplay.Map
                 });
             }
 
-            return new PlacedRoom(id, gridPosition, definition, depthByCell, cellSet, doorCandidates);
+            for (int i = 0; i < template.EnemySpawns.Count; i++)
+            {
+                TemplateEnemySpawn templateEnemySpawn = template.EnemySpawns[i];
+                enemySpawns.Add(new EnemySpawnDefinition
+                {
+                    EnemyDefinition = templateEnemySpawn.EnemyDefinition,
+                    Position = templateEnemySpawn.Position + origin,
+                });
+            }
+
+            return new PlacedRoom(id, gridPosition, definition, depthByCell, cellSet, doorCandidates, enemySpawns);
         }
 
         private static bool TryBuildDoorConnection(PlacedRoom from, PlacedRoom to, out DoorConnection connection)
@@ -527,6 +553,11 @@ namespace Arkeum.Production.Gameplay.Map
                 AddWalkableCell(map, pair.Key, pair.Value);
                 occupiedRoomCells.Add(pair.Key);
             }
+
+            for (int i = 0; i < room.EnemySpawns.Count; i++)
+            {
+                map.EnemySpawns.Add(room.EnemySpawns[i]);
+            }
         }
 
         private static void AddCorridor(MapDefinition map, int fromRoomId, int toRoomId, DoorConnection connection, List<Vector2Int> corridorCells, int floor)
@@ -664,6 +695,21 @@ namespace Arkeum.Production.Gameplay.Map
                 map.TemporaryWeaponSpawns.Add(asset.TemporaryWeaponSpawns[i]);
             }
 
+            for (int i = 0; i < asset.EnemySpawns.Count; i++)
+            {
+                EnemySpawnDefinition enemySpawn = asset.EnemySpawns[i];
+                if (enemySpawn == null || enemySpawn.EnemyDefinition == null)
+                {
+                    continue;
+                }
+
+                map.EnemySpawns.Add(new EnemySpawnDefinition
+                {
+                    EnemyDefinition = enemySpawn.EnemyDefinition,
+                    Position = enemySpawn.Position,
+                });
+            }
+
             for (int i = 0; i < asset.Cells.Count; i++)
             {
                 MapCellData cell = asset.Cells[i];
@@ -769,15 +815,17 @@ namespace Arkeum.Production.Gameplay.Map
         {
             public readonly List<TemplateCell> Cells;
             public readonly List<TemplateDoor> Doors;
+            public readonly List<TemplateEnemySpawn> EnemySpawns;
             public readonly Vector2Int Min;
             public readonly Vector2Int Max;
             public readonly int Width;
             public readonly int Height;
 
-            public RoomTemplate(List<TemplateCell> cells, List<TemplateDoor> doors)
+            public RoomTemplate(List<TemplateCell> cells, List<TemplateDoor> doors, List<TemplateEnemySpawn> enemySpawns)
             {
                 Cells = cells;
                 Doors = doors;
+                EnemySpawns = enemySpawns;
                 Min = cells[0].Position;
                 Max = cells[0].Position;
 
@@ -829,6 +877,18 @@ namespace Arkeum.Production.Gameplay.Map
             }
         }
 
+        private readonly struct TemplateEnemySpawn
+        {
+            public readonly EnemyDefinition EnemyDefinition;
+            public readonly Vector2Int Position;
+
+            public TemplateEnemySpawn(EnemyDefinition enemyDefinition, Vector2Int position)
+            {
+                EnemyDefinition = enemyDefinition;
+                Position = position;
+            }
+        }
+
         private sealed class PlacedRoom
         {
             public readonly int Id;
@@ -837,6 +897,7 @@ namespace Arkeum.Production.Gameplay.Map
             public readonly Dictionary<Vector2Int, int> DepthByCell;
             public readonly HashSet<Vector2Int> CellSet;
             public readonly List<DungeonDoorDefinition> DoorCandidates;
+            public readonly List<EnemySpawnDefinition> EnemySpawns;
 
             public PlacedRoom(
                 int id,
@@ -844,7 +905,8 @@ namespace Arkeum.Production.Gameplay.Map
                 DungeonRoomDefinition definition,
                 Dictionary<Vector2Int, int> depthByCell,
                 HashSet<Vector2Int> cellSet,
-                List<DungeonDoorDefinition> doorCandidates)
+                List<DungeonDoorDefinition> doorCandidates,
+                List<EnemySpawnDefinition> enemySpawns)
             {
                 Id = id;
                 GridPosition = gridPosition;
@@ -852,6 +914,7 @@ namespace Arkeum.Production.Gameplay.Map
                 DepthByCell = depthByCell;
                 CellSet = cellSet;
                 DoorCandidates = doorCandidates;
+                EnemySpawns = enemySpawns;
             }
         }
 
@@ -861,30 +924,27 @@ namespace Arkeum.Production.Gameplay.Map
             public readonly int MinimumRoomCount;
             public readonly int RoomGap;
             public readonly int PlacementAttempts;
-            public readonly int RandomSeed;
 
-            private DungeonGenerationSettings(int floor, int minimumRoomCount, int roomGap, int placementAttempts, int randomSeed)
+            private DungeonGenerationSettings(int floor, int minimumRoomCount, int roomGap, int placementAttempts)
             {
                 Floor = floor;
                 MinimumRoomCount = Mathf.Max(6, minimumRoomCount);
                 RoomGap = Mathf.Max(1, roomGap);
                 PlacementAttempts = Mathf.Max(MinimumRoomCount, placementAttempts);
-                RandomSeed = randomSeed;
             }
 
             public static DungeonGenerationSettings From(RunFloorDefinition floorDefinition, int floor)
             {
                 if (floorDefinition == null)
                 {
-                    return new DungeonGenerationSettings(floor, 6, 5, 300, 173);
+                    return new DungeonGenerationSettings(floor, 6, 5, 300);
                 }
 
                 return new DungeonGenerationSettings(
                     floor,
                     floorDefinition.MinimumRoomCount,
                     floorDefinition.RoomGap,
-                    floorDefinition.PlacementAttempts,
-                    floorDefinition.RandomSeed);
+                    floorDefinition.PlacementAttempts);
             }
         }
 

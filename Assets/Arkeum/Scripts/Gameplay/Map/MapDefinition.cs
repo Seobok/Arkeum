@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Arkeum.Production.Gameplay.Run;
 using UnityEngine;
 
 namespace Arkeum.Production.Gameplay.Map
@@ -16,6 +17,7 @@ namespace Arkeum.Production.Gameplay.Map
         public Vector2Int UndertakerPosition;
         public List<Vector2Int> WalkableCells = new List<Vector2Int>();
         public List<Vector2Int> TemporaryWeaponSpawns = new List<Vector2Int>();
+        public List<EnemySpawnDefinition> EnemySpawns = new List<EnemySpawnDefinition>();
         public List<DungeonRoomDefinition> Rooms = new List<DungeonRoomDefinition>();
         public List<DungeonCorridorDefinition> Corridors = new List<DungeonCorridorDefinition>();
         public Dictionary<Vector2Int, int> DepthByCell = new Dictionary<Vector2Int, int>();

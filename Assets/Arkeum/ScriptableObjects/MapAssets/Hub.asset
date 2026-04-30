@@ -15,17 +15,15 @@ MonoBehaviour:
   EditorMin: {x: -8, y: -5}
   EditorMax: {x: 16, y: 5}
   PlayerSpawn: {x: 0, y: 0}
-  MerchantPosition: {x: -2, y: 0}
-  ReliquaryPosition: {x: 0, y: -2}
-  StartAltarPosition: {x: 2, y: 0}
-  UnlockAltarPosition: {x: 0, y: 0}
+  MerchantPosition: {x: 0, y: 0}
+  ReliquaryPosition: {x: 0, y: 0}
+  StartAltarPosition: {x: 3, y: 0}
+  UnlockAltarPosition: {x: -3, y: 0}
   UndertakerPosition: {x: 0, y: 2}
   TemporaryWeaponSpawns: []
+  EnemySpawns: []
   Cells:
   - Position: {x: 1, y: 0}
-    Walkable: 1
-    Depth: 1
-  - Position: {x: 0, y: 0}
     Walkable: 1
     Depth: 1
   - Position: {x: -1, y: 0}
@@ -46,9 +44,6 @@ MonoBehaviour:
   - Position: {x: 2, y: 1}
     Walkable: 1
     Depth: 1
-  - Position: {x: 2, y: 0}
-    Walkable: 1
-    Depth: 1
   - Position: {x: 2, y: -1}
     Walkable: 1
     Depth: 1
@@ -64,12 +59,6 @@ MonoBehaviour:
   - Position: {x: -2, y: -1}
     Walkable: 1
     Depth: 1
-  - Position: {x: -2, y: 0}
-    Walkable: 1
-    Depth: 1
-  - Position: {x: -3, y: 2}
-    Walkable: 1
-    Depth: 1
   - Position: {x: -3, y: 1}
     Walkable: 1
     Depth: 1
@@ -83,15 +72,6 @@ MonoBehaviour:
     Walkable: 1
     Depth: 1
   - Position: {x: -2, y: -2}
-    Walkable: 1
-    Depth: 1
-  - Position: {x: -1, y: -2}
-    Walkable: 1
-    Depth: 1
-  - Position: {x: 0, y: -2}
-    Walkable: 1
-    Depth: 1
-  - Position: {x: 1, y: -2}
     Walkable: 1
     Depth: 1
   - Position: {x: 2, y: -2}
@@ -118,13 +98,34 @@ MonoBehaviour:
   - Position: {x: 1, y: 2}
     Walkable: 1
     Depth: 1
-  - Position: {x: 0, y: 2}
-    Walkable: 1
-    Depth: 1
   - Position: {x: -1, y: 2}
     Walkable: 1
     Depth: 1
   - Position: {x: -2, y: 2}
+    Walkable: 1
+    Depth: 1
+  - Position: {x: 0, y: 2}
+    Walkable: 1
+    Depth: 1
+  - Position: {x: -2, y: 0}
+    Walkable: 1
+    Depth: 1
+  - Position: {x: 0, y: -2}
+    Walkable: 1
+    Depth: 1
+  - Position: {x: 2, y: 0}
+    Walkable: 1
+    Depth: 1
+  - Position: {x: -3, y: 2}
+    Walkable: 1
+    Depth: 1
+  - Position: {x: 0, y: 0}
+    Walkable: 1
+    Depth: 1
+  - Position: {x: -1, y: -2}
+    Walkable: 1
+    Depth: 1
+  - Position: {x: 1, y: -2}
     Walkable: 1
     Depth: 1
   Doors: []

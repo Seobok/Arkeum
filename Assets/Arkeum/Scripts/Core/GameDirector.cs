@@ -249,11 +249,13 @@ namespace Arkeum.Production.Core
                 },
             };
 
-            if (floorDefinition != null && floorDefinition.EnemySpawns.Count > 0)
+            IReadOnlyList<EnemySpawnDefinition> enemySpawns = map.EnemySpawns;
+
+            if (enemySpawns != null && enemySpawns.Count > 0)
             {
-                for (int i = 0; i < floorDefinition.EnemySpawns.Count; i++)
+                for (int i = 0; i < enemySpawns.Count; i++)
                 {
-                    ActorEntity enemy = CreateEnemy(floorDefinition.EnemySpawns[i], i);
+                    ActorEntity enemy = CreateEnemy(enemySpawns[i], i);
                     if (enemy != null)
                     {
                         actors.Add(enemy);
@@ -316,12 +318,23 @@ namespace Arkeum.Production.Core
                 return;
             }
 
-            Services.InteractionSystem.SetInteractables(new IInteractable[]
+            List<IInteractable> hubInteractables = new List<IInteractable>();
+            if (IsMarkerEnabled(map.StartAltarPosition))
             {
-                new GridInteractable(InteractableType.StartAltar, map.StartAltarPosition, _ => StartRun()),
-                new GridInteractable(InteractableType.UnlockAltar, map.UnlockAltarPosition, _ => TryUnlockStartingBandage()),
-                new GridInteractable(InteractableType.Undertaker, map.UndertakerPosition, _ => AdvanceUndertakerDialogue()),
-            });
+                hubInteractables.Add(new GridInteractable(InteractableType.StartAltar, map.StartAltarPosition, _ => StartRun()));
+            }
+
+            if (IsMarkerEnabled(map.UnlockAltarPosition))
+            {
+                hubInteractables.Add(new GridInteractable(InteractableType.UnlockAltar, map.UnlockAltarPosition, _ => TryUnlockStartingBandage()));
+            }
+
+            if (IsMarkerEnabled(map.UndertakerPosition))
+            {
+                hubInteractables.Add(new GridInteractable(InteractableType.Undertaker, map.UndertakerPosition, _ => AdvanceUndertakerDialogue()));
+            }
+
+            Services.InteractionSystem.SetInteractables(hubInteractables);
         }
 
         private void TryUnlockStartingBandage()
@@ -346,13 +359,13 @@ namespace Arkeum.Production.Core
         private void UpdateHubLocationMessage()
         {
             MapDefinition map = Services.MapService.CurrentMap;
-            if (hubPlayerPosition == map.StartAltarPosition)
+            if (IsMarkerEnabled(map.StartAltarPosition) && hubPlayerPosition == map.StartAltarPosition)
             {
                 Services.HudPresenter.SetMessage("Move into the start altar to begin a run.");
                 return;
             }
 
-            if (hubPlayerPosition == map.UnlockAltarPosition)
+            if (IsMarkerEnabled(map.UnlockAltarPosition) && hubPlayerPosition == map.UnlockAltarPosition)
             {
                 Services.HudPresenter.SetMessage(ActiveProfile.StartingBandageUnlocked
                     ? "The bandage unlock altar is already active."
@@ -360,7 +373,7 @@ namespace Arkeum.Production.Core
                 return;
             }
 
-            if (hubPlayerPosition == map.UndertakerPosition)
+            if (IsMarkerEnabled(map.UndertakerPosition) && hubPlayerPosition == map.UndertakerPosition)
             {
                 Services.HudPresenter.SetMessage("Move into the undertaker to continue the conversation.");
                 return;
@@ -412,6 +425,11 @@ namespace Arkeum.Production.Core
             return Object.FindObjectsByType<SceneInteractableMarker>(FindObjectsSortMode.None);
         }
 
+        private static bool IsMarkerEnabled(Vector2Int position)
+        {
+            return position != Vector2Int.zero;
+        }
+
         private void HandleHubMarkerInteraction(InteractableType interactableType)
         {
             switch (interactableType)
@@ -443,7 +461,6 @@ namespace Arkeum.Production.Core
             {
                 Id = $"{enemyDefinition.EnemyId}_{index}",
                 DisplayName = enemyDefinition.DisplayName,
-                BrainType = enemyDefinition.BrainType,
                 GridPosition = spawnDefinition.Position,
                 FacingDirection = Vector2Int.up,
                 CurrentHp = stats.MaxHp,

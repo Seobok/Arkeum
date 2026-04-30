@@ -74,16 +74,25 @@ namespace Arkeum.Production.Gameplay.Actors
         {
             ActorEntity enemy = context.Enemy;
             ActorEntity player = context.Player;
-            Vector2Int targetCell = HasPendingAttack(context)
-                ? enemy.PendingEnemyTargetCell
-                : player.GridPosition;
-            if (!TryCompletePreparation(enemy, EnemyActionType.Attack, enemy.Stats.AttackPreparationTurns, targetCell))
+            Vector2Int targetCell;
+            Vector2Int attackFacing;
+            if (HasPendingAttack(context))
+            {
+                targetCell = enemy.PendingEnemyTargetCell;
+                attackFacing = enemy.PendingEnemyFacingDirection;
+            }
+            else if (!TryGetAttackTarget(enemy, player.GridPosition, out targetCell, out attackFacing))
+            {
+                return BehaviorTreeStatus.Failure;
+            }
+
+            if (!TryCompletePreparation(enemy, EnemyActionType.Attack, enemy.Stats.AttackPreparationTurns, targetCell, attackFacing))
             {
                 return BehaviorTreeStatus.Running;
             }
 
             enemy.FacingDirection = enemy.PendingEnemyFacingDirection;
-            if (player.GridPosition == enemy.PendingEnemyTargetCell)
+            if (IsInPreparedAttackRange(enemy, player.GridPosition))
             {
                 combatSystem.ResolveEnemyAttack(enemy, player);
             }
@@ -263,13 +272,23 @@ namespace Arkeum.Production.Gameplay.Actors
 
         private static bool TryCompletePreparation(ActorEntity enemy, EnemyActionType actionType, int requiredTurns, Vector2Int targetCell)
         {
+            return TryCompletePreparation(enemy, actionType, requiredTurns, targetCell, enemy.FacingDirection);
+        }
+
+        private static bool TryCompletePreparation(
+            ActorEntity enemy,
+            EnemyActionType actionType,
+            int requiredTurns,
+            Vector2Int targetCell,
+            Vector2Int pendingFacingDirection)
+        {
             requiredTurns = Mathf.Max(0, requiredTurns);
             if (enemy.PendingEnemyAction != actionType)
             {
                 enemy.PendingEnemyAction = actionType;
                 enemy.PendingEnemyActionTurns = 0;
                 enemy.PendingEnemyTargetCell = targetCell;
-                enemy.PendingEnemyFacingDirection = enemy.FacingDirection;
+                enemy.PendingEnemyFacingDirection = pendingFacingDirection;
                 enemy.HasPendingEnemyTargetCell = true;
                 return requiredTurns == 0;
             }
@@ -277,7 +296,7 @@ namespace Arkeum.Production.Gameplay.Actors
             if (!enemy.HasPendingEnemyTargetCell)
             {
                 enemy.PendingEnemyTargetCell = targetCell;
-                enemy.PendingEnemyFacingDirection = enemy.FacingDirection;
+                enemy.PendingEnemyFacingDirection = pendingFacingDirection;
                 enemy.HasPendingEnemyTargetCell = true;
             }
 
@@ -301,16 +320,46 @@ namespace Arkeum.Production.Gameplay.Actors
 
         private static bool CanAttack(ActorEntity enemy, Vector2Int target)
         {
+            return TryGetAttackTarget(enemy, target, out _, out _);
+        }
+
+        private static bool TryGetAttackTarget(
+            ActorEntity enemy,
+            Vector2Int target,
+            out Vector2Int targetCell,
+            out Vector2Int attackFacing)
+        {
+            targetCell = target;
             EnemyAttackPatternDefinition attackPattern = enemy.EnemyDefinition != null
                 ? enemy.EnemyDefinition.AttackPattern
                 : null;
             if (attackPattern != null)
             {
-                return attackPattern.ContainsTarget(enemy.GridPosition, enemy.FacingDirection, target);
+                return attackPattern.TryGetTargetFacing(enemy.GridPosition, target, out attackFacing);
             }
 
             Vector2Int delta = target - enemy.GridPosition;
-            return IsStraightLine(delta, 1);
+            if (IsStraightLine(delta, 1))
+            {
+                attackFacing = GetFacingToward(enemy.GridPosition, target, enemy.FacingDirection);
+                return true;
+            }
+
+            attackFacing = enemy.FacingDirection;
+            return false;
+        }
+
+        private static bool IsInPreparedAttackRange(ActorEntity enemy, Vector2Int target)
+        {
+            EnemyAttackPatternDefinition attackPattern = enemy.EnemyDefinition != null
+                ? enemy.EnemyDefinition.AttackPattern
+                : null;
+            if (attackPattern != null)
+            {
+                return attackPattern.ContainsTargetAtFacing(enemy.GridPosition, enemy.PendingEnemyFacingDirection, target);
+            }
+
+            return target == enemy.PendingEnemyTargetCell;
         }
 
         private static bool IsStraightLine(Vector2Int delta, int range)

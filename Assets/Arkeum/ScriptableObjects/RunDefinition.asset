@@ -25,5 +25,4 @@ MonoBehaviour:
     MinimumRoomCount: 6
     RoomGap: 5
     PlacementAttempts: 300
-    RandomSeed: 173
     EnemySpawns: []

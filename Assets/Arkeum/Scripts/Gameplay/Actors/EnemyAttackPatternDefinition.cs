@@ -39,10 +39,50 @@ namespace Arkeum.Production.Gameplay.Actors
 
         public bool ContainsTarget(Vector2Int origin, Vector2Int facingDirection, Vector2Int target)
         {
+            if (rotateByFacing)
+            {
+                return TryGetTargetFacing(origin, target, out _);
+            }
+
+            return ContainsTargetAtFacing(origin, Vector2Int.right, target);
+        }
+
+        public bool TryGetTargetFacing(Vector2Int origin, Vector2Int target, out Vector2Int matchedFacing)
+        {
+            if (!rotateByFacing)
+            {
+                matchedFacing = Vector2Int.right;
+                return ContainsTargetAtFacing(origin, matchedFacing, target);
+            }
+
+            Vector2Int[] clockwiseFacings =
+            {
+                Vector2Int.right,
+                Vector2Int.down,
+                Vector2Int.left,
+                Vector2Int.up,
+            };
+
+            for (int i = 0; i < clockwiseFacings.Length; i++)
+            {
+                Vector2Int facing = clockwiseFacings[i];
+                if (ContainsTargetAtFacing(origin, facing, target))
+                {
+                    matchedFacing = facing;
+                    return true;
+                }
+            }
+
+            matchedFacing = Vector2Int.right;
+            return false;
+        }
+
+        public bool ContainsTargetAtFacing(Vector2Int origin, Vector2Int facingDirection, Vector2Int target)
+        {
             Vector2Int delta = target - origin;
             for (int i = 0; i < offsets.Count; i++)
             {
-                Vector2Int offset = rotateByFacing ? RotateOffset(offsets[i], facingDirection) : offsets[i];
+                Vector2Int offset = RotateOffset(offsets[i], facingDirection);
                 if (offset == delta)
                 {
                     return true;
@@ -71,17 +111,17 @@ namespace Arkeum.Production.Gameplay.Actors
         public static Vector2Int RotateOffset(Vector2Int offset, Vector2Int facingDirection)
         {
             Vector2Int facing = NormalizeFacing(facingDirection);
-            if (facing == Vector2Int.up)
+            if (facing == Vector2Int.right)
             {
                 return offset;
             }
 
-            if (facing == Vector2Int.right)
+            if (facing == Vector2Int.down)
             {
                 return new Vector2Int(offset.y, -offset.x);
             }
 
-            if (facing == Vector2Int.down)
+            if (facing == Vector2Int.left)
             {
                 return new Vector2Int(-offset.x, -offset.y);
             }
