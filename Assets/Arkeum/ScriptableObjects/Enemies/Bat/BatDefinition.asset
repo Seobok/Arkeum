@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fd7b7060f6900334b8d48f50d9aceeff, type: 3}
   m_Name: BatDefinition
   m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Gameplay.Actors.EnemyDefinition
-  enemyId: bat
+  enemyId: Bat
   displayName: "\uC131\uD608\uBC15\uC950"
   stats:
     MaxHp: 1
@@ -25,3 +25,5 @@ MonoBehaviour:
     MovePreparationTurns: 1
   bloodReward: 1
   attackPattern: {fileID: 0}
+  sprite: {fileID: 0}
+  tint: {r: 1, g: 1, b: 1, a: 1}

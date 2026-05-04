@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fd7b7060f6900334b8d48f50d9aceeff, type: 3}
   m_Name: SkeletonDefinition
   m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Gameplay.Actors.EnemyDefinition
-  enemyId: skeleton
+  enemyId: Skeleton
   displayName: "\uC7AC\uBB3B\uC740 \uD574\uACE8\uBCD1"
   stats:
     MaxHp: 2
@@ -25,3 +25,5 @@ MonoBehaviour:
     MovePreparationTurns: 1
   bloodReward: 1
   attackPattern: {fileID: 11400000, guid: 5c561af495ad5284bad0ecd44fa28faf, type: 2}
+  sprite: {fileID: 0}
+  tint: {r: 1, g: 1, b: 1, a: 1}
