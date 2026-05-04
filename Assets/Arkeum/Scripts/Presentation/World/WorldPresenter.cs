@@ -8,6 +8,8 @@ namespace Arkeum.Production.Presentation.World
 {
     public sealed class WorldPresenter : MonoBehaviour
     {
+        [SerializeField] private WorldVisualSet visualSet;
+
         private readonly List<GameObject> spawnedViews = new List<GameObject>();
         private readonly ProductionViewFactory viewFactory = new ProductionViewFactory();
 
@@ -97,50 +99,68 @@ namespace Arkeum.Production.Presentation.World
         {
             foreach (Vector2Int cell in map.WalkableCells)
             {
-                Color floorColor = map.DepthByCell.TryGetValue(cell, out int depth) && depth >= 2
-                    ? new Color(0.12f, 0.09f, 0.16f)
-                    : new Color(0.16f, 0.13f, 0.14f);
-                spawnedViews.Add(viewFactory.CreateCell(floorRoot, cell, floorColor, $"Cell_{cell.x}_{cell.y}", 0));
+                spawnedViews.Add(viewFactory.CreateCell(
+                    floorRoot,
+                    cell,
+                    GetFloorSprite(),
+                    GetFloorTint(),
+                    $"Cell_{cell.x}_{cell.y}",
+                    0));
             }
 
-            for (int i = 0; i < map.TemporaryWeaponSpawns.Count; i++)
+            for (int i = 0; i < map.WeaponSpawns.Count; i++)
             {
-                spawnedViews.Add(viewFactory.CreateCell(markerRoot, map.TemporaryWeaponSpawns[i], new Color(0.75f, 0.43f, 0.18f), $"Weapon_{i}", 4));
+                WeaponSpawnDefinition weaponSpawn = map.WeaponSpawns[i];
+                if (weaponSpawn == null)
+                {
+                    continue;
+                }
+
+                spawnedViews.Add(viewFactory.CreateCell(
+                    markerRoot,
+                    weaponSpawn.Position,
+                    GetWeaponSprite(weaponSpawn.Weapon),
+                    GetWeaponTint(weaponSpawn.Weapon),
+                    $"Weapon_{i}",
+                    4));
             }
 
-            if (map.MerchantPosition != Vector2Int.zero)
+            if (map.FloorExitPosition != Vector2Int.zero)
             {
-                spawnedViews.Add(viewFactory.CreateCell(markerRoot, map.MerchantPosition, new Color(0.1f, 0.4f, 0.37f), "MerchantMarker", 3));
-            }
-
-            if (map.ReliquaryPosition != Vector2Int.zero)
-            {
-                spawnedViews.Add(viewFactory.CreateCell(markerRoot, map.ReliquaryPosition, new Color(0.76f, 0.65f, 0.17f), "ReliquaryMarker", 2));
+                spawnedViews.Add(viewFactory.CreateCell(
+                    markerRoot,
+                    map.FloorExitPosition,
+                    GetFloorExitSprite(),
+                    GetFloorExitTint(),
+                    "FloorExitMarker",
+                    2));
             }
         }
 
         private void DrawHubMarkers()
         {
-            if (IsMarkerEnabled(CurrentMap.StartAltarPosition))
+            if (IsMarkerEnabled(CurrentMap.DungeonEntrancePosition))
             {
-                spawnedViews.Add(viewFactory.CreateCell(markerRoot, CurrentMap.StartAltarPosition, new Color(0.62f, 0.29f, 0.22f), "HubStartGate", 2));
+                spawnedViews.Add(viewFactory.CreateCell(
+                    markerRoot,
+                    CurrentMap.DungeonEntrancePosition,
+                    GetDungeonEntranceSprite(),
+                    GetDungeonEntranceTint(),
+                    "DungeonEntrance",
+                    2));
             }
 
-            if (IsMarkerEnabled(CurrentMap.UnlockAltarPosition))
-            {
-                spawnedViews.Add(viewFactory.CreateCell(markerRoot, CurrentMap.UnlockAltarPosition, new Color(0.84f, 0.73f, 0.28f), "HubUnlock", 2));
-            }
-
-            if (IsMarkerEnabled(CurrentMap.UndertakerPosition))
-            {
-                spawnedViews.Add(viewFactory.CreateCell(markerRoot, CurrentMap.UndertakerPosition, new Color(0.19f, 0.55f, 0.51f), "HubUndertaker", 2));
-                spawnedViews.Add(viewFactory.CreateActor(actorRoot, "Undertaker", CurrentMap.UndertakerPosition, new Color(0.19f, 0.55f, 0.51f), 10));
-            }
         }
 
         private void DrawHubPlayer()
         {
-            spawnedViews.Add(viewFactory.CreateActor(actorRoot, "HubPlayer", HubPlayerPosition, new Color(0.91f, 0.86f, 0.78f), 20));
+            spawnedViews.Add(viewFactory.CreateActor(
+                actorRoot,
+                "HubPlayer",
+                HubPlayerPosition,
+                GetPlayerSprite(),
+                GetPlayerTint(),
+                20));
         }
 
         private void DrawRunActors()
@@ -154,20 +174,23 @@ namespace Arkeum.Production.Presentation.World
                     continue;
                 }
 
-                Color color;
+                Sprite sprite;
+                Color tint;
                 int sortingOrder;
                 if (actor.IsPlayer)
                 {
-                    color = new Color(0.91f, 0.86f, 0.78f);
+                    sprite = GetPlayerSprite();
+                    tint = GetPlayerTint();
                     sortingOrder = 20;
                 }
                 else
                 {
-                    color = new Color(0.63f, 0.25f, 0.21f);
+                    sprite = GetEnemySprite(actor);
+                    tint = GetEnemyTint(actor);
                     sortingOrder = 10;
                 }
 
-                spawnedViews.Add(viewFactory.CreateActor(actorRoot, actor.DisplayName, actor.GridPosition, color, sortingOrder));
+                spawnedViews.Add(viewFactory.CreateActor(actorRoot, actor.DisplayName, actor.GridPosition, sprite, tint, sortingOrder));
             }
         }
 
@@ -207,7 +230,6 @@ namespace Arkeum.Production.Presentation.World
 
         private void DrawEnemyPreparedAttackMarkers(ActorEntity actor)
         {
-            Color color = new Color(0.82f, 0.16f, 0.13f);
             EnemyAttackPatternDefinition attackPattern = actor.EnemyDefinition != null
                 ? actor.EnemyDefinition.AttackPattern
                 : null;
@@ -215,7 +237,13 @@ namespace Arkeum.Production.Presentation.World
             if (attackPattern == null)
             {
                 string fallbackMarkerName = $"Pending_{actor.PendingEnemyAction}_{actor.Id}";
-                spawnedViews.Add(viewFactory.CreateCell(markerRoot, actor.PendingEnemyTargetCell, color, fallbackMarkerName, 6));
+                spawnedViews.Add(viewFactory.CreateCell(
+                    markerRoot,
+                    actor.PendingEnemyTargetCell,
+                    GetEnemyAttackMarkerSprite(),
+                    GetEnemyAttackMarkerTint(),
+                    fallbackMarkerName,
+                    6));
                 return;
             }
 
@@ -232,15 +260,26 @@ namespace Arkeum.Production.Presentation.World
                 }
 
                 string markerName = $"Pending_{actor.PendingEnemyAction}_{actor.Id}_{markerCell.x}_{markerCell.y}";
-                spawnedViews.Add(viewFactory.CreateCell(markerRoot, markerCell, color, markerName, 6));
+                spawnedViews.Add(viewFactory.CreateCell(
+                    markerRoot,
+                    markerCell,
+                    GetEnemyAttackMarkerSprite(),
+                    GetEnemyAttackMarkerTint(),
+                    markerName,
+                    6));
             }
         }
 
         private void DrawEnemyPreparedMoveMarker(ActorEntity actor)
         {
-            Color color = new Color(0.18f, 0.68f, 0.26f);
             string markerName = $"Pending_{actor.PendingEnemyAction}_{actor.Id}";
-            spawnedViews.Add(viewFactory.CreateCell(markerRoot, actor.PendingEnemyTargetCell, color, markerName, 6));
+            spawnedViews.Add(viewFactory.CreateCell(
+                markerRoot,
+                actor.PendingEnemyTargetCell,
+                GetEnemyMoveMarkerSprite(),
+                GetEnemyMoveMarkerTint(),
+                markerName,
+                6));
         }
 
         private void EnsureCamera()
@@ -295,6 +334,106 @@ namespace Arkeum.Production.Presentation.World
         private static bool IsMarkerEnabled(Vector2Int position)
         {
             return position != Vector2Int.zero;
+        }
+
+        private Sprite GetFloorSprite()
+        {
+            return visualSet != null ? visualSet.FloorSprite : null;
+        }
+
+        private Color GetFloorTint()
+        {
+            return visualSet != null ? visualSet.FloorTint : new Color(0.16f, 0.13f, 0.14f);
+        }
+
+        private Sprite GetPlayerSprite()
+        {
+            return visualSet != null ? visualSet.PlayerSprite : null;
+        }
+
+        private Color GetPlayerTint()
+        {
+            return visualSet != null ? visualSet.PlayerTint : new Color(0.91f, 0.86f, 0.78f);
+        }
+
+        private Sprite GetEnemySprite(ActorEntity actor)
+        {
+            if (actor?.EnemyDefinition != null && actor.EnemyDefinition.Sprite != null)
+            {
+                return actor.EnemyDefinition.Sprite;
+            }
+
+            return visualSet != null ? visualSet.DefaultEnemySprite : null;
+        }
+
+        private Color GetEnemyTint(ActorEntity actor)
+        {
+            if (actor?.EnemyDefinition != null && actor.EnemyDefinition.Sprite != null)
+            {
+                return actor.EnemyDefinition.Tint;
+            }
+
+            return visualSet != null ? visualSet.DefaultEnemyTint : new Color(0.63f, 0.25f, 0.21f);
+        }
+
+        private Sprite GetWeaponSprite(WeaponDefinition weapon)
+        {
+            if (weapon != null && weapon.Sprite != null)
+            {
+                return weapon.Sprite;
+            }
+
+            return visualSet != null ? visualSet.DefaultWeaponSprite : null;
+        }
+
+        private Color GetWeaponTint(WeaponDefinition weapon)
+        {
+            if (weapon != null)
+            {
+                return weapon.Tint;
+            }
+
+            return visualSet != null ? visualSet.DefaultWeaponTint : new Color(0.75f, 0.43f, 0.18f);
+        }
+
+        private Sprite GetFloorExitSprite()
+        {
+            return visualSet != null ? visualSet.FloorExitSprite : null;
+        }
+
+        private Color GetFloorExitTint()
+        {
+            return visualSet != null ? visualSet.FloorExitTint : new Color(0.76f, 0.65f, 0.17f);
+        }
+
+        private Sprite GetDungeonEntranceSprite()
+        {
+            return visualSet != null ? visualSet.DungeonEntranceSprite : null;
+        }
+
+        private Color GetDungeonEntranceTint()
+        {
+            return visualSet != null ? visualSet.DungeonEntranceTint : new Color(0.62f, 0.29f, 0.22f);
+        }
+
+        private Sprite GetEnemyAttackMarkerSprite()
+        {
+            return visualSet != null ? visualSet.EnemyAttackMarkerSprite : null;
+        }
+
+        private Color GetEnemyAttackMarkerTint()
+        {
+            return visualSet != null ? visualSet.EnemyAttackMarkerTint : new Color(0.82f, 0.16f, 0.13f);
+        }
+
+        private Sprite GetEnemyMoveMarkerSprite()
+        {
+            return visualSet != null ? visualSet.EnemyMoveMarkerSprite : null;
+        }
+
+        private Color GetEnemyMoveMarkerTint()
+        {
+            return visualSet != null ? visualSet.EnemyMoveMarkerTint : new Color(0.18f, 0.68f, 0.26f);
         }
     }
 }

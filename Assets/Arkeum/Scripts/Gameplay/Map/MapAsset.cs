@@ -10,12 +10,9 @@ namespace Arkeum.Production.Gameplay.Map
         public Vector2Int EditorMin = new Vector2Int(-8, -5);
         public Vector2Int EditorMax = new Vector2Int(16, 5);
         public Vector2Int PlayerSpawn;
-        public Vector2Int MerchantPosition;
-        public Vector2Int ReliquaryPosition;
-        public Vector2Int StartAltarPosition;
-        public Vector2Int UnlockAltarPosition;
-        public Vector2Int UndertakerPosition;
-        public List<Vector2Int> TemporaryWeaponSpawns = new List<Vector2Int>();
+        public Vector2Int FloorExitPosition;
+        public Vector2Int DungeonEntrancePosition;
+        public List<WeaponSpawnDefinition> WeaponSpawns = new List<WeaponSpawnDefinition>();
         public List<EnemySpawnDefinition> EnemySpawns = new List<EnemySpawnDefinition>();
         public List<MapCellData> Cells = new List<MapCellData>();
         public List<MapDoorData> Doors = new List<MapDoorData>();
@@ -35,12 +32,11 @@ namespace Arkeum.Production.Gameplay.Map
             return false;
         }
 
-        public void SetCell(Vector2Int position, bool walkable, int depth)
+        public void SetCell(Vector2Int position, bool walkable)
         {
             if (TryGetCell(position, out MapCellData cell))
             {
                 cell.Walkable = walkable;
-                cell.Depth = depth;
                 return;
             }
 
@@ -48,7 +44,6 @@ namespace Arkeum.Production.Gameplay.Map
             {
                 Position = position,
                 Walkable = walkable,
-                Depth = depth,
             });
         }
 

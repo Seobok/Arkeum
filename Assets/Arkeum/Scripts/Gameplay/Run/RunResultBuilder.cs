@@ -10,10 +10,7 @@ namespace Arkeum.Production.Gameplay.Run
             return new[]
             {
                 $"Blood shards lost: {runState.BloodShards}",
-                $"Draughts left behind: {runState.DraughtCount}",
-                runState.TemporaryWeaponEquipped
-                    ? "Temporary weapon lost at the end of the run."
-                    : "No temporary weapon was equipped.",
+                FormatWeaponLoss(runState),
             };
         }
 
@@ -25,6 +22,21 @@ namespace Arkeum.Production.Gameplay.Run
                 $"Total returns: {profile.TotalReturns}",
                 $"Total gleam: {profile.Gleam}",
             };
+        }
+
+        private static string FormatWeaponLoss(RunState runState)
+        {
+            if (runState == null || !runState.HasEquippedWeapon)
+            {
+                return "No weapon was equipped.";
+            }
+
+            if (runState.EquippedWeapon == null)
+            {
+                return "Weapon lost at the end of the run.";
+            }
+
+            return $"{runState.EquippedWeapon.DisplayName} lost at the end of the run.";
         }
     }
 }

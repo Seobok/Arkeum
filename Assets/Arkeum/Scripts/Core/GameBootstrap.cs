@@ -71,9 +71,8 @@ namespace Arkeum.Production.Core
             TileOccupancyService tileOccupancyService = new TileOccupancyService();
             MapGenerator mapGenerator = new MapGenerator(hubMapAsset, runDefinition);
             MapService mapService = new MapService(mapGenerator, tileOccupancyService);
-            UnlockService unlockService = new UnlockService();
             QuestService questService = new QuestService();
-            ProgressionService progressionService = new ProgressionService(unlockService, questService);
+            ProgressionService progressionService = new ProgressionService(questService);
             RunResultBuilder runResultBuilder = new RunResultBuilder();
 
             return new ServiceRegistry(
@@ -86,6 +85,7 @@ namespace Arkeum.Production.Core
                 mapService,
                 progressionService,
                 runResultBuilder,
+                runDefinition,
                 worldPresenter,
                 hudPresenter);
         }

@@ -15,11 +15,8 @@ MonoBehaviour:
   EditorMin: {x: -5, y: -5}
   EditorMax: {x: 4, y: 4}
   PlayerSpawn: {x: 2, y: 2}
-  MerchantPosition: {x: 0, y: 0}
-  ReliquaryPosition: {x: 1, y: 1}
-  StartAltarPosition: {x: 0, y: 0}
-  UnlockAltarPosition: {x: 0, y: 0}
-  UndertakerPosition: {x: 0, y: 0}
+  FloorExitPosition: {x: 1, y: 1}
+  DungeonEntrancePosition: {x: 0, y: 0}
   TemporaryWeaponSpawns: []
   EnemySpawns:
   - EnemyDefinition: {fileID: 11400000, guid: a168e807141081d43b4b94ea558c25dd, type: 2}

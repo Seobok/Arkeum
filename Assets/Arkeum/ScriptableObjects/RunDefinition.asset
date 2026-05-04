@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e741c53b728848c4d8f4c42943db6029, type: 3}
   m_Name: RunDefinition
   m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Gameplay.Run.RunDefinition
+  startingLoadout: {fileID: 11400000, guid: cda73b7ccfdd4cb9b2c7596c9ced96fa, type: 2}
   floors:
   - FloorIndex: 1
     MapAsset: {fileID: 11400000, guid: 5454b70dab147d04aa66c5421932c83a, type: 2}

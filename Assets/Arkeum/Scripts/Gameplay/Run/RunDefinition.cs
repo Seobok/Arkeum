@@ -6,8 +6,10 @@ namespace Arkeum.Production.Gameplay.Run
     [CreateAssetMenu(fileName = "RunDefinition", menuName = "Arkeum/Run Definition")]
     public sealed class RunDefinition : ScriptableObject
     {
+        [SerializeField] private RunStartingLoadoutDefinition startingLoadout;
         [SerializeField] private List<RunFloorDefinition> floors = new List<RunFloorDefinition>();
 
+        public RunStartingLoadoutDefinition StartingLoadout => startingLoadout;
         public IReadOnlyList<RunFloorDefinition> Floors => floors;
 
         public RunFloorDefinition GetFloor(int floorIndex)

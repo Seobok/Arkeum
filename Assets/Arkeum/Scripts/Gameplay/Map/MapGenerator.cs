@@ -60,12 +60,10 @@ namespace Arkeum.Production.Gameplay.Map
             {
                 RunFloor = 0,
                 PlayerSpawn = new Vector2Int(0, 0),
-                StartAltarPosition = new Vector2Int(-2, 0),
-                UnlockAltarPosition = new Vector2Int(0, 2),
-                UndertakerPosition = new Vector2Int(2, 0),
+                DungeonEntrancePosition = new Vector2Int(-2, 0),
             };
 
-            AddRoom(map, -3, -2, 3, 2, 0);
+            AddRoom(map, -3, -2, 3, 2);
             return map;
         }
 
@@ -268,6 +266,7 @@ namespace Arkeum.Production.Gameplay.Map
             List<TemplateCell> cells = new List<TemplateCell>();
             List<TemplateDoor> doors = new List<TemplateDoor>();
             List<TemplateEnemySpawn> enemySpawns = new List<TemplateEnemySpawn>();
+            List<TemplateWeaponSpawn> weaponSpawns = new List<TemplateWeaponSpawn>();
             Vector2Int origin = asset != null ? asset.PlayerSpawn : Vector2Int.zero;
             int ignoredDoors = 0;
 
@@ -283,7 +282,7 @@ namespace Arkeum.Production.Gameplay.Map
                     }
 
                     Vector2Int position = cell.Position - origin;
-                    cells.Add(new TemplateCell(position, cell.Depth));
+                    cells.Add(new TemplateCell(position));
                     walkablePositions.Add(position);
                 }
 
@@ -315,6 +314,18 @@ namespace Arkeum.Production.Gameplay.Map
 
                     enemySpawns.Add(new TemplateEnemySpawn(enemySpawn.EnemyDefinition, enemySpawn.Position - origin));
                 }
+
+                for (int i = 0; i < asset.WeaponSpawns.Count; i++)
+                {
+                    WeaponSpawnDefinition weaponSpawn = asset.WeaponSpawns[i];
+                    if (weaponSpawn == null)
+                    {
+                        continue;
+                    }
+
+                    weaponSpawns.Add(new TemplateWeaponSpawn(weaponSpawn.Weapon, weaponSpawn.Position - origin));
+                }
+
             }
 
             if (cells.Count == 0)
@@ -324,7 +335,7 @@ namespace Arkeum.Production.Gameplay.Map
                 {
                     for (int y = -2; y <= 2; y++)
                     {
-                        cells.Add(new TemplateCell(new Vector2Int(x, y), 1));
+                        cells.Add(new TemplateCell(new Vector2Int(x, y)));
                     }
                 }
             }
@@ -339,7 +350,7 @@ namespace Arkeum.Production.Gameplay.Map
                 Debug.LogWarning($"[MapGenerator] Ignored doors outside walkable cells. asset={DescribeAsset(asset)}, ignoredDoors={ignoredDoors}, validDoors={doors.Count}");
             }
 
-            return new RoomTemplate(cells, doors, enemySpawns);
+            return new RoomTemplate(cells, doors, enemySpawns, weaponSpawns);
         }
 
         private static PlacedRoom CreatePlacedRoom(int id, RoomTemplate template, Vector2Int origin, Vector2Int gridPosition)
@@ -352,16 +363,15 @@ namespace Arkeum.Production.Gameplay.Map
                 Max = template.Max + origin,
             };
 
-            Dictionary<Vector2Int, int> depthByCell = new Dictionary<Vector2Int, int>();
             HashSet<Vector2Int> cellSet = new HashSet<Vector2Int>();
             List<DungeonDoorDefinition> doorCandidates = new List<DungeonDoorDefinition>();
             List<EnemySpawnDefinition> enemySpawns = new List<EnemySpawnDefinition>();
+            List<WeaponSpawnDefinition> weaponSpawns = new List<WeaponSpawnDefinition>();
             for (int i = 0; i < template.Cells.Count; i++)
             {
                 TemplateCell templateCell = template.Cells[i];
                 Vector2Int cell = templateCell.Position + origin;
                 definition.Cells.Add(cell);
-                depthByCell[cell] = templateCell.Depth;
                 cellSet.Add(cell);
             }
 
@@ -385,7 +395,17 @@ namespace Arkeum.Production.Gameplay.Map
                 });
             }
 
-            return new PlacedRoom(id, gridPosition, definition, depthByCell, cellSet, doorCandidates, enemySpawns);
+            for (int i = 0; i < template.WeaponSpawns.Count; i++)
+            {
+                TemplateWeaponSpawn templateWeaponSpawn = template.WeaponSpawns[i];
+                weaponSpawns.Add(new WeaponSpawnDefinition
+                {
+                    Weapon = templateWeaponSpawn.Weapon,
+                    Position = templateWeaponSpawn.Position + origin,
+                });
+            }
+
+            return new PlacedRoom(id, gridPosition, definition, cellSet, doorCandidates, enemySpawns, weaponSpawns);
         }
 
         private static bool TryBuildDoorConnection(PlacedRoom from, PlacedRoom to, out DoorConnection connection)
@@ -548,15 +568,20 @@ namespace Arkeum.Production.Gameplay.Map
         private static void AddPlacedRoom(MapDefinition map, PlacedRoom room, HashSet<Vector2Int> occupiedRoomCells)
         {
             map.Rooms.Add(room.Definition);
-            foreach (KeyValuePair<Vector2Int, int> pair in room.DepthByCell)
+            foreach (Vector2Int cell in room.CellSet)
             {
-                AddWalkableCell(map, pair.Key, pair.Value);
-                occupiedRoomCells.Add(pair.Key);
+                AddWalkableCell(map, cell);
+                occupiedRoomCells.Add(cell);
             }
 
             for (int i = 0; i < room.EnemySpawns.Count; i++)
             {
                 map.EnemySpawns.Add(room.EnemySpawns[i]);
+            }
+
+            for (int i = 0; i < room.WeaponSpawns.Count; i++)
+            {
+                map.WeaponSpawns.Add(room.WeaponSpawns[i]);
             }
         }
 
@@ -576,7 +601,7 @@ namespace Arkeum.Production.Gameplay.Map
             {
                 Vector2Int cell = corridorCells[i];
                 corridor.Cells.Add(cell);
-                AddWalkableCell(map, cell, Mathf.Max(1, floor));
+                AddWalkableCell(map, cell);
             }
 
             map.Corridors.Add(corridor);
@@ -637,25 +662,23 @@ namespace Arkeum.Production.Gameplay.Map
             doors.Add(new TemplateDoor(best, direction));
         }
 
-        private static void AddRoom(MapDefinition map, int minX, int minY, int maxX, int maxY, int depth)
+        private static void AddRoom(MapDefinition map, int minX, int minY, int maxX, int maxY)
         {
             for (int x = minX; x <= maxX; x++)
             {
                 for (int y = minY; y <= maxY; y++)
                 {
-                    AddWalkableCell(map, new Vector2Int(x, y), depth);
+                    AddWalkableCell(map, new Vector2Int(x, y));
                 }
             }
         }
 
-        private static void AddWalkableCell(MapDefinition map, Vector2Int cell, int depth)
+        private static void AddWalkableCell(MapDefinition map, Vector2Int cell)
         {
             if (!map.WalkableCells.Contains(cell))
             {
                 map.WalkableCells.Add(cell);
             }
-
-            map.DepthByCell[cell] = depth;
         }
 
         private static void AddDoor(DungeonRoomDefinition room, DungeonDoorDefinition door)
@@ -683,16 +706,23 @@ namespace Arkeum.Production.Gameplay.Map
             {
                 RunFloor = 0,
                 PlayerSpawn = asset.PlayerSpawn,
-                MerchantPosition = asset.MerchantPosition,
-                ReliquaryPosition = asset.ReliquaryPosition,
-                StartAltarPosition = asset.StartAltarPosition,
-                UnlockAltarPosition = asset.UnlockAltarPosition,
-                UndertakerPosition = asset.UndertakerPosition,
+                FloorExitPosition = asset.FloorExitPosition,
+                DungeonEntrancePosition = asset.DungeonEntrancePosition,
             };
 
-            for (int i = 0; i < asset.TemporaryWeaponSpawns.Count; i++)
+            for (int i = 0; i < asset.WeaponSpawns.Count; i++)
             {
-                map.TemporaryWeaponSpawns.Add(asset.TemporaryWeaponSpawns[i]);
+                WeaponSpawnDefinition weaponSpawn = asset.WeaponSpawns[i];
+                if (weaponSpawn == null)
+                {
+                    continue;
+                }
+
+                map.WeaponSpawns.Add(new WeaponSpawnDefinition
+                {
+                    Weapon = weaponSpawn.Weapon,
+                    Position = weaponSpawn.Position,
+                });
             }
 
             for (int i = 0; i < asset.EnemySpawns.Count; i++)
@@ -718,7 +748,7 @@ namespace Arkeum.Production.Gameplay.Map
                     continue;
                 }
 
-                AddWalkableCell(map, cell.Position, cell.Depth);
+                AddWalkableCell(map, cell.Position);
             }
 
             return map.WalkableCells.Count > 0;
@@ -816,16 +846,22 @@ namespace Arkeum.Production.Gameplay.Map
             public readonly List<TemplateCell> Cells;
             public readonly List<TemplateDoor> Doors;
             public readonly List<TemplateEnemySpawn> EnemySpawns;
+            public readonly List<TemplateWeaponSpawn> WeaponSpawns;
             public readonly Vector2Int Min;
             public readonly Vector2Int Max;
             public readonly int Width;
             public readonly int Height;
 
-            public RoomTemplate(List<TemplateCell> cells, List<TemplateDoor> doors, List<TemplateEnemySpawn> enemySpawns)
+            public RoomTemplate(
+                List<TemplateCell> cells,
+                List<TemplateDoor> doors,
+                List<TemplateEnemySpawn> enemySpawns,
+                List<TemplateWeaponSpawn> weaponSpawns)
             {
                 Cells = cells;
                 Doors = doors;
                 EnemySpawns = enemySpawns;
+                WeaponSpawns = weaponSpawns;
                 Min = cells[0].Position;
                 Max = cells[0].Position;
 
@@ -868,12 +904,10 @@ namespace Arkeum.Production.Gameplay.Map
         private readonly struct TemplateCell
         {
             public readonly Vector2Int Position;
-            public readonly int Depth;
 
-            public TemplateCell(Vector2Int position, int depth)
+            public TemplateCell(Vector2Int position)
             {
                 Position = position;
-                Depth = depth;
             }
         }
 
@@ -889,32 +923,44 @@ namespace Arkeum.Production.Gameplay.Map
             }
         }
 
+        private readonly struct TemplateWeaponSpawn
+        {
+            public readonly WeaponDefinition Weapon;
+            public readonly Vector2Int Position;
+
+            public TemplateWeaponSpawn(WeaponDefinition weapon, Vector2Int position)
+            {
+                Weapon = weapon;
+                Position = position;
+            }
+        }
+
         private sealed class PlacedRoom
         {
             public readonly int Id;
             public readonly Vector2Int GridPosition;
             public readonly DungeonRoomDefinition Definition;
-            public readonly Dictionary<Vector2Int, int> DepthByCell;
             public readonly HashSet<Vector2Int> CellSet;
             public readonly List<DungeonDoorDefinition> DoorCandidates;
             public readonly List<EnemySpawnDefinition> EnemySpawns;
+            public readonly List<WeaponSpawnDefinition> WeaponSpawns;
 
             public PlacedRoom(
                 int id,
                 Vector2Int gridPosition,
                 DungeonRoomDefinition definition,
-                Dictionary<Vector2Int, int> depthByCell,
                 HashSet<Vector2Int> cellSet,
                 List<DungeonDoorDefinition> doorCandidates,
-                List<EnemySpawnDefinition> enemySpawns)
+                List<EnemySpawnDefinition> enemySpawns,
+                List<WeaponSpawnDefinition> weaponSpawns)
             {
                 Id = id;
                 GridPosition = gridPosition;
                 Definition = definition;
-                DepthByCell = depthByCell;
                 CellSet = cellSet;
                 DoorCandidates = doorCandidates;
                 EnemySpawns = enemySpawns;
+                WeaponSpawns = weaponSpawns;
             }
         }
 

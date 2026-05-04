@@ -21,6 +21,7 @@ namespace Arkeum.Production.Core
         public MapService MapService { get; }
         public ProgressionService ProgressionService { get; }
         public RunResultBuilder RunResultBuilder { get; }
+        public RunDefinition RunDefinition { get; }
         public WorldPresenter WorldPresenter { get; }
         public HudPresenter HudPresenter { get; }
 
@@ -34,6 +35,7 @@ namespace Arkeum.Production.Core
             MapService mapService,
             ProgressionService progressionService,
             RunResultBuilder runResultBuilder,
+            RunDefinition runDefinition,
             WorldPresenter worldPresenter,
             HudPresenter hudPresenter)
         {
@@ -46,6 +48,7 @@ namespace Arkeum.Production.Core
             MapService = mapService;
             ProgressionService = progressionService;
             RunResultBuilder = runResultBuilder;
+            RunDefinition = runDefinition;
             WorldPresenter = worldPresenter;
             HudPresenter = hudPresenter;
         }

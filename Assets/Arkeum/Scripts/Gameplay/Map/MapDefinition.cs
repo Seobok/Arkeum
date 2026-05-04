@@ -10,17 +10,13 @@ namespace Arkeum.Production.Gameplay.Map
     {
         public int RunFloor;
         public Vector2Int PlayerSpawn;
-        public Vector2Int MerchantPosition;
-        public Vector2Int ReliquaryPosition;
-        public Vector2Int StartAltarPosition;
-        public Vector2Int UnlockAltarPosition;
-        public Vector2Int UndertakerPosition;
+        public Vector2Int FloorExitPosition;
+        public Vector2Int DungeonEntrancePosition;
         public List<Vector2Int> WalkableCells = new List<Vector2Int>();
-        public List<Vector2Int> TemporaryWeaponSpawns = new List<Vector2Int>();
+        public List<WeaponSpawnDefinition> WeaponSpawns = new List<WeaponSpawnDefinition>();
         public List<EnemySpawnDefinition> EnemySpawns = new List<EnemySpawnDefinition>();
         public List<DungeonRoomDefinition> Rooms = new List<DungeonRoomDefinition>();
         public List<DungeonCorridorDefinition> Corridors = new List<DungeonCorridorDefinition>();
-        public Dictionary<Vector2Int, int> DepthByCell = new Dictionary<Vector2Int, int>();
     }
 
     public enum DoorDirection

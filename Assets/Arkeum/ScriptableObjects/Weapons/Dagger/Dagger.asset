@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1435ff1f62b674c4da5cdf104778db07, type: 3}
+  m_Name: Dagger
+  m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Gameplay.Run.WeaponDefinition
+  id: Dagger
+  displayName: "\uB2E8\uAC80"
+  sprite: {fileID: 0}
+  tint: {r: 0.75, g: 0.43, b: 0.18, a: 1}
+  attackBonus: 1
+  attackEditorMin: {x: -3, y: -3}
+  attackEditorMax: {x: 3, y: 3}
+  rotateAttackByFacing: 1
+  attackOffsets:
+  - {x: 1, y: 0}

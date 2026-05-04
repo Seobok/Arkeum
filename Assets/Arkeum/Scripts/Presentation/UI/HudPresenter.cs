@@ -98,22 +98,17 @@ namespace Arkeum.Production.Presentation.UI
             if (gameDirector.CurrentState == GameState.InRun && boundRun != null && boundRun.Player != null)
             {
                 GUILayout.Label(
-                    $"HP {boundRun.Player.CurrentHp}/{boundRun.Player.Stats.MaxHp}  |  Shards {boundRun.BloodShards}  |  Bandage {boundRun.BandageCount}  |  Draught {boundRun.DraughtCount}  |  Turn {boundRun.TurnCount}",
+                    $"HP {boundRun.Player.CurrentHp}/{boundRun.Player.Stats.MaxHp}  |  Shards {boundRun.BloodShards}  |  Bandage {boundRun.BandageCount}  |  Turn {boundRun.TurnCount}",
                     bodyStyle);
-                GUILayout.Label($"Depth {boundRun.DepthReached}  |  Temporary weapon {(boundRun.TemporaryWeaponEquipped ? "Equipped" : "None")}", bodyStyle);
+                GUILayout.Label($"Floor {boundRun.CurrentFloor}  |  Weapon {(boundRun.HasEquippedWeapon ? "Equipped" : "None")}", bodyStyle);
                 GUILayout.Label("Rule: every action gives enemies a response.", accentStyle);
             }
             else
             {
                 GUILayout.Label("Hub: Return Altar", bodyStyle);
                 GUILayout.Label(
-                    $"Gleam {gameDirector.ActiveProfile.Gleam}  |  Returns {gameDirector.ActiveProfile.TotalReturns}  |  Best depth {gameDirector.ActiveProfile.HighestDepth}",
+                    $"Gleam {gameDirector.ActiveProfile.Gleam}  |  Returns {gameDirector.ActiveProfile.TotalReturns}",
                     bodyStyle);
-                GUILayout.Label(
-                    gameDirector.ActiveProfile.StartingBandageUnlocked
-                        ? "Starting bandage unlock: active"
-                        : "Starting bandage unlock: locked",
-                    accentStyle);
             }
 
             GUILayout.EndArea();
@@ -127,7 +122,7 @@ namespace Arkeum.Production.Presentation.UI
             {
                 GUILayout.Label("Move keys: attack, interact, or move", bodyStyle);
                 GUILayout.Label("Wait: Q", bodyStyle);
-                GUILayout.Label("Items: 1 bandage / 2 draught", bodyStyle);
+                GUILayout.Label("Items: 1 bandage", bodyStyle);
                 DrawRunOptions();
             }
             else if (gameDirector.CurrentState == GameState.RunResult)
@@ -182,7 +177,7 @@ namespace Arkeum.Production.Presentation.UI
             {
                 builder.Clear();
                 builder.Append("Weapon: ");
-                builder.Append(boundRun.TemporaryWeaponEquipped ? "Worn blade (+1 attack)" : "Default blade");
+                builder.Append(FormatWeaponLine(boundRun));
                 GUILayout.Space(6f);
                 GUILayout.Label(builder.ToString(), bodyStyle);
             }
@@ -250,6 +245,22 @@ namespace Arkeum.Production.Presentation.UI
                 padding = new RectOffset(12, 12, 12, 12),
                 normal = { background = panelTexture }
             };
+        }
+
+        private static string FormatWeaponLine(RunState runState)
+        {
+            if (runState == null || !runState.HasEquippedWeapon)
+            {
+                return "Default blade";
+            }
+
+            WeaponDefinition weapon = runState.EquippedWeapon;
+            if (weapon == null)
+            {
+                return "Weapon (+1 attack)";
+            }
+
+            return $"{weapon.DisplayName} (+{weapon.AttackBonus} attack)";
         }
     }
 }

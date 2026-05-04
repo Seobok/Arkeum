@@ -4,6 +4,6 @@
     {
         None,
         Death,
-        DepthClear,
+        FloorClear,
     }
 }

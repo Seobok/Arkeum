@@ -5,12 +5,10 @@ namespace Arkeum.Production.Gameplay.Progression
 {
     public sealed class ProgressionService
     {
-        private readonly UnlockService unlockService;
         private readonly QuestService questService;
 
-        public ProgressionService(UnlockService unlockService, QuestService questService)
+        public ProgressionService(QuestService questService)
         {
-            this.unlockService = unlockService;
             this.questService = questService;
         }
 
@@ -22,49 +20,20 @@ namespace Arkeum.Production.Gameplay.Progression
             }
 
             profile.TotalReturns += 1;
-            if (profile.HighestDepth < runState.DepthReached)
+            if (profile.HighestFloor < runState.CurrentFloor)
             {
-                profile.HighestDepth = runState.DepthReached;
+                profile.HighestFloor = runState.CurrentFloor;
             }
 
-            int gleamGain = runState.EndReason == RunEndReason.DepthClear ? 2 : 1;
-            if (runState.DepthReached >= 2)
-            {
-                gleamGain += 1;
-            }
-
+            int gleamGain = runState.EndReason == RunEndReason.FloorClear ? 2 : 1;
             runState.GleamReward = gleamGain;
             profile.Gleam += gleamGain;
-            if (runState.EndReason == RunEndReason.DepthClear)
+            if (runState.EndReason == RunEndReason.FloorClear)
             {
                 questService.MarkPrototypeClear(profile);
             }
 
             return gleamGain;
-        }
-
-        public bool TryUnlockStartingBandage(SaveProfile profile, int cost, out string message)
-        {
-            if (profile == null)
-            {
-                message = "Profile is not available.";
-                return false;
-            }
-
-            if (profile.StartingBandageUnlocked)
-            {
-                message = "The starting bandage is already unlocked.";
-                return false;
-            }
-
-            if (!unlockService.TryUnlockStartingBandage(profile, cost))
-            {
-                message = "You do not have enough gleam to unlock the starting bandage.";
-                return false;
-            }
-
-            message = "Starting bandage unlocked. Future runs begin with 1 bandage.";
-            return true;
         }
 
         public void MarkRunClear(SaveProfile profile)
@@ -78,41 +47,27 @@ namespace Arkeum.Production.Gameplay.Progression
             keptLines.Clear();
 
             lostLines.Add($"Blood shards lost: {runState.BloodShards}");
-            lostLines.Add($"Draughts left behind: {runState.DraughtCount}");
-            lostLines.Add(runState.TemporaryWeaponEquipped
-                ? "Temporary weapon lost at the end of the run."
-                : "No temporary weapon was equipped.");
+            lostLines.Add(FormatWeaponLoss(runState));
 
             keptLines.Add($"Gleam gained: +{runState.GleamReward}");
             keptLines.Add($"Total gleam: {profile.Gleam}");
             keptLines.Add($"Total returns: {profile.TotalReturns}");
-            keptLines.Add($"Deepest corridor reached: {profile.HighestDepth}");
-            keptLines.Add(profile.StartingBandageUnlocked
-                ? "Starting bandage unlock is active."
-                : "Starting bandage unlock is still locked.");
+            keptLines.Add($"Highest floor reached: {profile.HighestFloor}");
         }
 
-        public string GetUndertakerGreeting(SaveProfile profile)
+        private static string FormatWeaponLoss(RunState runState)
         {
-            if (profile == null || profile.TotalReturns == 0)
+            if (runState == null || !runState.HasEquippedWeapon)
             {
-                return "The undertaker watches in silence. Step into the corridor and return if you can.";
+                return "No weapon was equipped.";
             }
 
-            if (profile.TotalReturns < 3)
+            if (runState.EquippedWeapon == null)
             {
-                return "You have returned more than once. The altar remembers what the corridor takes.";
+                return "Weapon lost at the end of the run.";
             }
 
-            return "Many returns have hardened the silence. Even now, the undertaker keeps count.";
-        }
-
-        public void SeedDialogue(Queue<string> undertakerLines)
-        {
-            undertakerLines.Clear();
-            undertakerLines.Enqueue("The undertaker says: The corridor never forgets a hurried step.");
-            undertakerLines.Enqueue("The undertaker says: What you carry out matters less than what you learn to keep.");
-            undertakerLines.Enqueue("The undertaker says: Return enough times, and even failure becomes a kind of map.");
+            return $"{runState.EquippedWeapon.DisplayName} lost at the end of the run.";
         }
     }
 }

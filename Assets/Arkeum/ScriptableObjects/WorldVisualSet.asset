@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fd0f2e0e8c31dae4dba3ac877f7a477c, type: 3}
+  m_Name: WorldVisualSet
+  m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Presentation.World.WorldVisualSet
+  floorSprite: {fileID: 0}
+  floorTint: {r: 0.16, g: 0.13, b: 0.14, a: 1}
+  playerSprite: {fileID: 0}
+  playerTint: {r: 0.91, g: 0.86, b: 0.78, a: 1}
+  defaultEnemySprite: {fileID: 0}
+  defaultEnemyTint: {r: 0.63, g: 0.25, b: 0.21, a: 1}
+  temporaryWeaponSprite: {fileID: 0}
+  temporaryWeaponTint: {r: 0.75, g: 0.43, b: 0.18, a: 1}
+  floorExitSprite: {fileID: 0}
+  floorExitTint: {r: 0.76, g: 0.65, b: 0.17, a: 1}
+  dungeonEntranceSprite: {fileID: 0}
+  dungeonEntranceTint: {r: 0.62, g: 0.29, b: 0.22, a: 1}
+  enemyAttackMarkerSprite: {fileID: 0}
+  enemyAttackMarkerTint: {r: 0.82, g: 0.16, b: 0.13, a: 1}
+  enemyMoveMarkerSprite: {fileID: 0}
+  enemyMoveMarkerTint: {r: 0.18, g: 0.68, b: 0.26, a: 1}

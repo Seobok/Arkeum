@@ -6,30 +6,42 @@ namespace Arkeum.Production.Presentation.World
     {
         private Sprite squareSprite;
 
-        public GameObject CreateCell(Transform parent, Vector2Int cell, Color color, string name, int sortingOrder = 0)
+        public GameObject CreateCell(
+            Transform parent,
+            Vector2Int cell,
+            Sprite sprite,
+            Color tint,
+            string name,
+            int sortingOrder = 0)
         {
             GameObject tile = new GameObject(name);
             tile.transform.SetParent(parent, false);
             tile.transform.position = new Vector3(cell.x, cell.y, 0f);
 
             SpriteRenderer renderer = tile.AddComponent<SpriteRenderer>();
-            renderer.sprite = GetSquareSprite();
-            renderer.color = color;
+            renderer.sprite = sprite != null ? sprite : GetSquareSprite();
+            renderer.color = tint;
             renderer.sortingOrder = sortingOrder;
             tile.transform.localScale = new Vector3(0.95f, 0.95f, 1f);
 
             return tile;
         }
 
-        public GameObject CreateActor(Transform parent, string name, Vector2Int cell, Color color, int sortingOrder)
+        public GameObject CreateActor(
+            Transform parent,
+            string name,
+            Vector2Int cell,
+            Sprite sprite,
+            Color tint,
+            int sortingOrder)
         {
             GameObject actor = new GameObject(name);
             actor.transform.SetParent(parent, false);
             actor.transform.position = new Vector3(cell.x, cell.y, -0.1f);
 
             SpriteRenderer renderer = actor.AddComponent<SpriteRenderer>();
-            renderer.sprite = GetSquareSprite();
-            renderer.color = color;
+            renderer.sprite = sprite != null ? sprite : GetSquareSprite();
+            renderer.color = tint;
             renderer.sortingOrder = sortingOrder;
             actor.transform.localScale = new Vector3(0.72f, 0.72f, 1f);
 

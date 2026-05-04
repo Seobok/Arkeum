@@ -40,23 +40,19 @@ namespace Arkeum.Production.Gameplay.Run
             CurrentRun = runState;
         }
 
-        public RunState CreateRunState(SaveProfile profile)
+        public RunState CreateRunState(SaveProfile profile, RunStartingLoadoutDefinition startingLoadout)
         {
-            int startingBandage = profile != null && profile.StartingBandageUnlocked ? 1 : 0;
             return new RunState
             {
                 RunIndex = (profile?.TotalReturns ?? 0) + 1,
                 CurrentFloor = 1,
                 TurnCount = 0,
-                DepthReached = 1,
                 BloodShards = 0,
-                BandageCount = startingBandage,
-                DraughtCount = 0,
+                BandageCount = startingLoadout != null ? startingLoadout.BandageCount : 0,
                 AttackBonus = 0,
-                TemporaryWeaponEquipped = false,
-                ReliquaryClaimed = false,
-                TemporaryWeaponCollected = false,
-                DraughtStock = 2,
+                FloorExitUsed = false,
+                HasEquippedWeapon = startingLoadout?.Weapon != null,
+                EquippedWeapon = startingLoadout != null ? startingLoadout.Weapon : null,
                 EndReason = RunEndReason.None,
             };
         }
@@ -69,9 +65,9 @@ namespace Arkeum.Production.Gameplay.Run
             }
 
             Vector2Int targetCell = CurrentRun.Player.GridPosition + direction;
-            if (actorRepository.TryGetEnemyAt(targetCell, out ActorEntity enemy))
+            if (TryGetPlayerAttackTarget(direction, out ActorEntity enemy, out WeaponAttackContext attackContext))
             {
-                int damage = combatSystem.ResolvePlayerAttack(CurrentRun, CurrentRun.Player, enemy);
+                int damage = combatSystem.ResolvePlayerAttack(CurrentRun, CurrentRun.Player, enemy, attackContext);
                 SetMessage($"You strike {enemy.DisplayName} for {damage} damage.");
                 if (!enemy.IsAlive)
                 {
@@ -95,11 +91,72 @@ namespace Arkeum.Production.Gameplay.Run
             }
 
             CurrentRun.Player.GridPosition = targetCell;
-            CurrentRun.DepthReached = Mathf.Max(CurrentRun.DepthReached, mapService.GetDepth(targetCell));
-            TryAutoPickupAtPlayerPosition();
-            SetMessage($"You advance into {GetDepthName(CurrentRun.DepthReached)}.");
+            if (!TryAutoPickupAtPlayerPosition())
+            {
+                SetMessage(string.Empty);
+            }
+
             ConsumeTurn();
             return true;
+        }
+
+        private bool TryGetPlayerAttackTarget(Vector2Int direction, out ActorEntity enemy, out WeaponAttackContext attackContext)
+        {
+            enemy = null;
+            attackContext = null;
+            Vector2Int facing = EnemyAttackPatternDefinition.NormalizeFacing(direction);
+            WeaponDefinition weapon = CurrentRun.EquippedWeapon;
+            if (weapon == null || weapon.AttackOffsets == null || weapon.AttackOffsets.Count == 0)
+            {
+                if (!actorRepository.TryGetEnemyAt(CurrentRun.Player.GridPosition + facing, out enemy))
+                {
+                    return false;
+                }
+
+                attackContext = BuildWeaponAttackContext(enemy, null, facing, Vector2Int.right);
+                return true;
+            }
+
+            for (int i = 0; i < weapon.AttackOffsets.Count; i++)
+            {
+                Vector2Int weaponOffset = weapon.AttackOffsets[i];
+                if (weaponOffset == Vector2Int.zero)
+                {
+                    continue;
+                }
+
+                Vector2Int targetOffset = weaponOffset;
+                if (weapon.RotateAttackByFacing)
+                {
+                    targetOffset = EnemyAttackPatternDefinition.RotateOffset(weaponOffset, facing);
+                }
+
+                if (actorRepository.TryGetEnemyAt(CurrentRun.Player.GridPosition + targetOffset, out enemy))
+                {
+                    attackContext = BuildWeaponAttackContext(enemy, weapon, facing, weaponOffset);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private WeaponAttackContext BuildWeaponAttackContext(
+            ActorEntity defender,
+            WeaponDefinition weapon,
+            Vector2Int facing,
+            Vector2Int weaponOffset)
+        {
+            return new WeaponAttackContext
+            {
+                RunState = CurrentRun,
+                Attacker = CurrentRun.Player,
+                Defender = defender,
+                Weapon = weapon,
+                FacingDirection = facing,
+                WeaponOffset = weaponOffset,
+                AttackPower = CurrentRun.Player.Stats.AttackPower,
+            };
         }
 
         public bool UseBandage()
@@ -129,37 +186,6 @@ namespace Arkeum.Production.Gameplay.Run
             CurrentRun.BandageCount -= 1;
             CurrentRun.Player.CurrentHp = Mathf.Min(CurrentRun.Player.Stats.MaxHp, CurrentRun.Player.CurrentHp + 4);
             SetMessage("You bind your wounds.");
-            ConsumeTurn();
-            return true;
-        }
-
-        public bool UseDraught()
-        {
-            if (CurrentRun == null)
-            {
-                return false;
-            }
-
-            if (CurrentRun.Player == null)
-            {
-                return false;
-            }
-
-            if (CurrentRun.DraughtCount <= 0)
-            {
-                SetMessage("No draughts remain.");
-                return false;
-            }
-
-            if (CurrentRun.Player.CurrentHp >= CurrentRun.Player.Stats.MaxHp)
-            {
-                SetMessage("You are already at full health.");
-                return false;
-            }
-
-            CurrentRun.DraughtCount -= 1;
-            CurrentRun.Player.CurrentHp = Mathf.Min(CurrentRun.Player.Stats.MaxHp, CurrentRun.Player.CurrentHp + 6);
-            SetMessage("The draught forces your wounds closed.");
             ConsumeTurn();
             return true;
         }
@@ -227,26 +253,28 @@ namespace Arkeum.Production.Gameplay.Run
             }
         }
 
-        private void TryAutoPickupAtPlayerPosition()
+        private bool TryAutoPickupAtPlayerPosition()
         {
-            if (CurrentRun.TemporaryWeaponCollected)
+            if (mapService.TryGetWeaponSpawn(CurrentRun.Player.GridPosition, out WeaponSpawnDefinition weaponSpawn))
             {
-                return;
+                CurrentRun.HasEquippedWeapon = true;
+                CurrentRun.EquippedWeapon = weaponSpawn.Weapon;
+                CurrentRun.Player.Stats.AttackPower = CurrentRun.EffectiveAttack;
+                SetMessage(BuildWeaponPickupMessage(weaponSpawn.Weapon));
+                return true;
             }
 
-            if (mapService.IsTemporaryWeaponSpawn(CurrentRun.Player.GridPosition))
-            {
-                CurrentRun.TemporaryWeaponCollected = true;
-                CurrentRun.TemporaryWeaponEquipped = true;
-                CurrentRun.AttackBonus = 1;
-                CurrentRun.Player.Stats.AttackPower = CurrentRun.EffectiveAttack;
-                SetMessage("You pick up a worn blade. Attack rises by 1 for this run.");
-            }
+            return false;
         }
 
-        private string GetDepthName(int depth)
+        private static string BuildWeaponPickupMessage(WeaponDefinition weapon)
         {
-            return depth <= 1 ? "Outer Corridor" : "Deep Corridor";
+            if (weapon == null)
+            {
+                return "You pick up a weapon.";
+            }
+
+            return $"You pick up {weapon.DisplayName}. Attack rises by {weapon.AttackBonus} for this run.";
         }
 
         private void SetMessage(string message)

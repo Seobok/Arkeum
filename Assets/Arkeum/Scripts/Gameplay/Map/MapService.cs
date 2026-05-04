@@ -9,7 +9,6 @@ namespace Arkeum.Production.Gameplay.Map
         private readonly MapGenerator mapGenerator;
         private readonly TileOccupancyService tileOccupancyService;
         private readonly HashSet<Vector2Int> walkableCells = new HashSet<Vector2Int>();
-        private readonly Dictionary<Vector2Int, int> depthByCell = new Dictionary<Vector2Int, int>();
 
         public MapDefinition CurrentMap { get; private set; }
         public RunFloorDefinition CurrentRunFloor { get; private set; }
@@ -51,26 +50,28 @@ namespace Arkeum.Production.Gameplay.Map
             return walkableCells.Contains(cell);
         }
 
-        public int GetDepth(Vector2Int cell)
+        public bool TryGetWeaponSpawn(Vector2Int cell, out WeaponSpawnDefinition weaponSpawn)
         {
-            if (depthByCell.TryGetValue(cell, out int depth))
+            if (CurrentMap?.WeaponSpawns != null)
             {
-                return depth;
+                for (int i = 0; i < CurrentMap.WeaponSpawns.Count; i++)
+                {
+                    weaponSpawn = CurrentMap.WeaponSpawns[i];
+                    if (weaponSpawn != null && weaponSpawn.Position == cell)
+                    {
+                        return true;
+                    }
+                }
             }
 
-            return 1;
-        }
-
-        public bool IsTemporaryWeaponSpawn(Vector2Int cell)
-        {
-            return CurrentMap != null && CurrentMap.TemporaryWeaponSpawns.Contains(cell);
+            weaponSpawn = null;
+            return false;
         }
 
         private void SetCurrentMap(MapDefinition mapDefinition)
         {
             CurrentMap = mapDefinition;
             walkableCells.Clear();
-            depthByCell.Clear();
             tileOccupancyService.Clear();
 
             if (mapDefinition == null)
@@ -84,16 +85,11 @@ namespace Arkeum.Production.Gameplay.Map
                 walkableCells.Add(mapDefinition.WalkableCells[i]);
             }
 
-            foreach (KeyValuePair<Vector2Int, int> pair in mapDefinition.DepthByCell)
-            {
-                depthByCell[pair.Key] = pair.Value;
-            }
-
             Debug.Log(
                 $"[MapService] Current map set. floor={mapDefinition.RunFloor}, " +
-                $"walkableCells={walkableCells.Count}, depthCells={depthByCell.Count}, " +
+                $"walkableCells={walkableCells.Count}, " +
                 $"rooms={mapDefinition.Rooms.Count}, corridors={mapDefinition.Corridors.Count}, " +
-                $"playerSpawn={mapDefinition.PlayerSpawn}, merchant={mapDefinition.MerchantPosition}, reliquary={mapDefinition.ReliquaryPosition}");
+                $"playerSpawn={mapDefinition.PlayerSpawn}, floorExit={mapDefinition.FloorExitPosition}");
         }
     }
 }

@@ -33,24 +33,17 @@ namespace Arkeum.Production.Gameplay.Interaction
             InteractableType interactableType = interactable?.InteractableType ?? InteractableType.None;
             if (interactableType == InteractableType.None && mapDefinition != null)
             {
-                if (mapDefinition.MerchantPosition != Vector2Int.zero &&
-                    targetCell == mapDefinition.MerchantPosition)
+                if (mapDefinition.FloorExitPosition != Vector2Int.zero &&
+                    targetCell == mapDefinition.FloorExitPosition)
                 {
-                    interactableType = InteractableType.Merchant;
-                }
-                else if (mapDefinition.ReliquaryPosition != Vector2Int.zero &&
-                         targetCell == mapDefinition.ReliquaryPosition)
-                {
-                    interactableType = InteractableType.Reliquary;
+                    interactableType = InteractableType.FloorExit;
                 }
             }
 
             switch (interactableType)
             {
-                case InteractableType.Merchant:
-                    return TryBuyDraught(runState);
-                case InteractableType.Reliquary:
-                    return TryClaimReliquary(runState);
+                case InteractableType.FloorExit:
+                    return TryUseFloorExit(runState);
                 case InteractableType.None:
                     return InteractionResolution.Unhandled;
                 default:
@@ -60,33 +53,15 @@ namespace Arkeum.Production.Gameplay.Interaction
             }
         }
 
-        private static InteractionResolution TryBuyDraught(RunState runState)
+        private static InteractionResolution TryUseFloorExit(RunState runState)
         {
-            if (runState.BloodShards < 3)
-            {
-                return InteractionResolution.HandledWithoutTurn("You do not have enough blood shards.");
-            }
-
-            if (runState.DraughtStock <= 0)
-            {
-                return InteractionResolution.HandledWithoutTurn("The merchant has nothing left to sell.");
-            }
-
-            runState.BloodShards -= 3;
-            runState.DraughtCount += 1;
-            runState.DraughtStock -= 1;
-            return new InteractionResolution(true, true, "You buy a healing draught for this run.", RunEndReason.None);
-        }
-
-        private static InteractionResolution TryClaimReliquary(RunState runState)
-        {
-            if (runState.ReliquaryClaimed)
+            if (runState.FloorExitUsed)
             {
                 return InteractionResolution.Unhandled;
             }
 
-            runState.ReliquaryClaimed = true;
-            return new InteractionResolution(true, false, "You recover the reacting reliquary light.", RunEndReason.DepthClear);
+            runState.FloorExitUsed = true;
+            return new InteractionResolution(true, false, "You clear the floor.", RunEndReason.FloorClear);
         }
     }
 }

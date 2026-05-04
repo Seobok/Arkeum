@@ -9,7 +9,7 @@
                 return;
             }
 
-            profile.HighestDepth = profile.HighestDepth < 2 ? 2 : profile.HighestDepth;
+            profile.HighestFloor = profile.HighestFloor < 1 ? 1 : profile.HighestFloor;
             profile.Mq01Completed = true;
             if (!profile.CompletedQuestIds.Contains("MQ-01"))
             {

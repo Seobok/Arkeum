@@ -10,13 +10,11 @@ namespace Arkeum.Production.Core
 {
     public sealed class GameDirector : MonoBehaviour
     {
-        private const int StartingBandageUnlockCost = 3;
         private const int PlayerMaxHP = 12;
         private const int StartingRunFloor = 1;
 
         [SerializeField] private GameState startingState = GameState.Hub;
 
-        private readonly Queue<string> undertakerLines = new Queue<string>();
         private readonly List<string> lostResultLines = new List<string>();
         private readonly List<string> keptResultLines = new List<string>();
 
@@ -53,7 +51,6 @@ namespace Arkeum.Production.Core
             Services = services;
             ActiveProfile = profile;
             CurrentState = startingState;
-            SeedDialogue();
 
             switch(startingState)
             {
@@ -79,7 +76,7 @@ namespace Arkeum.Production.Core
             Services.WorldPresenter.Refresh();
             Services.HudPresenter.BindRun(null);
             Services.HudPresenter.ClearRunResult();
-            Services.HudPresenter.SetDialogue(Services.ProgressionService.GetUndertakerGreeting(ActiveProfile));
+            Services.HudPresenter.SetDialogue(string.Empty);
             Services.HudPresenter.SetMessage(message ?? "The embers of the return altar flicker quietly.");
             CurrentRunController = null;
             CurrentState = GameState.Hub;
@@ -108,7 +105,7 @@ namespace Arkeum.Production.Core
                 Services.MapService,
                 Services.ActorRepository);
 
-            RunState runState = runController.CreateRunState(ActiveProfile);
+            RunState runState = runController.CreateRunState(ActiveProfile, Services.RunDefinition?.StartingLoadout);
             runState.CurrentFloor = runFloor;
             runState.CurrentFloorDefinition = floorDefinition;
             ActorEntity player = Services.ActorRepository.Player;
@@ -199,10 +196,6 @@ namespace Arkeum.Production.Core
             {
                 handled = CurrentRunController.UseBandage();
             }
-            else if (Services.InputReader.WasUseDraughtPressed())
-            {
-                handled = CurrentRunController.UseDraught();
-            }
 
             if (!handled)
             {
@@ -288,14 +281,9 @@ namespace Arkeum.Production.Core
             }
 
             List<IInteractable> runInteractables = new List<IInteractable>();
-            if (map.MerchantPosition != Vector2Int.zero)
+            if (map.FloorExitPosition != Vector2Int.zero)
             {
-                runInteractables.Add(new GridInteractable(InteractableType.Merchant, map.MerchantPosition, _ => { }));
-            }
-
-            if (map.ReliquaryPosition != Vector2Int.zero)
-            {
-                runInteractables.Add(new GridInteractable(InteractableType.Reliquary, map.ReliquaryPosition, _ => { }));
+                runInteractables.Add(new GridInteractable(InteractableType.FloorExit, map.FloorExitPosition, _ => { }));
             }
 
             Services.InteractionSystem.SetInteractables(runInteractables);
@@ -319,72 +307,24 @@ namespace Arkeum.Production.Core
             }
 
             List<IInteractable> hubInteractables = new List<IInteractable>();
-            if (IsMarkerEnabled(map.StartAltarPosition))
+            if (IsMarkerEnabled(map.DungeonEntrancePosition))
             {
-                hubInteractables.Add(new GridInteractable(InteractableType.StartAltar, map.StartAltarPosition, _ => StartRun()));
-            }
-
-            if (IsMarkerEnabled(map.UnlockAltarPosition))
-            {
-                hubInteractables.Add(new GridInteractable(InteractableType.UnlockAltar, map.UnlockAltarPosition, _ => TryUnlockStartingBandage()));
-            }
-
-            if (IsMarkerEnabled(map.UndertakerPosition))
-            {
-                hubInteractables.Add(new GridInteractable(InteractableType.Undertaker, map.UndertakerPosition, _ => AdvanceUndertakerDialogue()));
+                hubInteractables.Add(new GridInteractable(InteractableType.DungeonEntrance, map.DungeonEntrancePosition, _ => StartRun()));
             }
 
             Services.InteractionSystem.SetInteractables(hubInteractables);
         }
 
-        private void TryUnlockStartingBandage()
-        {
-            Services.ProgressionService.TryUnlockStartingBandage(ActiveProfile, StartingBandageUnlockCost, out string message);
-            Services.HudPresenter.SetMessage(message);
-        }
-
-        private void AdvanceUndertakerDialogue()
-        {
-            if (undertakerLines.Count == 0)
-            {
-                SeedDialogue();
-            }
-
-            string line = undertakerLines.Dequeue();
-            undertakerLines.Enqueue(line);
-            Services.HudPresenter.SetDialogue(line);
-            Services.HudPresenter.SetMessage("The undertaker speaks without emotion.");
-        }
-
         private void UpdateHubLocationMessage()
         {
             MapDefinition map = Services.MapService.CurrentMap;
-            if (IsMarkerEnabled(map.StartAltarPosition) && hubPlayerPosition == map.StartAltarPosition)
+            if (IsMarkerEnabled(map.DungeonEntrancePosition) && hubPlayerPosition == map.DungeonEntrancePosition)
             {
-                Services.HudPresenter.SetMessage("Move into the start altar to begin a run.");
-                return;
-            }
-
-            if (IsMarkerEnabled(map.UnlockAltarPosition) && hubPlayerPosition == map.UnlockAltarPosition)
-            {
-                Services.HudPresenter.SetMessage(ActiveProfile.StartingBandageUnlocked
-                    ? "The bandage unlock altar is already active."
-                    : $"Move into the unlock altar to spend {StartingBandageUnlockCost} gleam.");
-                return;
-            }
-
-            if (IsMarkerEnabled(map.UndertakerPosition) && hubPlayerPosition == map.UndertakerPosition)
-            {
-                Services.HudPresenter.SetMessage("Move into the undertaker to continue the conversation.");
+                Services.HudPresenter.SetMessage("Move into the dungeon entrance to begin a run.");
                 return;
             }
 
             Services.HudPresenter.SetMessage("The embers of the return altar flicker quietly.");
-        }
-
-        private void SeedDialogue()
-        {
-            Services.ProgressionService.SeedDialogue(undertakerLines);
         }
 
         private void ApplySceneInteractablePositions()
@@ -396,20 +336,11 @@ namespace Arkeum.Production.Core
                 SceneInteractableMarker marker = sceneMarkers[i];
                 switch (marker.InteractableType)
                 {
-                    case InteractableType.StartAltar:
-                        map.StartAltarPosition = marker.GridPosition;
+                    case InteractableType.DungeonEntrance:
+                        map.DungeonEntrancePosition = marker.GridPosition;
                         break;
-                    case InteractableType.UnlockAltar:
-                        map.UnlockAltarPosition = marker.GridPosition;
-                        break;
-                    case InteractableType.Undertaker:
-                        map.UndertakerPosition = marker.GridPosition;
-                        break;
-                    case InteractableType.Merchant:
-                        map.MerchantPosition = marker.GridPosition;
-                        break;
-                    case InteractableType.Reliquary:
-                        map.ReliquaryPosition = marker.GridPosition;
+                    case InteractableType.FloorExit:
+                        map.FloorExitPosition = marker.GridPosition;
                         break;
                 }
 
@@ -434,14 +365,8 @@ namespace Arkeum.Production.Core
         {
             switch (interactableType)
             {
-                case InteractableType.StartAltar:
+                case InteractableType.DungeonEntrance:
                     StartRun();
-                    break;
-                case InteractableType.UnlockAltar:
-                    TryUnlockStartingBandage();
-                    break;
-                case InteractableType.Undertaker:
-                    AdvanceUndertakerDialogue();
                     break;
             }
         }

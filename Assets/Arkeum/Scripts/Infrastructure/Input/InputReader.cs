@@ -10,14 +10,12 @@ namespace Arkeum.Production.Infrastructure.Input
         private const string MoveActionName = "Move";
         private const string WaitActionName = "Wait";
         private const string UseBandageActionName = "Previous";
-        private const string UseDraughtActionName = "Next";
         private const string ConfirmActionName = "Attack";
 
         private readonly InputActionMap playerActions;
         private readonly InputAction moveAction;
         private readonly InputAction waitAction;
         private readonly InputAction useBandageAction;
-        private readonly InputAction useDraughtAction;
         private readonly InputAction confirmAction;
 
         public InputReader(InputActionAsset inputActions)
@@ -38,7 +36,6 @@ namespace Arkeum.Production.Infrastructure.Input
             moveAction = playerActions.FindAction(MoveActionName);
             waitAction = playerActions.FindAction(WaitActionName);
             useBandageAction = playerActions.FindAction(UseBandageActionName);
-            useDraughtAction = playerActions.FindAction(UseDraughtActionName);
             confirmAction = playerActions.FindAction(ConfirmActionName);
             playerActions.Enable();
         }
@@ -75,11 +72,6 @@ namespace Arkeum.Production.Infrastructure.Input
         public bool WasUseBandagePressed()
         {
             return useBandageAction != null && useBandageAction.WasPressedThisFrame();
-        }
-
-        public bool WasUseDraughtPressed()
-        {
-            return useDraughtAction != null && useDraughtAction.WasPressedThisFrame();
         }
 
         public bool WasConfirmPressed()

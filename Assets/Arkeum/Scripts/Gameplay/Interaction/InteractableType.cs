@@ -3,10 +3,7 @@
     public enum InteractableType
     {
         None,
-        StartAltar,
-        UnlockAltar,
-        Undertaker,
-        Merchant,
-        Reliquary,
+        DungeonEntrance,
+        FloorExit,
     }
 }

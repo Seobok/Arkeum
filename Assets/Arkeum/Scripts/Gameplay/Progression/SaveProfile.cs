@@ -7,9 +7,8 @@ namespace Arkeum.Production.Gameplay.Progression
     public sealed class SaveProfile
     {
         public int TotalReturns;
-        public int HighestDepth;
+        public int HighestFloor;
         public int Gleam;
-        public bool StartingBandageUnlocked;
         public bool Mq01Completed;
         public List<string> UnlockedFlags = new List<string>();
         public List<string> CompletedQuestIds = new List<string>();

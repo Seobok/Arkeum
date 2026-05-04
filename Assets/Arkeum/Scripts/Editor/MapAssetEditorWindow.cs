@@ -13,23 +13,19 @@ namespace Arkeum.Editor
         private const float CellSize = 28f;
         private static readonly Color GridColor = new Color(0.22f, 0.22f, 0.22f);
         private static readonly Color WalkableColor = new Color(0.23f, 0.2f, 0.2f);
-        private static readonly Color DeepColor = new Color(0.18f, 0.14f, 0.25f);
         private static readonly Color WeaponColor = new Color(0.75f, 0.43f, 0.18f);
         private static readonly Color PlayerColor = new Color(0.91f, 0.86f, 0.78f);
-        private static readonly Color MerchantColor = new Color(0.1f, 0.4f, 0.37f);
-        private static readonly Color ReliquaryColor = new Color(0.76f, 0.65f, 0.17f);
-        private static readonly Color StartColor = new Color(0.62f, 0.29f, 0.22f);
-        private static readonly Color UnlockColor = new Color(0.84f, 0.73f, 0.28f);
-        private static readonly Color UndertakerColor = new Color(0.19f, 0.55f, 0.51f);
+        private static readonly Color FloorExitColor = new Color(0.76f, 0.65f, 0.17f);
+        private static readonly Color DungeonEntranceColor = new Color(0.62f, 0.29f, 0.22f);
         private static readonly Color DoorColor = new Color(0.22f, 0.5f, 0.84f);
         private static readonly Color EnemyColor = new Color(0.64f, 0.15f, 0.16f);
 
         private MapTool selectedTool = MapTool.Walkable;
         private MapAsset selectedAsset;
         private Vector2 scrollPosition;
-        private int brushDepth = 1;
         private DoorDirection selectedDoorDirection = DoorDirection.Right;
         private EnemyDefinition selectedEnemyDefinition;
+        private WeaponDefinition selectedWeaponDefinition;
 
         [MenuItem("Arkeum/Map Editor")]
         private static void OpenWindow()
@@ -71,8 +67,6 @@ namespace Arkeum.Editor
 
                 GUILayout.Space(8f);
                 selectedTool = (MapTool)EditorGUILayout.EnumPopup(selectedTool, EditorStyles.toolbarPopup, GUILayout.Width(140f));
-                brushDepth = EditorGUILayout.IntField(brushDepth, GUILayout.Width(40f));
-                brushDepth = Mathf.Max(0, brushDepth);
                 if (selectedTool == MapTool.Door)
                 {
                     selectedDoorDirection = (DoorDirection)EditorGUILayout.EnumPopup(selectedDoorDirection, EditorStyles.toolbarPopup, GUILayout.Width(84f));
@@ -82,6 +76,14 @@ namespace Arkeum.Editor
                     selectedEnemyDefinition = (EnemyDefinition)EditorGUILayout.ObjectField(
                         selectedEnemyDefinition,
                         typeof(EnemyDefinition),
+                        false,
+                        GUILayout.Width(180f));
+                }
+                else if (selectedTool == MapTool.WeaponSpawn)
+                {
+                    selectedWeaponDefinition = (WeaponDefinition)EditorGUILayout.ObjectField(
+                        selectedWeaponDefinition,
+                        typeof(WeaponDefinition),
                         false,
                         GUILayout.Width(180f));
                 }
@@ -112,7 +114,7 @@ namespace Arkeum.Editor
         {
             EditorGUILayout.LabelField("Brushes", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Walkable/Erase edits terrain. Depth applies to Walkable. Door stores explicit room exits for dungeon generation.",
+                "Walkable/Erase edits terrain. Door stores explicit room exits for dungeon generation.",
                 MessageType.None);
         }
 
@@ -177,21 +179,17 @@ namespace Arkeum.Editor
 
         private void DrawCellOverlay(Vector2Int cell, Rect cellRect)
         {
-            if (selectedAsset.TryGetCell(cell, out MapCellData cellData) && cellData.Walkable)
-            {
-                GUI.Label(cellRect, cellData.Depth.ToString(), CenteredMiniLabel());
-            }
-
             DrawMarker(cellRect, selectedAsset.PlayerSpawn == cell, "P", PlayerColor);
-            DrawMarker(cellRect, IsMarkerEnabled(selectedAsset.MerchantPosition) && selectedAsset.MerchantPosition == cell, "M", MerchantColor);
-            DrawMarker(cellRect, IsMarkerEnabled(selectedAsset.ReliquaryPosition) && selectedAsset.ReliquaryPosition == cell, "R", ReliquaryColor);
-            DrawMarker(cellRect, IsMarkerEnabled(selectedAsset.StartAltarPosition) && selectedAsset.StartAltarPosition == cell, "S", StartColor);
-            DrawMarker(cellRect, IsMarkerEnabled(selectedAsset.UnlockAltarPosition) && selectedAsset.UnlockAltarPosition == cell, "U", UnlockColor);
-            DrawMarker(cellRect, IsMarkerEnabled(selectedAsset.UndertakerPosition) && selectedAsset.UndertakerPosition == cell, "T", UndertakerColor);
+            DrawMarker(cellRect, IsMarkerEnabled(selectedAsset.FloorExitPosition) && selectedAsset.FloorExitPosition == cell, "X", FloorExitColor);
+            DrawMarker(cellRect, IsMarkerEnabled(selectedAsset.DungeonEntrancePosition) && selectedAsset.DungeonEntrancePosition == cell, "E", DungeonEntranceColor);
 
-            if (selectedAsset.TemporaryWeaponSpawns.Contains(cell))
+            if (TryGetWeaponSpawn(cell, out WeaponSpawnDefinition weaponSpawn))
             {
-                DrawMarker(cellRect, true, "W", WeaponColor);
+                string displayName = weaponSpawn.Weapon != null ? weaponSpawn.Weapon.DisplayName : string.Empty;
+                string label = !string.IsNullOrEmpty(displayName)
+                    ? displayName.Substring(0, 1).ToUpperInvariant()
+                    : "W";
+                DrawMarker(cellRect, true, label, WeaponColor);
             }
 
             if (TryGetEnemySpawn(cell, out EnemySpawnDefinition enemySpawn))
@@ -234,17 +232,14 @@ namespace Arkeum.Editor
             switch (selectedTool)
             {
                 case MapTool.Walkable:
-                    selectedAsset.SetCell(cell, true, brushDepth);
+                    selectedAsset.SetCell(cell, true);
                     break;
                 case MapTool.Erase:
                     selectedAsset.RemoveCell(cell);
                     RemoveMarkerIfMatches(ref selectedAsset.PlayerSpawn, cell);
-                    RemoveMarkerIfMatches(ref selectedAsset.MerchantPosition, cell);
-                    RemoveMarkerIfMatches(ref selectedAsset.ReliquaryPosition, cell);
-                    RemoveMarkerIfMatches(ref selectedAsset.StartAltarPosition, cell);
-                    RemoveMarkerIfMatches(ref selectedAsset.UnlockAltarPosition, cell);
-                    RemoveMarkerIfMatches(ref selectedAsset.UndertakerPosition, cell);
-                    selectedAsset.TemporaryWeaponSpawns.RemoveAll(position => position == cell);
+                    RemoveMarkerIfMatches(ref selectedAsset.FloorExitPosition, cell);
+                    RemoveMarkerIfMatches(ref selectedAsset.DungeonEntrancePosition, cell);
+                    RemoveWeaponSpawnsAt(cell);
                     selectedAsset.EnemySpawns.RemoveAll(spawn => spawn != null && spawn.Position == cell);
                     selectedAsset.RemoveDoorsAt(cell);
                     break;
@@ -259,35 +254,31 @@ namespace Arkeum.Editor
                     selectedAsset.PlayerSpawn = cell;
                     EnsureWalkable(cell);
                     break;
-                case MapTool.Merchant:
-                    selectedAsset.MerchantPosition = cell;
+                case MapTool.FloorExit:
+                    selectedAsset.FloorExitPosition = cell;
                     EnsureWalkable(cell);
                     break;
-                case MapTool.Reliquary:
-                    selectedAsset.ReliquaryPosition = cell;
-                    EnsureWalkable(cell);
-                    break;
-                case MapTool.StartAltar:
-                    selectedAsset.StartAltarPosition = cell;
-                    EnsureWalkable(cell);
-                    break;
-                case MapTool.UnlockAltar:
-                    selectedAsset.UnlockAltarPosition = cell;
-                    EnsureWalkable(cell);
-                    break;
-                case MapTool.Undertaker:
-                    selectedAsset.UndertakerPosition = cell;
+                case MapTool.DungeonEntrance:
+                    selectedAsset.DungeonEntrancePosition = cell;
                     EnsureWalkable(cell);
                     break;
                 case MapTool.WeaponSpawn:
                     EnsureWalkable(cell);
-                    if (selectedAsset.TemporaryWeaponSpawns.Contains(cell))
+                    if (TryGetWeaponSpawn(cell, out _))
                     {
-                        selectedAsset.TemporaryWeaponSpawns.RemoveAll(position => position == cell);
+                        RemoveWeaponSpawnsAt(cell);
+                    }
+                    else if (selectedWeaponDefinition != null)
+                    {
+                        selectedAsset.WeaponSpawns.Add(new WeaponSpawnDefinition
+                        {
+                            Weapon = selectedWeaponDefinition,
+                            Position = cell,
+                        });
                     }
                     else
                     {
-                        selectedAsset.TemporaryWeaponSpawns.Add(cell);
+                        Debug.LogWarning("[MapAssetEditor] Select a WeaponDefinition before placing a weapon spawn.");
                     }
                     break;
                 case MapTool.EnemySpawn:
@@ -316,7 +307,7 @@ namespace Arkeum.Editor
 
         private void EnsureWalkable(Vector2Int cell)
         {
-            selectedAsset.SetCell(cell, true, brushDepth);
+            selectedAsset.SetCell(cell, true);
         }
 
         private void FrameToCells()
@@ -369,7 +360,7 @@ namespace Arkeum.Editor
                 return Color.black;
             }
 
-            return cellData.Depth >= 2 ? DeepColor : WalkableColor;
+            return WalkableColor;
         }
 
         private List<string> BuildValidationIssues(MapAsset asset)
@@ -386,17 +377,26 @@ namespace Arkeum.Editor
                 issues.Add("Player spawn is not on a walkable cell.");
             }
 
-            AddReachabilityIssue(asset, asset.PlayerSpawn, asset.MerchantPosition, "Merchant", issues);
-            AddReachabilityIssue(asset, asset.PlayerSpawn, asset.ReliquaryPosition, "Reliquary", issues);
-            AddReachabilityIssue(asset, asset.PlayerSpawn, asset.StartAltarPosition, "Start altar", issues);
-            AddReachabilityIssue(asset, asset.PlayerSpawn, asset.UnlockAltarPosition, "Unlock altar", issues);
-            AddReachabilityIssue(asset, asset.PlayerSpawn, asset.UndertakerPosition, "Undertaker", issues);
+            AddReachabilityIssue(asset, asset.PlayerSpawn, asset.FloorExitPosition, "Floor exit", issues);
+            AddReachabilityIssue(asset, asset.PlayerSpawn, asset.DungeonEntrancePosition, "Dungeon entrance", issues);
 
-            for (int i = 0; i < asset.TemporaryWeaponSpawns.Count; i++)
+            for (int i = 0; i < asset.WeaponSpawns.Count; i++)
             {
-                if (!IsWalkable(asset, asset.TemporaryWeaponSpawns[i]))
+                WeaponSpawnDefinition weaponSpawn = asset.WeaponSpawns[i];
+                if (weaponSpawn == null)
                 {
-                    issues.Add($"Weapon spawn {asset.TemporaryWeaponSpawns[i]} is not on a walkable cell.");
+                    issues.Add($"Weapon spawn {i} is empty.");
+                    continue;
+                }
+
+                if (weaponSpawn.Weapon == null)
+                {
+                    issues.Add($"Weapon spawn {weaponSpawn.Position} has no WeaponDefinition.");
+                }
+
+                if (!IsWalkable(asset, weaponSpawn.Position))
+                {
+                    issues.Add($"Weapon spawn {weaponSpawn.Position} is not on a walkable cell.");
                 }
             }
 
@@ -542,6 +542,26 @@ namespace Arkeum.Editor
             return false;
         }
 
+        private bool TryGetWeaponSpawn(Vector2Int cell, out WeaponSpawnDefinition weaponSpawn)
+        {
+            for (int i = 0; i < selectedAsset.WeaponSpawns.Count; i++)
+            {
+                weaponSpawn = selectedAsset.WeaponSpawns[i];
+                if (weaponSpawn != null && weaponSpawn.Position == cell)
+                {
+                    return true;
+                }
+            }
+
+            weaponSpawn = null;
+            return false;
+        }
+
+        private void RemoveWeaponSpawnsAt(Vector2Int cell)
+        {
+            selectedAsset.WeaponSpawns.RemoveAll(spawn => spawn != null && spawn.Position == cell);
+        }
+
         private static GUIStyle CenteredMiniLabel()
         {
             GUIStyle style = new GUIStyle(EditorStyles.miniBoldLabel)
@@ -624,11 +644,8 @@ namespace Arkeum.Editor
             Door,
             DoorErase,
             PlayerSpawn,
-            Merchant,
-            Reliquary,
-            StartAltar,
-            UnlockAltar,
-            Undertaker,
+            FloorExit,
+            DungeonEntrance,
             WeaponSpawn,
             EnemySpawn,
         }
