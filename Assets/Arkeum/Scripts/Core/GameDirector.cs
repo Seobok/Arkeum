@@ -207,8 +207,65 @@ namespace Arkeum.Production.Core
 
             if (CurrentRunController.CurrentRun.EndReason != RunEndReason.None)
             {
+                if (CurrentRunController.CurrentRun.EndReason == RunEndReason.FloorClear && TryAdvanceToNextFloor())
+                {
+                    return;
+                }
+
                 ShowRunResult();
             }
+        }
+
+        private bool TryAdvanceToNextFloor()
+        {
+            RunState runState = CurrentRunController?.CurrentRun;
+            if (runState == null)
+            {
+                return false;
+            }
+
+            int nextFloor = runState.CurrentFloor + 1;
+            RunFloorDefinition nextFloorDefinition = Services.MapService.GetRunFloor(nextFloor);
+            if (nextFloorDefinition == null)
+            {
+                return false;
+            }
+
+            int currentHp = runState.Player != null ? runState.Player.CurrentHp : PlayerMaxHP;
+            Services.MapService.LoadRunFloor(nextFloorDefinition, nextFloor);
+            if (Services.MapService.CurrentMap == null)
+            {
+                Debug.LogError($"[GameDirector] Failed to advance to floor {nextFloor}. Run floor map was not created.");
+                return false;
+            }
+
+            ApplySceneInteractablePositions();
+            BuildRunActors();
+            BuildRunInteractables();
+
+            ActorEntity player = Services.ActorRepository.Player;
+            if (player == null)
+            {
+                Debug.LogError($"[GameDirector] Failed to advance to floor {nextFloor}. Player actor was not created.");
+                return false;
+            }
+
+            runState.CurrentFloor = nextFloor;
+            runState.CurrentFloorDefinition = nextFloorDefinition;
+            runState.FloorExitUsed = false;
+            runState.EndReason = RunEndReason.None;
+            runState.Player = player;
+            player.CurrentHp = Mathf.Clamp(currentHp, 1, PlayerMaxHP);
+            player.Stats.MaxHp = PlayerMaxHP;
+            player.Stats.AttackPower = runState.EffectiveAttack;
+
+            Services.WorldPresenter.SetActorRepository(Services.ActorRepository);
+            Services.WorldPresenter.BindRun(runState, Services.MapService.CurrentMap);
+            Services.WorldPresenter.Refresh();
+            Services.HudPresenter.BindRun(runState);
+            Services.HudPresenter.SetMessage($"You descend to floor {nextFloor}.");
+            CurrentState = GameState.InRun;
+            return true;
         }
 
         private void UpdateRunResultInput()
