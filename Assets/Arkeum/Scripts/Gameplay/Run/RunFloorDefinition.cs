@@ -10,8 +10,16 @@ namespace Arkeum.Production.Gameplay.Run
         public int FloorIndex = 1;
         public MapAsset MapAsset;
         public List<MapAsset> RoomAssets = new List<MapAsset>();
+        public List<RunSpecialRoomDefinition> SpecialRooms = new List<RunSpecialRoomDefinition>();
         public int MinimumRoomCount = 6;
         public int RoomGap = 5;
         public int PlacementAttempts = 300;
+    }
+
+    [Serializable]
+    public sealed class RunSpecialRoomDefinition
+    {
+        public MapAsset RoomAsset;
+        public int Count = 1;
     }
 }

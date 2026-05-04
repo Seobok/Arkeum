@@ -34,6 +34,7 @@ namespace Arkeum.Production.Gameplay.Map
         public Vector2Int Origin;
         public Vector2Int Min;
         public Vector2Int Max;
+        public bool IsSpecialRoom;
         public List<Vector2Int> Cells = new List<Vector2Int>();
         public List<DungeonDoorDefinition> Doors = new List<DungeonDoorDefinition>();
     }

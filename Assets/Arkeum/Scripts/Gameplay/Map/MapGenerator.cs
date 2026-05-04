@@ -37,10 +37,11 @@ namespace Arkeum.Production.Gameplay.Map
                 $"[MapGenerator] CreateRunMap floor={floor}, fallbackFloor={fallbackFloor}, " +
                 $"floorDefinition={(floorDefinition != null ? "set" : "null")}, " +
                 $"floorMapAsset={DescribeAsset(floorMapAsset)}, " +
-                $"roomAssetCount={(floorDefinition != null && floorDefinition.RoomAssets != null ? floorDefinition.RoomAssets.Count : 0)}");
+                $"roomAssetCount={(floorDefinition != null && floorDefinition.RoomAssets != null ? floorDefinition.RoomAssets.Count : 0)}, " +
+                $"specialRoomDefinitionCount={(floorDefinition != null && floorDefinition.SpecialRooms != null ? floorDefinition.SpecialRooms.Count : 0)}");
 
             RoomTemplateSet roomTemplates = CreateRoomTemplates(floorDefinition, floorMapAsset);
-            DungeonGenerationSettings settings = DungeonGenerationSettings.From(floorDefinition, floor);
+            DungeonGenerationSettings settings = DungeonGenerationSettings.From(floorDefinition, floor, roomTemplates.SpecialRoomSlots.Count);
             MapDefinition map = CreateDungeonMap(roomTemplates, settings);
             map.RunFloor = floor;
             return map;
@@ -91,6 +92,7 @@ namespace Arkeum.Production.Gameplay.Map
             int corridorBuildRejects = 0;
             int corridorValidityRejects = 0;
             int attempts = 0;
+            Dictionary<int, RoomTemplate> specialRoomSlots = CreateSpecialRoomSlotMap(settings.MinimumRoomCount, roomTemplates.SpecialRoomSlots, random);
             while (rooms.Count < settings.MinimumRoomCount && attempts < settings.PlacementAttempts)
             {
                 attempts++;
@@ -105,7 +107,7 @@ namespace Arkeum.Production.Gameplay.Map
                     continue;
                 }
 
-                RoomTemplate candidateTemplate = roomTemplates.Rooms[random.Next(roomTemplates.Rooms.Count)];
+                RoomTemplate candidateTemplate = SelectRoomTemplate(roomTemplates, specialRoomSlots, rooms.Count, random);
                 Vector2Int candidateOrigin = CalculateCandidateOrigin(parent, candidateTemplate, direction, settings.RoomGap);
                 PlacedRoom candidate = CreatePlacedRoom(rooms.Count, candidateTemplate, candidateOrigin, candidateGrid);
 
@@ -144,6 +146,7 @@ namespace Arkeum.Production.Gameplay.Map
             Debug.Log(
                 $"[MapGenerator] Dungeon placement summary floor={settings.Floor}, rooms={rooms.Count}/{settings.MinimumRoomCount}, " +
                 $"attempts={attempts}/{settings.PlacementAttempts}, cells={map.WalkableCells.Count}, corridors={map.Corridors.Count}, " +
+                $"specialRooms={CountSpecialRooms(rooms)}/{roomTemplates.SpecialRoomSlots.Count}, " +
                 $"rejects occupiedGrid={occupiedGridRejects}, overlap={overlapRejects}, missingDoor={doorRejects}, " +
                 $"corridorBuild={corridorBuildRejects}, corridorInvalid={corridorValidityRejects}");
 
@@ -171,12 +174,13 @@ namespace Arkeum.Production.Gameplay.Map
             List<PlacedRoom> rooms = new List<PlacedRoom>();
             HashSet<Vector2Int> occupiedRoomCells = new HashSet<Vector2Int>();
             int nextMinX = 0;
+            Dictionary<int, RoomTemplate> specialRoomSlots = CreateSpecialRoomSlotMap(settings.MinimumRoomCount, roomTemplates.SpecialRoomSlots, new System.Random());
 
             for (int i = 0; i < settings.MinimumRoomCount; i++)
             {
                 RoomTemplate roomTemplate = i == 0
                     ? roomTemplates.StartRoom
-                    : roomTemplates.Rooms[(i - 1) % roomTemplates.Rooms.Count];
+                    : SelectFallbackRoomTemplate(roomTemplates, specialRoomSlots, i);
                 Vector2Int origin = new Vector2Int(nextMinX - roomTemplate.Min.x, 0);
                 PlacedRoom room = CreatePlacedRoom(i, roomTemplate, origin, new Vector2Int(i, 0));
                 rooms.Add(room);
@@ -201,27 +205,47 @@ namespace Arkeum.Production.Gameplay.Map
             }
 
             ApplyRunMarkers(map, rooms);
-            Debug.LogWarning($"[MapGenerator] Fallback dungeon generated floor={settings.Floor}, rooms={map.Rooms.Count}, corridors={map.Corridors.Count}, cells={map.WalkableCells.Count}");
+            Debug.LogWarning($"[MapGenerator] Fallback dungeon generated floor={settings.Floor}, rooms={map.Rooms.Count}, specialRooms={CountSpecialRooms(rooms)}/{roomTemplates.SpecialRoomSlots.Count}, corridors={map.Corridors.Count}, cells={map.WalkableCells.Count}");
             return map;
         }
 
         private static RoomTemplateSet CreateRoomTemplates(RunFloorDefinition floorDefinition, MapAsset startRoomAsset)
         {
-            RoomTemplate startRoom = CreateRoomTemplate(startRoomAsset);
+            RoomTemplate startRoom = CreateRoomTemplate(startRoomAsset, false);
             List<MapAsset> roomAssets = new List<MapAsset>();
+            List<MapAsset> specialRoomAssets = new List<MapAsset>();
+            List<RoomTemplate> specialRoomSlots = new List<RoomTemplate>();
+
+            if (floorDefinition != null && floorDefinition.SpecialRooms != null)
+            {
+                for (int i = 0; i < floorDefinition.SpecialRooms.Count; i++)
+                {
+                    RunSpecialRoomDefinition specialRoom = floorDefinition.SpecialRooms[i];
+                    if (specialRoom == null || specialRoom.RoomAsset == null || specialRoom.Count <= 0)
+                    {
+                        continue;
+                    }
+
+                    AddUniqueAsset(specialRoomAssets, specialRoom.RoomAsset);
+                    for (int count = 0; count < specialRoom.Count; count++)
+                    {
+                        specialRoomSlots.Add(CreateRoomTemplate(specialRoom.RoomAsset, true));
+                    }
+                }
+            }
 
             if (floorDefinition != null && floorDefinition.RoomAssets != null)
             {
                 for (int i = 0; i < floorDefinition.RoomAssets.Count; i++)
                 {
-                    AddUniqueAsset(roomAssets, floorDefinition.RoomAssets[i]);
+                    AddUniqueNonSpecialAsset(roomAssets, specialRoomAssets, floorDefinition.RoomAssets[i]);
                 }
             }
 
             List<RoomTemplate> rooms = new List<RoomTemplate>();
             for (int i = 0; i < roomAssets.Count; i++)
             {
-                rooms.Add(CreateRoomTemplate(roomAssets[i]));
+                rooms.Add(CreateRoomTemplate(roomAssets[i], false));
             }
 
             if (rooms.Count == 0)
@@ -231,14 +255,25 @@ namespace Arkeum.Production.Gameplay.Map
 
             Debug.Log(
                 $"[MapGenerator] Room templates ready. startAsset={DescribeAsset(startRoomAsset)}, " +
-                $"startCells={startRoom.Cells.Count}, startDoors={startRoom.Doors.Count}, roomTemplates={rooms.Count}");
+                $"startCells={startRoom.Cells.Count}, startDoors={startRoom.Doors.Count}, roomTemplates={rooms.Count}, " +
+                $"specialRoomTypes={specialRoomAssets.Count}, specialRoomSlots={specialRoomSlots.Count}");
 
-            return new RoomTemplateSet(startRoom, rooms);
+            return new RoomTemplateSet(startRoom, rooms, specialRoomSlots);
         }
 
         private static void AddUniqueAsset(List<MapAsset> assets, MapAsset asset)
         {
             if (asset == null || assets.Contains(asset))
+            {
+                return;
+            }
+
+            assets.Add(asset);
+        }
+
+        private static void AddUniqueNonSpecialAsset(List<MapAsset> assets, List<MapAsset> specialAssets, MapAsset asset)
+        {
+            if (asset == null || specialAssets.Contains(asset) || assets.Contains(asset))
             {
                 return;
             }
@@ -261,7 +296,79 @@ namespace Arkeum.Production.Gameplay.Map
             }
         }
 
-        private static RoomTemplate CreateRoomTemplate(MapAsset asset)
+        private static Dictionary<int, RoomTemplate> CreateSpecialRoomSlotMap(int roomCount, List<RoomTemplate> specialRoomSlots, System.Random random)
+        {
+            Dictionary<int, RoomTemplate> slotsByRoomId = new Dictionary<int, RoomTemplate>();
+            if (specialRoomSlots.Count <= 0)
+            {
+                return slotsByRoomId;
+            }
+
+            List<int> roomIds = new List<int>();
+            for (int id = 1; id < roomCount; id++)
+            {
+                roomIds.Add(id);
+            }
+
+            Shuffle(roomIds, random);
+            List<RoomTemplate> slots = new List<RoomTemplate>(specialRoomSlots);
+            Shuffle(slots, random);
+
+            int assignCount = Mathf.Min(roomIds.Count, slots.Count);
+            for (int i = 0; i < assignCount; i++)
+            {
+                slotsByRoomId.Add(roomIds[i], slots[i]);
+            }
+
+            return slotsByRoomId;
+        }
+
+        private static RoomTemplate SelectRoomTemplate(RoomTemplateSet roomTemplates, Dictionary<int, RoomTemplate> specialRoomSlots, int roomId, System.Random random)
+        {
+            if (specialRoomSlots.TryGetValue(roomId, out RoomTemplate specialRoom))
+            {
+                return specialRoom;
+            }
+
+            return roomTemplates.Rooms[random.Next(roomTemplates.Rooms.Count)];
+        }
+
+        private static RoomTemplate SelectFallbackRoomTemplate(RoomTemplateSet roomTemplates, Dictionary<int, RoomTemplate> specialRoomSlots, int roomIndex)
+        {
+            if (specialRoomSlots.TryGetValue(roomIndex, out RoomTemplate specialRoom))
+            {
+                return specialRoom;
+            }
+
+            return roomTemplates.Rooms[(roomIndex - 1) % roomTemplates.Rooms.Count];
+        }
+
+        private static void Shuffle<T>(List<T> values, System.Random random)
+        {
+            for (int i = values.Count - 1; i > 0; i--)
+            {
+                int swapIndex = random.Next(i + 1);
+                T value = values[i];
+                values[i] = values[swapIndex];
+                values[swapIndex] = value;
+            }
+        }
+
+        private static int CountSpecialRooms(IReadOnlyList<PlacedRoom> rooms)
+        {
+            int count = 0;
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                if (rooms[i].Definition.IsSpecialRoom)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static RoomTemplate CreateRoomTemplate(MapAsset asset, bool specialRoom)
         {
             List<TemplateCell> cells = new List<TemplateCell>();
             List<TemplateDoor> doors = new List<TemplateDoor>();
@@ -350,7 +457,7 @@ namespace Arkeum.Production.Gameplay.Map
                 Debug.LogWarning($"[MapGenerator] Ignored doors outside walkable cells. asset={DescribeAsset(asset)}, ignoredDoors={ignoredDoors}, validDoors={doors.Count}");
             }
 
-            return new RoomTemplate(cells, doors, enemySpawns, weaponSpawns);
+            return new RoomTemplate(cells, doors, enemySpawns, weaponSpawns, specialRoom);
         }
 
         private static PlacedRoom CreatePlacedRoom(int id, RoomTemplate template, Vector2Int origin, Vector2Int gridPosition)
@@ -361,6 +468,7 @@ namespace Arkeum.Production.Gameplay.Map
                 Origin = origin,
                 Min = template.Min + origin,
                 Max = template.Max + origin,
+                IsSpecialRoom = template.IsSpecialRoom,
             };
 
             HashSet<Vector2Int> cellSet = new HashSet<Vector2Int>();
@@ -851,17 +959,20 @@ namespace Arkeum.Production.Gameplay.Map
             public readonly Vector2Int Max;
             public readonly int Width;
             public readonly int Height;
+            public readonly bool IsSpecialRoom;
 
             public RoomTemplate(
                 List<TemplateCell> cells,
                 List<TemplateDoor> doors,
                 List<TemplateEnemySpawn> enemySpawns,
-                List<TemplateWeaponSpawn> weaponSpawns)
+                List<TemplateWeaponSpawn> weaponSpawns,
+                bool isSpecialRoom)
             {
                 Cells = cells;
                 Doors = doors;
                 EnemySpawns = enemySpawns;
                 WeaponSpawns = weaponSpawns;
+                IsSpecialRoom = isSpecialRoom;
                 Min = cells[0].Position;
                 Max = cells[0].Position;
 
@@ -881,11 +992,13 @@ namespace Arkeum.Production.Gameplay.Map
         {
             public readonly RoomTemplate StartRoom;
             public readonly List<RoomTemplate> Rooms;
+            public readonly List<RoomTemplate> SpecialRoomSlots;
 
-            public RoomTemplateSet(RoomTemplate startRoom, List<RoomTemplate> rooms)
+            public RoomTemplateSet(RoomTemplate startRoom, List<RoomTemplate> rooms, List<RoomTemplate> specialRoomSlots)
             {
                 StartRoom = startRoom;
                 Rooms = rooms;
+                SpecialRoomSlots = specialRoomSlots;
             }
         }
 
@@ -971,24 +1084,25 @@ namespace Arkeum.Production.Gameplay.Map
             public readonly int RoomGap;
             public readonly int PlacementAttempts;
 
-            private DungeonGenerationSettings(int floor, int minimumRoomCount, int roomGap, int placementAttempts)
+            private DungeonGenerationSettings(int floor, int minimumRoomCount, int specialRoomSlotCount, int roomGap, int placementAttempts)
             {
                 Floor = floor;
-                MinimumRoomCount = Mathf.Max(6, minimumRoomCount);
+                MinimumRoomCount = Mathf.Max(6, Mathf.Max(minimumRoomCount, Mathf.Max(0, specialRoomSlotCount) + 1));
                 RoomGap = Mathf.Max(1, roomGap);
                 PlacementAttempts = Mathf.Max(MinimumRoomCount, placementAttempts);
             }
 
-            public static DungeonGenerationSettings From(RunFloorDefinition floorDefinition, int floor)
+            public static DungeonGenerationSettings From(RunFloorDefinition floorDefinition, int floor, int specialRoomSlotCount)
             {
                 if (floorDefinition == null)
                 {
-                    return new DungeonGenerationSettings(floor, 6, 5, 300);
+                    return new DungeonGenerationSettings(floor, 6, specialRoomSlotCount, 5, 300);
                 }
 
                 return new DungeonGenerationSettings(
                     floor,
                     floorDefinition.MinimumRoomCount,
+                    specialRoomSlotCount,
                     floorDefinition.RoomGap,
                     floorDefinition.PlacementAttempts);
             }

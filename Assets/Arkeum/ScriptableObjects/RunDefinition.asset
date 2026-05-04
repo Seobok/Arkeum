@@ -23,7 +23,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 28d62fec35b38554ea0165982557a35a, type: 2}
     - {fileID: 11400000, guid: 7ffcdb1fb0637c943976a6ce4a4457c5, type: 2}
     - {fileID: 11400000, guid: 58b1416f9c8509d449a16657b43ab5fd, type: 2}
+    SpecialRooms: []
     MinimumRoomCount: 6
     RoomGap: 5
     PlacementAttempts: 300
-    EnemySpawns: []
