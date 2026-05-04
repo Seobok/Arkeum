@@ -10,13 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1948eef484604db479b0b8cedbdc1feb, type: 3}
-  m_Name: SkeletonAttackPattern
+  m_Name: OrcAttackPattern
   m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Gameplay.Actors.EnemyAttackPatternDefinition
   editorMin: {x: -1, y: -1}
   editorMax: {x: 1, y: 1}
   rotateByFacing: 1
   offsets:
   - {x: 1, y: 0}
-  - {x: 2, y: 0}
-  - {x: 3, y: 0}
-  - {x: 4, y: 0}
+  - {x: 1, y: 1}
+  - {x: 1, y: -1}

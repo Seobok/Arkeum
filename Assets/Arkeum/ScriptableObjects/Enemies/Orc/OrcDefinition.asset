@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fd7b7060f6900334b8d48f50d9aceeff, type: 3}
-  m_Name: SkeletonDefinition
+  m_Name: OrcDefinition
   m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Gameplay.Actors.EnemyDefinition
-  enemyId: Skeleton
-  displayName: "\uC2A4\uCF08\uB808\uD1A4"
+  enemyId: Orc
+  displayName: "\uC624\uD06C"
   stats:
     MaxHp: 2
     AttackPower: 1
@@ -24,6 +24,6 @@ MonoBehaviour:
     AttackPreparationTurns: 1
     MovePreparationTurns: 1
   bloodReward: 1
-  attackPattern: {fileID: 11400000, guid: 5c561af495ad5284bad0ecd44fa28faf, type: 2}
+  attackPattern: {fileID: 11400000, guid: b4ad50a72da48f042bada5606eaba7bd, type: 2}
   sprite: {fileID: 0}
   tint: {r: 1, g: 1, b: 1, a: 1}
