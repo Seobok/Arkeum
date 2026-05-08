@@ -101,6 +101,7 @@ namespace Arkeum.Production.Presentation.UI
                     $"HP {boundRun.Player.CurrentHp}/{boundRun.Player.Stats.MaxHp}  |  Shards {boundRun.BloodShards}  |  Bandage {boundRun.BandageCount}  |  Turn {boundRun.TurnCount}",
                     bodyStyle);
                 GUILayout.Label($"Floor {boundRun.CurrentFloor}  |  Weapon {(boundRun.HasEquippedWeapon ? "Equipped" : "None")}", bodyStyle);
+                GUILayout.Label(FormatTimingLine(boundRun), boundRun.IsTimingModeEnabled ? accentStyle : bodyStyle);
                 GUILayout.Label("Rule: every action gives enemies a response.", accentStyle);
             }
             else
@@ -123,6 +124,7 @@ namespace Arkeum.Production.Presentation.UI
                 GUILayout.Label("Move keys: attack, interact, or move", bodyStyle);
                 GUILayout.Label("Wait: Q", bodyStyle);
                 GUILayout.Label("Items: 1 bandage", bodyStyle);
+                GUILayout.Label("Timing: Next", bodyStyle);
                 DrawRunOptions();
             }
             else if (gameDirector.CurrentState == GameState.RunResult)
@@ -261,6 +263,23 @@ namespace Arkeum.Production.Presentation.UI
             }
 
             return $"{weapon.DisplayName} (+{weapon.AttackBonus} attack)";
+        }
+
+        private static string FormatTimingLine(RunState runState)
+        {
+            if (runState == null)
+            {
+                return "Timing: Off";
+            }
+
+            string state = runState.IsTimingModeEnabled ? "On" : "Off";
+            WeaponDefinition weapon = runState.EquippedWeapon;
+            if (!runState.IsTimingModeEnabled || weapon == null)
+            {
+                return $"Timing: {state}";
+            }
+
+            return weapon.HasTimingChallenge ? $"Timing: {state}" : $"Timing: {state} (weapon has no challenge)";
         }
     }
 }

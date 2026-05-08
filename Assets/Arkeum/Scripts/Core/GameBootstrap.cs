@@ -4,6 +4,7 @@ using Arkeum.Production.Gameplay.Interaction;
 using Arkeum.Production.Gameplay.Map;
 using Arkeum.Production.Gameplay.Progression;
 using Arkeum.Production.Gameplay.Run;
+using Arkeum.Production.Gameplay.Timing;
 using Arkeum.Production.Infrastructure.Input;
 using Arkeum.Production.Presentation.UI;
 using Arkeum.Production.Presentation.World;
@@ -16,11 +17,13 @@ namespace Arkeum.Production.Core
     [RequireComponent(typeof(GameDirector))]
     [RequireComponent(typeof(WorldPresenter))]
     [RequireComponent(typeof(HudPresenter))]
+    [RequireComponent(typeof(TimingPopupPresenter))]
     public sealed class GameBootstrap : MonoBehaviour
     {
         [SerializeField] private GameDirector gameDirector;
         [SerializeField] private WorldPresenter worldPresenter;
         [SerializeField] private HudPresenter hudPresenter;
+        [SerializeField] private TimingPopupPresenter timingPopupPresenter;
         [SerializeField] private InputActionAsset inputActions;
         [Header("Map Assets")]
         [SerializeField] private MapAsset hubMapAsset;
@@ -31,6 +34,7 @@ namespace Arkeum.Production.Core
             gameDirector = GetComponent<GameDirector>();
             worldPresenter = GetComponent<WorldPresenter>();
             hudPresenter = GetComponent<HudPresenter>();
+            timingPopupPresenter = GetComponent<TimingPopupPresenter>();
         }
 
         private void Awake()
@@ -50,9 +54,20 @@ namespace Arkeum.Production.Core
                 hudPresenter = GetComponent<HudPresenter>();
             }
 
+            if (timingPopupPresenter == null)
+            {
+                timingPopupPresenter = GetComponent<TimingPopupPresenter>();
+            }
+
+            if (timingPopupPresenter == null)
+            {
+                timingPopupPresenter = gameObject.AddComponent<TimingPopupPresenter>();
+            }
+
             ServiceRegistry services = BuildServices();
             worldPresenter.Initialize();
             hudPresenter.Initialize(gameDirector);
+            timingPopupPresenter.Initialize();
             SaveProfile profile = new SaveProfile();
             gameDirector.Initialize(services, profile);
         }
@@ -74,6 +89,7 @@ namespace Arkeum.Production.Core
             QuestService questService = new QuestService();
             ProgressionService progressionService = new ProgressionService(questService);
             RunResultBuilder runResultBuilder = new RunResultBuilder();
+            TimingService timingService = new TimingService();
 
             return new ServiceRegistry(
                 inputReader,
@@ -85,9 +101,11 @@ namespace Arkeum.Production.Core
                 mapService,
                 progressionService,
                 runResultBuilder,
+                timingService,
                 runDefinition,
                 worldPresenter,
-                hudPresenter);
+                hudPresenter,
+                timingPopupPresenter);
         }
     }
 }

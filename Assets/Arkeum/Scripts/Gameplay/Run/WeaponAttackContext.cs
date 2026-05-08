@@ -1,4 +1,5 @@
 using Arkeum.Production.Gameplay.Actors;
+using Arkeum.Production.Gameplay.Timing;
 using UnityEngine;
 
 namespace Arkeum.Production.Gameplay.Run
@@ -12,5 +13,6 @@ namespace Arkeum.Production.Gameplay.Run
         public Vector2Int FacingDirection;
         public Vector2Int WeaponOffset;
         public int AttackPower;
+        public TimingAttackResult TimingResult;
     }
 }

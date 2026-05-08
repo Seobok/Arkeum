@@ -1,8 +1,9 @@
-﻿using Arkeum.Production.Gameplay.Actors;
+using Arkeum.Production.Gameplay.Actors;
 using Arkeum.Production.Gameplay.Combat;
 using Arkeum.Production.Gameplay.Interaction;
 using Arkeum.Production.Gameplay.Map;
 using Arkeum.Production.Gameplay.Progression;
+using Arkeum.Production.Gameplay.Timing;
 using UnityEngine;
 
 namespace Arkeum.Production.Gameplay.Run
@@ -15,6 +16,7 @@ namespace Arkeum.Production.Gameplay.Run
         private readonly InteractionSystem interactionSystem;
         private readonly MapService mapService;
         private readonly ActorRepository actorRepository;
+        private readonly TimingService timingService;
 
         public RunState CurrentRun { get; private set; }
         public string LastMessage { get; private set; } = string.Empty;
@@ -25,7 +27,8 @@ namespace Arkeum.Production.Gameplay.Run
             EnemyTurnSystem enemyTurnSystem,
             InteractionSystem interactionSystem,
             MapService mapService,
-            ActorRepository actorRepository)
+            ActorRepository actorRepository,
+            TimingService timingService)
         {
             this.turnSystem = turnSystem;
             this.combatSystem = combatSystem;
@@ -33,6 +36,7 @@ namespace Arkeum.Production.Gameplay.Run
             this.interactionSystem = interactionSystem;
             this.mapService = mapService;
             this.actorRepository = actorRepository;
+            this.timingService = timingService;
         }
 
         public void Begin(RunState runState)
@@ -53,41 +57,40 @@ namespace Arkeum.Production.Gameplay.Run
                 FloorExitUsed = false,
                 HasEquippedWeapon = startingLoadout?.Weapon != null,
                 EquippedWeapon = startingLoadout != null ? startingLoadout.Weapon : null,
+                IsTimingModeEnabled = false,
                 EndReason = RunEndReason.None,
             };
         }
 
-        public bool TryHandlePlayerAction(Vector2Int direction)
+        public PlayerActionResultType TryHandlePlayerAction(Vector2Int direction)
         {
             if (CurrentRun?.Player == null)
             {
-                return false;
+                return PlayerActionResultType.NotHandled;
             }
 
             Vector2Int targetCell = CurrentRun.Player.GridPosition + direction;
             if (TryGetPlayerAttackTarget(direction, out ActorEntity enemy, out WeaponAttackContext attackContext))
             {
-                int damage = combatSystem.ResolvePlayerAttack(CurrentRun, CurrentRun.Player, enemy, attackContext);
-                SetMessage($"You strike {enemy.DisplayName} for {damage} damage.");
-                if (!enemy.IsAlive)
+                if (timingService != null && timingService.TryBegin(CurrentRun, attackContext, out TimingSession _))
                 {
-                    CurrentRun.BloodShards += enemy.BloodReward;
-                    SetMessage($"{enemy.DisplayName} falls. You gain {enemy.BloodReward} blood shards.");
+                    SetMessage("Time your strike.");
+                    return PlayerActionResultType.TimingChallengeStarted;
                 }
 
-                ConsumeTurn();
-                return true;
+                ResolvePlayerAttack(enemy, attackContext);
+                return PlayerActionResultType.Handled;
             }
 
             if (TryHandleRunInteractionAt(targetCell))
             {
-                return true;
+                return PlayerActionResultType.Handled;
             }
 
             if (!mapService.IsWalkable(targetCell))
             {
                 SetMessage("The path is blocked.");
-                return false;
+                return PlayerActionResultType.NotHandled;
             }
 
             CurrentRun.Player.GridPosition = targetCell;
@@ -97,7 +100,49 @@ namespace Arkeum.Production.Gameplay.Run
             }
 
             ConsumeTurn();
+            return PlayerActionResultType.Handled;
+        }
+
+        public bool ResolveTimedAttack(TimingAttackResult timingResult)
+        {
+            TimingSession session = timingService?.CurrentSession;
+            WeaponAttackContext attackContext = session?.AttackContext;
+            ActorEntity enemy = attackContext?.Defender;
+            if (attackContext == null || enemy == null || CurrentRun?.Player == null)
+            {
+                timingService?.CancelCurrent();
+                return false;
+            }
+
+            timingService.CompleteCurrent(timingResult.Grade);
+            attackContext.TimingResult = timingResult;
+            ResolvePlayerAttack(enemy, attackContext);
             return true;
+        }
+
+        public void ToggleTimingMode()
+        {
+            if (CurrentRun == null)
+            {
+                return;
+            }
+
+            CurrentRun.IsTimingModeEnabled = !CurrentRun.IsTimingModeEnabled;
+            SetMessage(CurrentRun.IsTimingModeEnabled ? "Timing enabled." : "Timing disabled.");
+        }
+
+        private void ResolvePlayerAttack(ActorEntity enemy, WeaponAttackContext attackContext)
+        {
+            int damage = combatSystem.ResolvePlayerAttack(CurrentRun, CurrentRun.Player, enemy, attackContext);
+            string resultPrefix = FormatTimingResultPrefix(attackContext);
+            SetMessage($"{resultPrefix}You strike {enemy.DisplayName} for {damage} damage.");
+            if (!enemy.IsAlive)
+            {
+                CurrentRun.BloodShards += enemy.BloodReward;
+                SetMessage($"{enemy.DisplayName} falls. You gain {enemy.BloodReward} blood shards.");
+            }
+
+            ConsumeTurn();
         }
 
         private bool TryGetPlayerAttackTarget(Vector2Int direction, out ActorEntity enemy, out WeaponAttackContext attackContext)
@@ -156,6 +201,7 @@ namespace Arkeum.Production.Gameplay.Run
                 FacingDirection = facing,
                 WeaponOffset = weaponOffset,
                 AttackPower = CurrentRun.Player.Stats.AttackPower,
+                TimingResult = TimingAttackResult.None,
             };
         }
 
@@ -280,6 +326,26 @@ namespace Arkeum.Production.Gameplay.Run
         private void SetMessage(string message)
         {
             LastMessage = message;
+        }
+
+        private static string FormatTimingResultPrefix(WeaponAttackContext attackContext)
+        {
+            if (attackContext == null || !attackContext.TimingResult.Attempted)
+            {
+                return string.Empty;
+            }
+
+            switch (attackContext.TimingResult.Grade)
+            {
+                case TimingResultGrade.Perfect:
+                    return "Perfect timing. ";
+                case TimingResultGrade.Good:
+                    return "Good timing. ";
+                case TimingResultGrade.Failed:
+                    return "Mistimed. ";
+                default:
+                    return string.Empty;
+            }
         }
     }
 }

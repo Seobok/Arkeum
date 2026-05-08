@@ -1,4 +1,4 @@
-﻿namespace Arkeum.Production.Core
+namespace Arkeum.Production.Core
 {
     public enum GameState
     {
@@ -6,6 +6,7 @@
         Hub,
         RunPreparing,
         InRun,
+        TimingChallenge,
         RunResult,
     }
 }

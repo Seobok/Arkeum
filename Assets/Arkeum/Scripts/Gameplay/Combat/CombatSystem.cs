@@ -1,5 +1,7 @@
-﻿using Arkeum.Production.Gameplay.Actors;
+using Arkeum.Production.Gameplay.Actors;
 using Arkeum.Production.Gameplay.Run;
+using Arkeum.Production.Gameplay.Timing;
+using UnityEngine;
 
 namespace Arkeum.Production.Gameplay.Combat
 {
@@ -21,6 +23,7 @@ namespace Arkeum.Production.Gameplay.Combat
                 attackPower = attackContext.AttackPower;
             }
 
+            attackPower = ApplyTimingResult(attackContext, attackPower);
             int damage = damageResolver.ResolveDamage(attackPower, defender.Stats.Defense);
             ApplyDamage(defender, damage);
             return damage;
@@ -59,6 +62,18 @@ namespace Arkeum.Production.Gameplay.Combat
 
                 effect.ModifyPlayerAttack(context);
             }
+        }
+
+        private static int ApplyTimingResult(WeaponAttackContext context, int attackPower)
+        {
+            if (context == null || !context.TimingResult.Attempted)
+            {
+                return attackPower;
+            }
+
+            TimingAttackResult timingResult = context.TimingResult;
+            float multipliedAttackPower = attackPower * timingResult.DamageMultiplier;
+            return Mathf.Max(0, Mathf.RoundToInt(multipliedAttackPower) + timingResult.FlatDamageBonus);
         }
     }
 }

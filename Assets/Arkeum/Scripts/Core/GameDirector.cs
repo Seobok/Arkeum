@@ -4,6 +4,7 @@ using Arkeum.Production.Gameplay.Interaction;
 using Arkeum.Production.Gameplay.Map;
 using Arkeum.Production.Gameplay.Progression;
 using Arkeum.Production.Gameplay.Run;
+using Arkeum.Production.Gameplay.Timing;
 using UnityEngine;
 
 namespace Arkeum.Production.Core
@@ -40,6 +41,9 @@ namespace Arkeum.Production.Core
                 case GameState.InRun:
                     UpdateRunInput();
                     break;
+                case GameState.TimingChallenge:
+                    UpdateTimingChallengeInput();
+                    break;
                 case GameState.RunResult:
                     UpdateRunResultInput();
                     break;
@@ -75,6 +79,8 @@ namespace Arkeum.Production.Core
             Services.WorldPresenter.SetActorRepository(null);
             Services.WorldPresenter.Refresh();
             Services.HudPresenter.BindRun(null);
+            Services.TimingPopupPresenter.Hide();
+            Services.TimingService.CancelCurrent();
             Services.HudPresenter.ClearRunResult();
             Services.HudPresenter.SetDialogue(string.Empty);
             Services.HudPresenter.SetMessage(message ?? "The embers of the return altar flicker quietly.");
@@ -103,7 +109,8 @@ namespace Arkeum.Production.Core
                 Services.EnemyTurnSystem,
                 Services.InteractionSystem,
                 Services.MapService,
-                Services.ActorRepository);
+                Services.ActorRepository,
+                Services.TimingService);
 
             RunState runState = runController.CreateRunState(ActiveProfile, Services.RunDefinition?.StartingLoadout);
             runState.CurrentFloor = runFloor;
@@ -182,26 +189,81 @@ namespace Arkeum.Production.Core
                 return;
             }
 
-            bool handled = false;
+            if (Services.InputReader.WasTimingTogglePressed())
+            {
+                CurrentRunController.ToggleTimingMode();
+                Services.HudPresenter.SetMessage(CurrentRunController.LastMessage);
+                return;
+            }
+
+            PlayerActionResultType actionResult = PlayerActionResultType.NotHandled;
             if (Services.InputReader.TryGetMoveDirection(out Vector2Int direction))
             {
-                handled = CurrentRunController.TryHandlePlayerAction(direction);
+                actionResult = CurrentRunController.TryHandlePlayerAction(direction);
             }
             else if (Services.InputReader.WasWaitPressed())
             {
                 CurrentRunController.Wait();
-                handled = true;
+                actionResult = PlayerActionResultType.Handled;
             }
             else if (Services.InputReader.WasUseBandagePressed())
             {
-                handled = CurrentRunController.UseBandage();
+                actionResult = CurrentRunController.UseBandage()
+                    ? PlayerActionResultType.Handled
+                    : PlayerActionResultType.NotHandled;
             }
 
-            if (!handled)
+            if (actionResult == PlayerActionResultType.NotHandled)
             {
                 return;
             }
 
+            if (actionResult == PlayerActionResultType.TimingChallengeStarted)
+            {
+                Services.TimingPopupPresenter.Show(Services.TimingService.CurrentSession);
+                Services.HudPresenter.SetMessage(CurrentRunController.LastMessage);
+                CurrentState = GameState.TimingChallenge;
+                return;
+            }
+
+            CompleteHandledRunAction();
+        }
+
+        private void UpdateTimingChallengeInput()
+        {
+            TimingSession session = Services.TimingService.CurrentSession;
+            if (session == null)
+            {
+                Services.TimingPopupPresenter.Hide();
+                CurrentState = GameState.InRun;
+                return;
+            }
+
+            Services.TimingService.Tick(Time.deltaTime);
+            ITimingChallengeRuntime runtime = session.Runtime;
+            if (Services.InputReader.WasTimingActionPressed())
+            {
+                CompleteTimingChallenge(session, runtime.EvaluateAction());
+                return;
+            }
+
+            if (runtime.IsExpired)
+            {
+                CompleteTimingChallenge(session, runtime.EvaluateTimeout());
+            }
+        }
+
+        private void CompleteTimingChallenge(TimingSession session, TimingResultGrade grade)
+        {
+            TimingAttackResult result = session.BuildResult(grade);
+            CurrentRunController.ResolveTimedAttack(result);
+            Services.TimingPopupPresenter.Hide();
+            CurrentState = GameState.InRun;
+            CompleteHandledRunAction();
+        }
+
+        private void CompleteHandledRunAction()
+        {
             Services.WorldPresenter.Refresh();
             Services.HudPresenter.SetMessage(CurrentRunController.LastMessage);
 

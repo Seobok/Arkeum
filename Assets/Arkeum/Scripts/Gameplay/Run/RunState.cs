@@ -18,6 +18,7 @@ namespace Arkeum.Production.Gameplay.Run
         public bool FloorExitUsed;              // 이벤트 진행 플래그?
         public bool HasEquippedWeapon;
         public WeaponDefinition EquippedWeapon;
+        public bool IsTimingModeEnabled;
         public RunEndReason EndReason;          // 런이 끝난 이유
         public ActorEntity Player;              // 실제 플레이어 액터
 

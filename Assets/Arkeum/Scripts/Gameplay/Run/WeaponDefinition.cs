@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Arkeum.Production.Gameplay.Timing;
 using UnityEngine;
 
 namespace Arkeum.Production.Gameplay.Run
@@ -19,6 +20,7 @@ namespace Arkeum.Production.Gameplay.Run
             Vector2Int.right,
         };
         [SerializeField] private List<WeaponEffectDefinition> effects = new List<WeaponEffectDefinition>();
+        [SerializeField] private TimingChallengeDefinition timingChallenge;
 
         public string Id => id;
         public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? name : displayName;
@@ -39,6 +41,8 @@ namespace Arkeum.Production.Gameplay.Run
 
         public List<Vector2Int> AttackOffsets => attackOffsets;
         public IReadOnlyList<WeaponEffectDefinition> Effects => effects;
+        public TimingChallengeDefinition TimingChallenge => timingChallenge;
+        public bool HasTimingChallenge => timingChallenge != null;
 
         public bool RotateAttackByFacing
         {

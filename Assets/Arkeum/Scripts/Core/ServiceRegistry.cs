@@ -4,6 +4,7 @@ using Arkeum.Production.Gameplay.Interaction;
 using Arkeum.Production.Gameplay.Map;
 using Arkeum.Production.Gameplay.Progression;
 using Arkeum.Production.Gameplay.Run;
+using Arkeum.Production.Gameplay.Timing;
 using Arkeum.Production.Infrastructure.Input;
 using Arkeum.Production.Presentation.UI;
 using Arkeum.Production.Presentation.World;
@@ -21,9 +22,11 @@ namespace Arkeum.Production.Core
         public MapService MapService { get; }
         public ProgressionService ProgressionService { get; }
         public RunResultBuilder RunResultBuilder { get; }
+        public TimingService TimingService { get; }
         public RunDefinition RunDefinition { get; }
         public WorldPresenter WorldPresenter { get; }
         public HudPresenter HudPresenter { get; }
+        public TimingPopupPresenter TimingPopupPresenter { get; }
 
         public ServiceRegistry(
             InputReader inputReader,
@@ -35,9 +38,11 @@ namespace Arkeum.Production.Core
             MapService mapService,
             ProgressionService progressionService,
             RunResultBuilder runResultBuilder,
+            TimingService timingService,
             RunDefinition runDefinition,
             WorldPresenter worldPresenter,
-            HudPresenter hudPresenter)
+            HudPresenter hudPresenter,
+            TimingPopupPresenter timingPopupPresenter)
         {
             InputReader = inputReader;
             TurnSystem = turnSystem;
@@ -48,9 +53,11 @@ namespace Arkeum.Production.Core
             MapService = mapService;
             ProgressionService = progressionService;
             RunResultBuilder = runResultBuilder;
+            TimingService = timingService;
             RunDefinition = runDefinition;
             WorldPresenter = worldPresenter;
             HudPresenter = hudPresenter;
+            TimingPopupPresenter = timingPopupPresenter;
         }
     }
 }
