@@ -61,7 +61,9 @@ namespace Arkeum.Production.Core
 
             if (timingPopupPresenter == null)
             {
-                timingPopupPresenter = gameObject.AddComponent<TimingPopupPresenter>();
+                Debug.LogError("[GameBootstrap] TimingPopupPresenter is missing. Add it to GameRoot and wire its UGUI references in the Inspector.", this);
+                enabled = false;
+                return;
             }
 
             ServiceRegistry services = BuildServices();

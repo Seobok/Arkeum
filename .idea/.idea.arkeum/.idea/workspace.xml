@@ -6,13 +6,12 @@
   <component name="ChangeListManager">
     <list default="true" id="21854d10-4486-4f0b-a0de-1ffa86a46fbb" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.arkeum/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.arkeum/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scenes/SampleScene.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scenes/SampleScene.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/RunDefinition.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/RunDefinition.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Core/GameDirector.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Core/GameDirector.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Interaction/InteractionResolver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Interaction/InteractionResolver.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Map/MapGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Map/MapGenerator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Map/MapService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Map/MapService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Run/RunDefinition.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Run/RunDefinition.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scenes/GameScene.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scenes/GameScene.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/WorldVisualSet.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/WorldVisualSet.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Core/GameBootstrap.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Core/GameBootstrap.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/UI/HudPresenter.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/UI/HudPresenter.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/UI/HudPresenter.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/UI/HudPresenter.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/UI/TimingPopupPresenter.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/UI/TimingPopupPresenter.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -99,6 +98,8 @@
       <updated>1776950910583</updated>
       <workItem from="1776950912112" duration="701000" />
       <workItem from="1777184482315" duration="3839000" />
+      <workItem from="1777950815085" duration="649000" />
+      <workItem from="1778410449418" duration="606000" />
     </task>
     <servers />
   </component>

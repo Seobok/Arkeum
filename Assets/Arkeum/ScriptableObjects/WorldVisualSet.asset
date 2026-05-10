@@ -12,17 +12,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fd0f2e0e8c31dae4dba3ac877f7a477c, type: 3}
   m_Name: WorldVisualSet
   m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Presentation.World.WorldVisualSet
-  floorSprite: {fileID: 0}
-  floorTint: {r: 0.16, g: 0.13, b: 0.14, a: 1}
-  playerSprite: {fileID: 0}
-  playerTint: {r: 0.91, g: 0.86, b: 0.78, a: 1}
+  floorSprite: {fileID: 343247394, guid: cbfa85894397c144a9a0fb1ba6a53d9e, type: 3}
+  floorTint: {r: 1, g: 1, b: 1, a: 1}
+  playerSprite: {fileID: -7978735674136817684, guid: 510fb8782b4339344bde7862dbfbfa81, type: 3}
+  playerTint: {r: 1, g: 1, b: 1, a: 1}
   defaultEnemySprite: {fileID: 0}
   defaultEnemyTint: {r: 0.63, g: 0.25, b: 0.21, a: 1}
-  temporaryWeaponSprite: {fileID: 0}
-  temporaryWeaponTint: {r: 0.75, g: 0.43, b: 0.18, a: 1}
-  floorExitSprite: {fileID: 0}
+  defaultWeaponSprite: {fileID: 0}
+  defaultWeaponTint: {r: 0.75, g: 0.43, b: 0.18, a: 1}
+  floorExitSprite: {fileID: -1777576658924061826, guid: 97f0ff2ed5460584286e631dd2ae2fff, type: 3}
   floorExitTint: {r: 0.76, g: 0.65, b: 0.17, a: 1}
-  dungeonEntranceSprite: {fileID: 0}
+  dungeonEntranceSprite: {fileID: -1777576658924061826, guid: 97f0ff2ed5460584286e631dd2ae2fff, type: 3}
   dungeonEntranceTint: {r: 0.62, g: 0.29, b: 0.22, a: 1}
   enemyAttackMarkerSprite: {fileID: 0}
   enemyAttackMarkerTint: {r: 0.82, g: 0.16, b: 0.13, a: 1}

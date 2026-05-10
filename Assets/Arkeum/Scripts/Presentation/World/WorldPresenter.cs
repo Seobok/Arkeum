@@ -47,11 +47,6 @@ namespace Arkeum.Production.Presentation.World
         {
             CurrentRun = runState;
             CurrentMap = mapDefinition;
-            Debug.Log(
-                $"[WorldPresenter] BindRun mapCells={(mapDefinition != null ? mapDefinition.WalkableCells.Count : 0)}, " +
-                $"rooms={(mapDefinition != null ? mapDefinition.Rooms.Count : 0)}, " +
-                $"corridors={(mapDefinition != null ? mapDefinition.Corridors.Count : 0)}, " +
-                $"player={(runState?.Player != null ? runState.Player.GridPosition.ToString() : "null")}");
         }
 
         public void Refresh()
@@ -68,9 +63,6 @@ namespace Arkeum.Production.Presentation.World
                 return;
             }
 
-            Debug.Log(
-                $"[WorldPresenter] Refresh state={(CurrentRun != null ? "Run" : "Hub")}, " +
-                $"mapCells={CurrentMap.WalkableCells.Count}, rooms={CurrentMap.Rooms.Count}, corridors={CurrentMap.Corridors.Count}");
             DrawMap(CurrentMap);
             if (CurrentRun != null && actorRepository != null)
             {

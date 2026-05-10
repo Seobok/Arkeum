@@ -1,23 +1,42 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Text;
 using Arkeum.Production.Core;
 using Arkeum.Production.Gameplay.Run;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Arkeum.Production.Presentation.UI
 {
     public sealed class HudPresenter : MonoBehaviour
     {
+        [Header("Top Status")]
+        [SerializeField] private Text topStatusText;
+        [SerializeField] private Text topDetailsText;
+        [SerializeField] private Text topTimingText;
+        [SerializeField] private Text topRuleText;
+
+        [Header("Controls")]
+        [SerializeField] private Text controlsBodyText;
+        [SerializeField] private Text stateText;
+        [SerializeField] private Toggle preparedTargetToggle;
+
+        [Header("Log")]
+        [SerializeField] private Text logMessageText;
+        [SerializeField] private Text dialogueText;
+        [SerializeField] private Text weaponText;
+
+        [Header("Run Result")]
+        [SerializeField] private GameObject resultPanel;
+        [SerializeField] private Text resultLostText;
+        [SerializeField] private Text resultKeptText;
+
         private readonly List<string> lostLines = new List<string>();
         private readonly List<string> keptLines = new List<string>();
         private readonly StringBuilder builder = new StringBuilder(256);
 
-        private GUIStyle titleStyle;
-        private GUIStyle bodyStyle;
-        private GUIStyle panelStyle;
-        private GUIStyle accentStyle;
         private GameDirector gameDirector;
         private RunState boundRun;
+        private bool missingReferencesLogged;
 
         public string CurrentMessage { get; private set; } = string.Empty;
         public string DialogueLine { get; private set; } = string.Empty;
@@ -27,21 +46,31 @@ namespace Arkeum.Production.Presentation.UI
         public void Initialize(GameDirector director)
         {
             gameDirector = director;
+            if (preparedTargetToggle != null)
+            {
+                preparedTargetToggle.onValueChanged.RemoveListener(OnPreparedTargetToggleChanged);
+                preparedTargetToggle.onValueChanged.AddListener(OnPreparedTargetToggleChanged);
+            }
+
+            Refresh();
         }
 
         public void BindRun(RunState runState)
         {
             boundRun = runState;
+            Refresh();
         }
 
         public void SetMessage(string message)
         {
-            CurrentMessage = message;
+            CurrentMessage = message ?? string.Empty;
+            Refresh();
         }
 
         public void SetDialogue(string dialogue)
         {
-            DialogueLine = dialogue;
+            DialogueLine = dialogue ?? string.Empty;
+            Refresh();
         }
 
         public void SetRunResult(IReadOnlyList<string> lost, IReadOnlyList<string> kept)
@@ -64,189 +93,162 @@ namespace Arkeum.Production.Presentation.UI
                     keptLines.Add(kept[i]);
                 }
             }
+
+            Refresh();
         }
 
         public void ClearRunResult()
         {
             lostLines.Clear();
             keptLines.Clear();
+            Refresh();
         }
 
-        private void OnGUI()
+        private void OnDestroy()
         {
-            if (gameDirector == null)
+            if (preparedTargetToggle != null)
+            {
+                preparedTargetToggle.onValueChanged.RemoveListener(OnPreparedTargetToggleChanged);
+            }
+        }
+
+        private void LateUpdate()
+        {
+            Refresh();
+        }
+
+        private void Refresh()
+        {
+            if (gameDirector == null || !HasRequiredReferences())
             {
                 return;
             }
 
-            EnsureStyles();
-            DrawTopBar();
-            DrawHelp();
-            DrawBottomLog();
-
-            if (gameDirector.CurrentState == GameState.RunResult)
+            bool inRun = gameDirector.CurrentState == GameState.InRun || gameDirector.CurrentState == GameState.TimingChallenge;
+            if (inRun && boundRun != null && boundRun.Player != null)
             {
-                DrawRunResult();
-            }
-        }
-
-        private void DrawTopBar()
-        {
-            GUILayout.BeginArea(new Rect(12f, 12f, 500f, 150f), panelStyle);
-            GUILayout.Label("Arkeum Production Preview", titleStyle);
-
-            if (gameDirector.CurrentState == GameState.InRun && boundRun != null && boundRun.Player != null)
-            {
-                GUILayout.Label(
-                    $"HP {boundRun.Player.CurrentHp}/{boundRun.Player.Stats.MaxHp}  |  Shards {boundRun.BloodShards}  |  Bandage {boundRun.BandageCount}  |  Turn {boundRun.TurnCount}",
-                    bodyStyle);
-                GUILayout.Label($"Floor {boundRun.CurrentFloor}  |  Weapon {(boundRun.HasEquippedWeapon ? "Equipped" : "None")}", bodyStyle);
-                GUILayout.Label(FormatTimingLine(boundRun), boundRun.IsTimingModeEnabled ? accentStyle : bodyStyle);
-                GUILayout.Label("Rule: every action gives enemies a response.", accentStyle);
+                topStatusText.text = $"HP {boundRun.Player.CurrentHp}/{boundRun.Player.Stats.MaxHp}  |  Shards {boundRun.BloodShards}  |  Bandage {boundRun.BandageCount}  |  Turn {boundRun.TurnCount}";
+                topDetailsText.text = $"Floor {boundRun.CurrentFloor}  |  Weapon {(boundRun.HasEquippedWeapon ? "Equipped" : "None")}";
+                topTimingText.text = FormatTimingLine(boundRun);
+                topRuleText.text = "Rule: every action gives enemies a response.";
             }
             else
             {
-                GUILayout.Label("Hub: Return Altar", bodyStyle);
-                GUILayout.Label(
-                    $"Gleam {gameDirector.ActiveProfile.Gleam}  |  Returns {gameDirector.ActiveProfile.TotalReturns}",
-                    bodyStyle);
+                topStatusText.text = "Hub: Return Altar";
+                topDetailsText.text = gameDirector.ActiveProfile != null
+                    ? $"Gleam {gameDirector.ActiveProfile.Gleam}  |  Returns {gameDirector.ActiveProfile.TotalReturns}"
+                    : string.Empty;
+                topTimingText.text = string.Empty;
+                topRuleText.text = string.Empty;
             }
 
-            GUILayout.EndArea();
-        }
+            controlsBodyText.text = BuildControlsText();
+            stateText.text = gameDirector.CurrentState.ToString();
+            RefreshPreparedTargetToggle(inRun);
 
-        private void DrawHelp()
-        {
-            GUILayout.BeginArea(new Rect(Screen.width - 330f, 12f, 318f, 220f), panelStyle);
-            GUILayout.Label("Controls", titleStyle);
-            if (gameDirector.CurrentState == GameState.InRun)
-            {
-                GUILayout.Label("Move keys: attack, interact, or move", bodyStyle);
-                GUILayout.Label("Wait: Q", bodyStyle);
-                GUILayout.Label("Items: 1 bandage", bodyStyle);
-                GUILayout.Label("Timing: Next", bodyStyle);
-                DrawRunOptions();
-            }
-            else if (gameDirector.CurrentState == GameState.RunResult)
-            {
-                GUILayout.Label("Close result: Enter", bodyStyle);
-            }
-            else
-            {
-                GUILayout.Label("Move: arrow keys / WASD", bodyStyle);
-                GUILayout.Label("Interact: bump the target in front of you", bodyStyle);
-            }
+            logMessageText.text = string.IsNullOrEmpty(CurrentMessage) ? "..." : CurrentMessage;
+            dialogueText.text = DialogueLine;
+            dialogueText.gameObject.SetActive(!string.IsNullOrEmpty(DialogueLine));
 
-            GUILayout.Space(12f);
-            GUILayout.Label("State", titleStyle);
-            GUILayout.Label(gameDirector.CurrentState.ToString(), bodyStyle);
-            GUILayout.EndArea();
-        }
-
-        private void DrawRunOptions()
-        {
-            if (gameDirector.Services?.WorldPresenter == null)
-            {
-                return;
-            }
-
-            GUILayout.Space(8f);
-            GUILayout.Label("Options", titleStyle);
-            bool showPreparedTargetMarkers = GUILayout.Toggle(
-                gameDirector.Services.WorldPresenter.ShowEnemyPreparedTargetMarkers,
-                "Prepared target tiles",
-                bodyStyle);
-            if (showPreparedTargetMarkers != gameDirector.Services.WorldPresenter.ShowEnemyPreparedTargetMarkers)
-            {
-                gameDirector.Services.WorldPresenter.SetShowEnemyPreparedTargetMarkers(showPreparedTargetMarkers);
-                gameDirector.Services.WorldPresenter.Refresh();
-            }
-        }
-
-        private void DrawBottomLog()
-        {
-            GUILayout.BeginArea(new Rect(12f, Screen.height - 148f, Screen.width - 24f, 136f), panelStyle);
-            GUILayout.Label("Log", titleStyle);
-            GUILayout.Label(string.IsNullOrEmpty(CurrentMessage) ? "..." : CurrentMessage, bodyStyle);
-
-            if (!string.IsNullOrEmpty(DialogueLine))
-            {
-                GUILayout.Space(6f);
-                GUILayout.Label(DialogueLine, accentStyle);
-            }
-
-            if (gameDirector.CurrentState == GameState.InRun && boundRun != null)
+            bool showWeapon = inRun && boundRun != null;
+            weaponText.gameObject.SetActive(showWeapon);
+            if (showWeapon)
             {
                 builder.Clear();
                 builder.Append("Weapon: ");
                 builder.Append(FormatWeaponLine(boundRun));
-                GUILayout.Space(6f);
-                GUILayout.Label(builder.ToString(), bodyStyle);
+                weaponText.text = builder.ToString();
             }
 
-            GUILayout.EndArea();
+            bool showResult = gameDirector.CurrentState == GameState.RunResult;
+            resultPanel.SetActive(showResult);
+            if (showResult)
+            {
+                resultLostText.text = BuildResultText("Lost", lostLines);
+                resultKeptText.text = BuildResultText("Kept", keptLines) + "\n\nPress Enter to return to the altar.";
+            }
         }
 
-        private void DrawRunResult()
+        private bool HasRequiredReferences()
         {
-            Rect rect = new Rect(Screen.width * 0.5f - 250f, Screen.height * 0.5f - 190f, 500f, 380f);
-            GUILayout.BeginArea(rect, panelStyle);
-            GUILayout.Label("Run Result", titleStyle);
-            GUILayout.Space(8f);
+            bool hasReferences =
+                topStatusText != null &&
+                topDetailsText != null &&
+                topTimingText != null &&
+                topRuleText != null &&
+                controlsBodyText != null &&
+                stateText != null &&
+                preparedTargetToggle != null &&
+                logMessageText != null &&
+                dialogueText != null &&
+                weaponText != null &&
+                resultPanel != null &&
+                resultLostText != null &&
+                resultKeptText != null;
 
-            GUILayout.Label("Lost", titleStyle);
-            for (int i = 0; i < lostLines.Count; i++)
+            if (!hasReferences && !missingReferencesLogged)
             {
-                GUILayout.Label(lostLines[i], bodyStyle);
+                missingReferencesLogged = true;
+                Debug.LogWarning("[HudPresenter] UGUI references are not fully assigned. Create the HUD Canvas manually and wire the serialized fields in the Inspector.", this);
             }
 
-            GUILayout.Space(8f);
-            GUILayout.Label("Kept", titleStyle);
-            for (int i = 0; i < keptLines.Count; i++)
-            {
-                GUILayout.Label(keptLines[i], bodyStyle);
-            }
-
-            GUILayout.Space(12f);
-            GUILayout.Label("Press Enter to return to the altar.", accentStyle);
-            GUILayout.EndArea();
+            return hasReferences;
         }
 
-        private void EnsureStyles()
+        private string BuildControlsText()
         {
-            if (titleStyle != null)
+            if (gameDirector.CurrentState == GameState.InRun || gameDirector.CurrentState == GameState.TimingChallenge)
+            {
+                return "Move keys: attack, interact, or move\nWait: Q\nItems: 1 bandage\nTiming: Next";
+            }
+
+            if (gameDirector.CurrentState == GameState.RunResult)
+            {
+                return "Close result: Enter";
+            }
+
+            return "Move: arrow keys / WASD\nInteract: bump the target in front of you";
+        }
+
+        private void RefreshPreparedTargetToggle(bool inRun)
+        {
+            bool canShow = inRun && gameDirector.Services?.WorldPresenter != null;
+            preparedTargetToggle.gameObject.SetActive(canShow);
+            if (!canShow)
             {
                 return;
             }
 
-            titleStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 18,
-                fontStyle = FontStyle.Bold,
-                normal = { textColor = new Color(0.95f, 0.92f, 0.84f) }
-            };
+            preparedTargetToggle.SetIsOnWithoutNotify(gameDirector.Services.WorldPresenter.ShowEnemyPreparedTargetMarkers);
+        }
 
-            bodyStyle = new GUIStyle(GUI.skin.label)
+        private void OnPreparedTargetToggleChanged(bool show)
+        {
+            if (gameDirector?.Services?.WorldPresenter == null)
             {
-                fontSize = 14,
-                wordWrap = true,
-                normal = { textColor = new Color(0.84f, 0.82f, 0.76f) }
-            };
+                return;
+            }
 
-            accentStyle = new GUIStyle(bodyStyle)
+            gameDirector.Services.WorldPresenter.SetShowEnemyPreparedTargetMarkers(show);
+            gameDirector.Services.WorldPresenter.Refresh();
+        }
+
+        private static string BuildResultText(string title, List<string> lines)
+        {
+            StringBuilder resultBuilder = new StringBuilder(title);
+            if (lines.Count == 0)
             {
-                normal = { textColor = new Color(0.95f, 0.63f, 0.46f) }
-            };
+                resultBuilder.Append("\nNone");
+                return resultBuilder.ToString();
+            }
 
-            Texture2D panelTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-            panelTexture.SetPixel(0, 0, new Color(0.09f, 0.06f, 0.07f, 0.88f));
-            panelTexture.Apply();
-
-            panelStyle = new GUIStyle(GUI.skin.box)
+            for (int i = 0; i < lines.Count; i++)
             {
-                padding = new RectOffset(12, 12, 12, 12),
-                normal = { background = panelTexture }
-            };
+                resultBuilder.Append('\n');
+                resultBuilder.Append(lines[i]);
+            }
+
+            return resultBuilder.ToString();
         }
 
         private static string FormatWeaponLine(RunState runState)
