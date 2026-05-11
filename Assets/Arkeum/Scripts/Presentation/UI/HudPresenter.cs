@@ -9,8 +9,14 @@ namespace Arkeum.Production.Presentation.UI
 {
     public sealed class HudPresenter : MonoBehaviour
     {
+        [Header("Health")] 
+        [SerializeField] private GameObject healthBar;
+        [SerializeField] private GameObject healthPrefab;
+        [SerializeField] private Sprite[] healthSprites;
+        private List<GameObject> healthUis = new List<GameObject>();
+        
         [Header("Top Status")]
-        [SerializeField] private Text topStatusText;
+        //[SerializeField] private Text topStatusText;
         [SerializeField] private Text topDetailsText;
         [SerializeField] private Text topTimingText;
         [SerializeField] private Text topRuleText;
@@ -127,14 +133,31 @@ namespace Arkeum.Production.Presentation.UI
             bool inRun = gameDirector.CurrentState == GameState.InRun || gameDirector.CurrentState == GameState.TimingChallenge;
             if (inRun && boundRun != null && boundRun.Player != null)
             {
-                topStatusText.text = $"HP {boundRun.Player.CurrentHp}/{boundRun.Player.Stats.MaxHp}  |  Shards {boundRun.BloodShards}  |  Bandage {boundRun.BandageCount}  |  Turn {boundRun.TurnCount}";
+                //topStatusText.text = $"HP {boundRun.Player.CurrentHp}/{boundRun.Player.Stats.MaxHp}  |  Shards {boundRun.BloodShards}  |  Bandage {boundRun.BandageCount}  |  Turn {boundRun.TurnCount}";
+                
+                //MAX HP ENSURE
+                int maxHp = boundRun.Player.Stats.MaxHp;
+                int curMaxHp = healthBar.transform.childCount;
+
+                if (curMaxHp > maxHp)
+                {
+                    while (healthBar.transform.childCount > maxHp)
+                    {
+                        Destroy(healthBar.transform.GetChild(healthBar.transform.childCount - 1));
+                    }
+                }
+                else if (curMaxHp < maxHp)
+                {
+                    
+                }
+                
                 topDetailsText.text = $"Floor {boundRun.CurrentFloor}  |  Weapon {(boundRun.HasEquippedWeapon ? "Equipped" : "None")}";
                 topTimingText.text = FormatTimingLine(boundRun);
                 topRuleText.text = "Rule: every action gives enemies a response.";
             }
             else
             {
-                topStatusText.text = "Hub: Return Altar";
+                //topStatusText.text = "Hub: Return Altar";
                 topDetailsText.text = gameDirector.ActiveProfile != null
                     ? $"Gleam {gameDirector.ActiveProfile.Gleam}  |  Returns {gameDirector.ActiveProfile.TotalReturns}"
                     : string.Empty;
