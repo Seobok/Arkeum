@@ -8,7 +8,7 @@ namespace Arkeum.Production.Gameplay.Progression
     {
         public int TotalReturns;
         public int HighestFloor;
-        public int Gleam;
+        public int Shard;
         public bool Mq01Completed;
         public List<string> UnlockedFlags = new List<string>();
         public List<string> CompletedQuestIds = new List<string>();

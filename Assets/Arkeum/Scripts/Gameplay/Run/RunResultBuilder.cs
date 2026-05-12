@@ -9,7 +9,7 @@ namespace Arkeum.Production.Gameplay.Run
         {
             return new[]
             {
-                $"Blood shards lost: {runState.BloodShards}",
+                $"Blood shards lost: {runState.Gold}",
                 FormatWeaponLoss(runState),
             };
         }
@@ -18,9 +18,9 @@ namespace Arkeum.Production.Gameplay.Run
         {
             return new[]
             {
-                $"Gleam gained: +{runState.GleamReward}",
+                $"Shard gained: +{runState.GleamReward}",
                 $"Total returns: {profile.TotalReturns}",
-                $"Total gleam: {profile.Gleam}",
+                $"Total gleam: {profile.Shard}",
             };
         }
 

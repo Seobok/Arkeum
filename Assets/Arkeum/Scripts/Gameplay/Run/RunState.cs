@@ -11,7 +11,7 @@ namespace Arkeum.Production.Gameplay.Run
         public int CurrentFloor;                // 현재 런 층
         public RunFloorDefinition CurrentFloorDefinition;
         public int TurnCount;                   // 행동 횟수
-        public int BloodShards;                 // 소모 자원
+        public int Gold;                      // 소모 자원
         public int BandageCount;                // 회복 아이템 수량
         public int AttackBonus;                 // 공격력 보정값
         public int GleamReward;                 // 종료 후 얻는 영구 보상

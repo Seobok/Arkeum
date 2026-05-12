@@ -1,7 +1,8 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text;
 using Arkeum.Production.Core;
 using Arkeum.Production.Gameplay.Run;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,9 +12,13 @@ namespace Arkeum.Production.Presentation.UI
     {
         [Header("Health")] 
         [SerializeField] private GameObject healthBar;
-        [SerializeField] private GameObject healthPrefab;
+        [SerializeField] private Image healthPrefab;
         [SerializeField] private Sprite[] healthSprites;
-        private List<GameObject> healthUis = new List<GameObject>();
+        private List<Image> healthImages;
+
+        [Header("Cost")]
+        [SerializeField] private TextMeshProUGUI goldText;
+        [SerializeField] private TextMeshProUGUI shardText;
         
         [Header("Top Status")]
         //[SerializeField] private Text topStatusText;
@@ -57,6 +62,11 @@ namespace Arkeum.Production.Presentation.UI
                 preparedTargetToggle.onValueChanged.RemoveListener(OnPreparedTargetToggleChanged);
                 preparedTargetToggle.onValueChanged.AddListener(OnPreparedTargetToggleChanged);
             }
+
+            // Init HP UI
+            InitializeHpList();
+            // Update Max HP UI
+            UpdateMaxHpUi();
 
             Refresh();
         }
@@ -133,33 +143,27 @@ namespace Arkeum.Production.Presentation.UI
             bool inRun = gameDirector.CurrentState == GameState.InRun || gameDirector.CurrentState == GameState.TimingChallenge;
             if (inRun && boundRun != null && boundRun.Player != null)
             {
-                //topStatusText.text = $"HP {boundRun.Player.CurrentHp}/{boundRun.Player.Stats.MaxHp}  |  Shards {boundRun.BloodShards}  |  Bandage {boundRun.BandageCount}  |  Turn {boundRun.TurnCount}";
-                
-                //MAX HP ENSURE
-                int maxHp = boundRun.Player.Stats.MaxHp;
-                int curMaxHp = healthBar.transform.childCount;
+                // 런 중 일때는 HP UI On
+                ToggleHpUi(true);
+                //HP Sprite
+                UpdateCurrentHpUi();
+                //Gold Text
+                UpdateGoldUi();
+                //BandageCount , TurnCount
 
-                if (curMaxHp > maxHp)
-                {
-                    while (healthBar.transform.childCount > maxHp)
-                    {
-                        Destroy(healthBar.transform.GetChild(healthBar.transform.childCount - 1));
-                    }
-                }
-                else if (curMaxHp < maxHp)
-                {
-                    
-                }
-                
+
                 topDetailsText.text = $"Floor {boundRun.CurrentFloor}  |  Weapon {(boundRun.HasEquippedWeapon ? "Equipped" : "None")}";
                 topTimingText.text = FormatTimingLine(boundRun);
                 topRuleText.text = "Rule: every action gives enemies a response.";
             }
             else
             {
-                //topStatusText.text = "Hub: Return Altar";
+                // 런 중이 아닐때는 HP UI Off
+                ToggleHpUi(false);
+                //Shard Text
+                UpdateShardUi();
                 topDetailsText.text = gameDirector.ActiveProfile != null
-                    ? $"Gleam {gameDirector.ActiveProfile.Gleam}  |  Returns {gameDirector.ActiveProfile.TotalReturns}"
+                    ? $"Shard {gameDirector.ActiveProfile.Shard}  |  Returns {gameDirector.ActiveProfile.TotalReturns}"
                     : string.Empty;
                 topTimingText.text = string.Empty;
                 topRuleText.text = string.Empty;
@@ -195,7 +199,6 @@ namespace Arkeum.Production.Presentation.UI
         private bool HasRequiredReferences()
         {
             bool hasReferences =
-                topStatusText != null &&
                 topDetailsText != null &&
                 topTimingText != null &&
                 topRuleText != null &&
@@ -233,6 +236,129 @@ namespace Arkeum.Production.Presentation.UI
             return "Move: arrow keys / WASD\nInteract: bump the target in front of you";
         }
 
+        #region HP UI
+        private void InitializeHpList()
+        {
+            if(healthBar == null)
+            {
+                Debug.LogWarning("HealthBar is Missing");
+                return;
+            }
+
+            healthImages = new List<Image>();
+            foreach(var image in healthBar.GetComponentsInChildren<Image>())
+            {
+                healthImages.Add(image);
+            }
+        }
+
+        public void UpdateMaxHpUi()
+        {
+            if (boundRun == null || boundRun.Player == null)
+            {
+                Debug.LogWarning("Run Data is Not Valid");
+                return;
+            }
+            if (healthBar == null)
+            {
+                Debug.LogWarning("Health Bar is Missing");
+                return;
+            }
+            if (healthImages == null)
+            {
+                InitializeHpList();
+            }
+
+            //MAX HP ENSURE
+            int maxHp = boundRun.Player.Stats.MaxHp;
+            int curMaxHp = healthBar.transform.childCount;
+
+            if (curMaxHp > maxHp)
+            {
+                while (healthBar.transform.childCount > maxHp)
+                {
+                    Transform child = healthBar.transform.GetChild(healthBar.transform.childCount - 1);
+                    healthImages.Remove(child.GetComponent<Image>());
+                    Destroy(child.gameObject);
+                }
+            }
+            else if (curMaxHp < maxHp)
+            {
+                while (healthBar.transform.childCount < maxHp)
+                {
+                    Image hp = Instantiate(healthPrefab, healthBar.transform);
+                    healthImages.Add(hp);
+                }
+            }
+        }
+
+        public void UpdateCurrentHpUi()
+        {
+            if (boundRun == null || boundRun.Player == null)
+            {
+                Debug.LogWarning("Run Data is Not Valid");
+                return;
+            }
+            if(healthSprites == null || healthSprites.Length < 2)
+            {
+                Debug.LogWarning("HealthSprite is Missing");
+                return;
+            }
+            if (healthImages == null)
+            {
+                InitializeHpList();
+            }
+
+            int curHp = boundRun.Player.CurrentHp;
+            for (int i = 0; i < healthImages.Count; i++)
+            {
+                if (i < curHp)
+                {
+                    healthImages[i].sprite = healthSprites[0];
+                }
+                else
+                {
+                    healthImages[i].sprite = healthSprites[1];
+                }
+            }
+        }
+
+        public void ToggleHpUi(bool isOn)
+        {
+            if(isOn != healthBar.activeSelf)
+            {
+                healthBar.SetActive(isOn);
+            }
+        }
+        #endregion
+
+        public void UpdateGoldUi()
+        {
+            if (boundRun == null)
+            {
+                Debug.LogWarning("Run Data is Not Valid");
+                return;
+            }
+            if (goldText == null)
+            {
+                Debug.LogWarning("goldText is Missing");
+                return;
+            }
+
+            goldText.text = boundRun.Gold.ToString();
+        }
+
+        public void UpdateShardUi()
+        {
+            if(shardText == null)
+            {
+                Debug.LogWarning("shardText is Missing");
+            }
+
+            shardText.text = gameDirector.ActiveProfile.Shard.ToString();
+        }
+
+        #region PreparedTarget UI
         private void RefreshPreparedTargetToggle(bool inRun)
         {
             bool canShow = inRun && gameDirector.Services?.WorldPresenter != null;
@@ -255,6 +381,7 @@ namespace Arkeum.Production.Presentation.UI
             gameDirector.Services.WorldPresenter.SetShowEnemyPreparedTargetMarkers(show);
             gameDirector.Services.WorldPresenter.Refresh();
         }
+        #endregion
 
         private static string BuildResultText(string title, List<string> lines)
         {

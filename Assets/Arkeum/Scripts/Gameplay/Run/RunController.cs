@@ -51,7 +51,7 @@ namespace Arkeum.Production.Gameplay.Run
                 RunIndex = (profile?.TotalReturns ?? 0) + 1,
                 CurrentFloor = 1,
                 TurnCount = 0,
-                BloodShards = 0,
+                Gold = 0,
                 BandageCount = startingLoadout != null ? startingLoadout.BandageCount : 0,
                 AttackBonus = 0,
                 FloorExitUsed = false,
@@ -138,7 +138,7 @@ namespace Arkeum.Production.Gameplay.Run
             SetMessage($"{resultPrefix}You strike {enemy.DisplayName} for {damage} damage.");
             if (!enemy.IsAlive)
             {
-                CurrentRun.BloodShards += enemy.BloodReward;
+                CurrentRun.Gold += enemy.BloodReward;
                 SetMessage($"{enemy.DisplayName} falls. You gain {enemy.BloodReward} blood shards.");
             }
 
