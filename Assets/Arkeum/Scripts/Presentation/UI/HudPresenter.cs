@@ -13,12 +13,16 @@ namespace Arkeum.Production.Presentation.UI
         [Header("Health")] 
         [SerializeField] private GameObject healthBar;
         [SerializeField] private Image healthPrefab;
-        [SerializeField] private Sprite[] healthSprites;
+        [SerializeField] private Sprite[] healthSprites; // 0=>Filled, 1=>Empty
         private List<Image> healthImages;
 
         [Header("Cost")]
         [SerializeField] private TextMeshProUGUI goldText;
         [SerializeField] private TextMeshProUGUI shardText;
+        
+        [Header("Inventory")]
+        [SerializeField] private Image inventoryImage;
+        [SerializeField] private Sprite[] inventorySprites; // 0=>Normal, 1=>Active
         
         [Header("Top Status")]
         //[SerializeField] private Text topStatusText;
@@ -64,9 +68,7 @@ namespace Arkeum.Production.Presentation.UI
             }
 
             // Init HP UI
-            InitializeHpList();
-            // Update Max HP UI
-            UpdateMaxHpUi();
+            TryInitializeHpList();
 
             Refresh();
         }
@@ -74,6 +76,10 @@ namespace Arkeum.Production.Presentation.UI
         public void BindRun(RunState runState)
         {
             boundRun = runState;
+            
+            // Update Max HP UI
+            UpdateMaxHpUi();
+            
             Refresh();
         }
 
@@ -137,7 +143,7 @@ namespace Arkeum.Production.Presentation.UI
         {
             if (gameDirector == null || !HasRequiredReferences())
             {
-                return;
+                //return;
             }
 
             bool inRun = gameDirector.CurrentState == GameState.InRun || gameDirector.CurrentState == GameState.TimingChallenge;
@@ -149,12 +155,12 @@ namespace Arkeum.Production.Presentation.UI
                 UpdateCurrentHpUi();
                 //Gold Text
                 UpdateGoldUi();
-                //BandageCount , TurnCount
-
-
-                topDetailsText.text = $"Floor {boundRun.CurrentFloor}  |  Weapon {(boundRun.HasEquippedWeapon ? "Equipped" : "None")}";
-                topTimingText.text = FormatTimingLine(boundRun);
-                topRuleText.text = "Rule: every action gives enemies a response.";
+                //BandageCount
+                //TurnCount
+                //CurrentFloor
+                //HasEquippedWeapon
+                //Timing O/X
+                UpdateInventoryUi();
             }
             else
             {
@@ -162,38 +168,38 @@ namespace Arkeum.Production.Presentation.UI
                 ToggleHpUi(false);
                 //Shard Text
                 UpdateShardUi();
-                topDetailsText.text = gameDirector.ActiveProfile != null
-                    ? $"Shard {gameDirector.ActiveProfile.Shard}  |  Returns {gameDirector.ActiveProfile.TotalReturns}"
-                    : string.Empty;
-                topTimingText.text = string.Empty;
-                topRuleText.text = string.Empty;
+                // topDetailsText.text = gameDirector.ActiveProfile != null
+                //     ? $"Shard {gameDirector.ActiveProfile.Shard}  |  Returns {gameDirector.ActiveProfile.TotalReturns}"
+                //     : string.Empty;
+                // topTimingText.text = string.Empty;
+                // topRuleText.text = string.Empty;
             }
 
-            controlsBodyText.text = BuildControlsText();
-            stateText.text = gameDirector.CurrentState.ToString();
-            RefreshPreparedTargetToggle(inRun);
-
-            logMessageText.text = string.IsNullOrEmpty(CurrentMessage) ? "..." : CurrentMessage;
-            dialogueText.text = DialogueLine;
-            dialogueText.gameObject.SetActive(!string.IsNullOrEmpty(DialogueLine));
-
-            bool showWeapon = inRun && boundRun != null;
-            weaponText.gameObject.SetActive(showWeapon);
-            if (showWeapon)
-            {
-                builder.Clear();
-                builder.Append("Weapon: ");
-                builder.Append(FormatWeaponLine(boundRun));
-                weaponText.text = builder.ToString();
-            }
-
-            bool showResult = gameDirector.CurrentState == GameState.RunResult;
-            resultPanel.SetActive(showResult);
-            if (showResult)
-            {
-                resultLostText.text = BuildResultText("Lost", lostLines);
-                resultKeptText.text = BuildResultText("Kept", keptLines) + "\n\nPress Enter to return to the altar.";
-            }
+            // controlsBodyText.text = BuildControlsText();
+            // stateText.text = gameDirector.CurrentState.ToString();
+            // RefreshPreparedTargetToggle(inRun);
+            //
+            // logMessageText.text = string.IsNullOrEmpty(CurrentMessage) ? "..." : CurrentMessage;
+            // dialogueText.text = DialogueLine;
+            // dialogueText.gameObject.SetActive(!string.IsNullOrEmpty(DialogueLine));
+            //
+            // bool showWeapon = inRun && boundRun != null;
+            // weaponText.gameObject.SetActive(showWeapon);
+            // if (showWeapon)
+            // {
+            //     builder.Clear();
+            //     builder.Append("Weapon: ");
+            //     builder.Append(FormatWeaponLine(boundRun));
+            //     weaponText.text = builder.ToString();
+            // }
+            //
+            // bool showResult = gameDirector.CurrentState == GameState.RunResult;
+            // resultPanel.SetActive(showResult);
+            // if (showResult)
+            // {
+            //     resultLostText.text = BuildResultText("Lost", lostLines);
+            //     resultKeptText.text = BuildResultText("Kept", keptLines) + "\n\nPress Enter to return to the altar.";
+            // }
         }
 
         private bool HasRequiredReferences()
@@ -237,12 +243,12 @@ namespace Arkeum.Production.Presentation.UI
         }
 
         #region HP UI
-        private void InitializeHpList()
+        private bool TryInitializeHpList()
         {
             if(healthBar == null)
             {
                 Debug.LogWarning("HealthBar is Missing");
-                return;
+                return false;
             }
 
             healthImages = new List<Image>();
@@ -250,6 +256,7 @@ namespace Arkeum.Production.Presentation.UI
             {
                 healthImages.Add(image);
             }
+            return true;
         }
 
         public void UpdateMaxHpUi()
@@ -266,13 +273,18 @@ namespace Arkeum.Production.Presentation.UI
             }
             if (healthImages == null)
             {
-                InitializeHpList();
+                if (!TryInitializeHpList())
+                {
+                    return;
+                }
             }
 
             //MAX HP ENSURE
             int maxHp = boundRun.Player.Stats.MaxHp;
             int curMaxHp = healthBar.transform.childCount;
 
+            Debug.Log($"curMaxHp = {curMaxHp}, maxHp = {maxHp}");
+            
             if (curMaxHp > maxHp)
             {
                 while (healthBar.transform.childCount > maxHp)
@@ -306,13 +318,16 @@ namespace Arkeum.Production.Presentation.UI
             }
             if (healthImages == null)
             {
-                InitializeHpList();
+                if (!TryInitializeHpList())
+                {
+                    return;
+                }
             }
 
             int curHp = boundRun.Player.CurrentHp;
             for (int i = 0; i < healthImages.Count; i++)
             {
-                if (i < curHp)
+                if (i <= curHp)
                 {
                     healthImages[i].sprite = healthSprites[0];
                 }
@@ -350,12 +365,40 @@ namespace Arkeum.Production.Presentation.UI
 
         public void UpdateShardUi()
         {
+            if (gameDirector == null || gameDirector.ActiveProfile == null)
+            {
+                Debug.LogWarning("Game Director is Not Valid");
+                return;
+            }
             if(shardText == null)
             {
                 Debug.LogWarning("shardText is Missing");
+                return;
             }
 
             shardText.text = gameDirector.ActiveProfile.Shard.ToString();
+        }
+
+        public void UpdateInventoryUi()
+        {
+            if (boundRun == null)
+            {
+                Debug.LogWarning("Run Data is Not Valid");
+                return;
+            }
+            if (inventoryImage == null)
+            {
+                Debug.LogWarning("inventoryImage is Missing");
+            }
+
+            if (boundRun.IsTimingModeEnabled)
+            {
+                inventoryImage.sprite = inventorySprites[1];
+            }
+            else
+            {
+                inventoryImage.sprite = inventorySprites[0];
+            }
         }
 
         #region PreparedTarget UI
