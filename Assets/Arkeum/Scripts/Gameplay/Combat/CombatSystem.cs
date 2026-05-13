@@ -38,11 +38,7 @@ namespace Arkeum.Production.Gameplay.Combat
 
         private void ApplyDamage(ActorEntity target, int damage)
         {
-            target.CurrentHp -= damage;
-            if (target.CurrentHp < 0)
-            {
-                target.CurrentHp = 0;
-            }
+            target.SetCurrentHp(target.CurrentHp - damage);
         }
 
         private static void ApplyWeaponEffects(WeaponAttackContext context)

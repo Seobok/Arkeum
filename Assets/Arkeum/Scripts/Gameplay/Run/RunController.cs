@@ -17,6 +17,7 @@ namespace Arkeum.Production.Gameplay.Run
         private readonly MapService mapService;
         private readonly ActorRepository actorRepository;
         private readonly TimingService timingService;
+        private readonly SaveProfile activeProfile;
 
         public RunState CurrentRun { get; private set; }
         public string LastMessage { get; private set; } = string.Empty;
@@ -28,7 +29,8 @@ namespace Arkeum.Production.Gameplay.Run
             InteractionSystem interactionSystem,
             MapService mapService,
             ActorRepository actorRepository,
-            TimingService timingService)
+            TimingService timingService,
+            SaveProfile activeProfile)
         {
             this.turnSystem = turnSystem;
             this.combatSystem = combatSystem;
@@ -37,6 +39,7 @@ namespace Arkeum.Production.Gameplay.Run
             this.mapService = mapService;
             this.actorRepository = actorRepository;
             this.timingService = timingService;
+            this.activeProfile = activeProfile;
         }
 
         public void Begin(RunState runState)
@@ -51,7 +54,6 @@ namespace Arkeum.Production.Gameplay.Run
                 RunIndex = (profile?.TotalReturns ?? 0) + 1,
                 CurrentFloor = 1,
                 TurnCount = 0,
-                Gold = 0,
                 BandageCount = startingLoadout != null ? startingLoadout.BandageCount : 0,
                 AttackBonus = 0,
                 FloorExitUsed = false,
@@ -138,8 +140,8 @@ namespace Arkeum.Production.Gameplay.Run
             SetMessage($"{resultPrefix}You strike {enemy.DisplayName} for {damage} damage.");
             if (!enemy.IsAlive)
             {
-                CurrentRun.Gold += enemy.BloodReward;
-                SetMessage($"{enemy.DisplayName} falls. You gain {enemy.BloodReward} blood shards.");
+                activeProfile?.AddGold(enemy.Gold);
+                SetMessage($"{enemy.DisplayName} falls. You gain {enemy.Gold} gold.");
             }
 
             ConsumeTurn();
@@ -230,7 +232,7 @@ namespace Arkeum.Production.Gameplay.Run
             }
 
             CurrentRun.BandageCount -= 1;
-            CurrentRun.Player.CurrentHp = Mathf.Min(CurrentRun.Player.Stats.MaxHp, CurrentRun.Player.CurrentHp + 4);
+            CurrentRun.Player.SetCurrentHp(CurrentRun.Player.CurrentHp + 4);
             SetMessage("You bind your wounds.");
             ConsumeTurn();
             return true;
@@ -291,7 +293,6 @@ namespace Arkeum.Production.Gameplay.Run
         {
             turnSystem.ConsumePlayerAction(CurrentRun);
             enemyTurnSystem.ResolveEnemyTurn(CurrentRun, actorRepository.GetAliveEnemies(), mapService, actorRepository);
-            CurrentRun.Player.CurrentHp = CurrentRun.Player.CurrentHp;
             if (CurrentRun.Player.CurrentHp <= 0 && CurrentRun.EndReason == RunEndReason.None)
             {
                 EndRun(RunEndReason.Death);

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Arkeum.Production.Gameplay.Progression;
 
 namespace Arkeum.Production.Gameplay.Run
@@ -9,7 +9,6 @@ namespace Arkeum.Production.Gameplay.Run
         {
             return new[]
             {
-                $"Blood shards lost: {runState.Gold}",
                 FormatWeaponLoss(runState),
             };
         }
@@ -18,9 +17,8 @@ namespace Arkeum.Production.Gameplay.Run
         {
             return new[]
             {
-                $"Shard gained: +{runState.GleamReward}",
+                $"Total gold: {profile.Gold}",
                 $"Total returns: {profile.TotalReturns}",
-                $"Total gleam: {profile.Shard}",
             };
         }
 

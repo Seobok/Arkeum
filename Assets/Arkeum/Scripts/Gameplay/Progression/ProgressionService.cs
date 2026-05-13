@@ -1,4 +1,4 @@
-﻿using Arkeum.Production.Gameplay.Run;
+using Arkeum.Production.Gameplay.Run;
 using System.Collections.Generic;
 
 namespace Arkeum.Production.Gameplay.Progression
@@ -12,11 +12,11 @@ namespace Arkeum.Production.Gameplay.Progression
             this.questService = questService;
         }
 
-        public int ApplyRunEnd(SaveProfile profile, RunState runState)
+        public void ApplyRunEnd(SaveProfile profile, RunState runState)
         {
             if (profile == null || runState == null)
             {
-                return 0;
+                return;
             }
 
             profile.TotalReturns += 1;
@@ -25,15 +25,10 @@ namespace Arkeum.Production.Gameplay.Progression
                 profile.HighestFloor = runState.CurrentFloor;
             }
 
-            int gleamGain = runState.EndReason == RunEndReason.FloorClear ? 2 : 1;
-            runState.GleamReward = gleamGain;
-            profile.Shard += gleamGain;
             if (runState.EndReason == RunEndReason.FloorClear)
             {
                 questService.MarkPrototypeClear(profile);
             }
-
-            return gleamGain;
         }
 
         public void MarkRunClear(SaveProfile profile)
@@ -46,11 +41,9 @@ namespace Arkeum.Production.Gameplay.Progression
             lostLines.Clear();
             keptLines.Clear();
 
-            lostLines.Add($"Blood shards lost: {runState.Gold}");
             lostLines.Add(FormatWeaponLoss(runState));
 
-            keptLines.Add($"Shard gained: +{runState.GleamReward}");
-            keptLines.Add($"Total gleam: {profile.Shard}");
+            keptLines.Add($"Total gold: {profile.Gold}");
             keptLines.Add($"Total returns: {profile.TotalReturns}");
             keptLines.Add($"Highest floor reached: {profile.HighestFloor}");
         }

@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Text;
 using Arkeum.Production.Core;
+using Arkeum.Production.Gameplay.Actors;
+using Arkeum.Production.Gameplay.Progression;
 using Arkeum.Production.Gameplay.Run;
 using TMPro;
 using UnityEngine;
@@ -18,7 +20,6 @@ namespace Arkeum.Production.Presentation.UI
 
         [Header("Cost")]
         [SerializeField] private TextMeshProUGUI goldText;
-        [SerializeField] private TextMeshProUGUI shardText;
         
         [Header("Inventory")]
         [SerializeField] private Image inventoryImage;
@@ -47,10 +48,11 @@ namespace Arkeum.Production.Presentation.UI
 
         private readonly List<string> lostLines = new List<string>();
         private readonly List<string> keptLines = new List<string>();
-        private readonly StringBuilder builder = new StringBuilder(256);
 
         private GameDirector gameDirector;
         private RunState boundRun;
+        private ActorEntity player;
+        private SaveProfile boundProfile;
         private bool missingReferencesLogged;
 
         public string CurrentMessage { get; private set; } = string.Empty;
@@ -58,6 +60,7 @@ namespace Arkeum.Production.Presentation.UI
         public IReadOnlyList<string> LostLines => lostLines;
         public IReadOnlyList<string> KeptLines => keptLines;
 
+        // 게임 상 1번 초기화 하는 코드
         public void Initialize(GameDirector director)
         {
             gameDirector = director;
@@ -67,20 +70,76 @@ namespace Arkeum.Production.Presentation.UI
                 preparedTargetToggle.onValueChanged.AddListener(OnPreparedTargetToggleChanged);
             }
 
-            // Init HP UI
+            // Init HP Component
             TryInitializeHpList();
 
             Refresh();
         }
 
+        // UI가 초기화 될 때 사용 (런을 시작 / 허브로 귀환 등)
         public void BindRun(RunState runState)
         {
             boundRun = runState;
+            boundProfile = gameDirector?.ActiveProfile;
+            player = boundRun?.Player;
+
+            BindProfileGoldEvents();
+            BindPlayerHpEvents();
             
-            // Update Max HP UI
-            UpdateMaxHpUi();
-            
+            // Init HP UI
+            ToggleHpUi(runState != null);
+
+            if (runState != null)
+            {
+                UpdateMaxHpUi();
+                UpdateCurrentHpUi();
+                UpdateGoldUi();
+            }
+
             Refresh();
+        }
+
+        private void BindProfileGoldEvents()
+        {
+            UnbindProfileGoldEvents();
+            if (boundProfile != null)
+            {
+                boundProfile.GoldChanged += UpdateGoldUi;
+            }
+        }
+
+        private void UnbindProfileGoldEvents()
+        {
+            if (boundProfile == null)
+            {
+                return;
+            }
+
+            boundProfile.GoldChanged -= UpdateGoldUi;
+            boundProfile = null;
+        }
+
+        private void BindPlayerHpEvents()
+        {
+            UnbindPlayerHpEvents();
+
+            if (player != null)
+            {
+                player.CurrentHpChanged += UpdateCurrentHpUi;
+                player.MaxHpChanged += UpdateMaxHpUi;
+            }
+        }
+
+        private void UnbindPlayerHpEvents()
+        {
+            if (player == null)
+            {
+                return;
+            }
+
+            player.CurrentHpChanged -= UpdateCurrentHpUi;
+            player.MaxHpChanged -= UpdateMaxHpUi;
+            player = null;
         }
 
         public void SetMessage(string message)
@@ -132,6 +191,9 @@ namespace Arkeum.Production.Presentation.UI
             {
                 preparedTargetToggle.onValueChanged.RemoveListener(OnPreparedTargetToggleChanged);
             }
+
+            UnbindPlayerHpEvents();
+            UnbindProfileGoldEvents();
         }
 
         private void LateUpdate()
@@ -149,12 +211,6 @@ namespace Arkeum.Production.Presentation.UI
             bool inRun = gameDirector.CurrentState == GameState.InRun || gameDirector.CurrentState == GameState.TimingChallenge;
             if (inRun && boundRun != null && boundRun.Player != null)
             {
-                // 런 중 일때는 HP UI On
-                ToggleHpUi(true);
-                //HP Sprite
-                UpdateCurrentHpUi();
-                //Gold Text
-                UpdateGoldUi();
                 //BandageCount
                 //TurnCount
                 //CurrentFloor
@@ -164,12 +220,8 @@ namespace Arkeum.Production.Presentation.UI
             }
             else
             {
-                // 런 중이 아닐때는 HP UI Off
-                ToggleHpUi(false);
-                //Shard Text
-                UpdateShardUi();
                 // topDetailsText.text = gameDirector.ActiveProfile != null
-                //     ? $"Shard {gameDirector.ActiveProfile.Shard}  |  Returns {gameDirector.ActiveProfile.TotalReturns}"
+                //     ? $"Gold {gameDirector.ActiveProfile.Gold}  |  Returns {gameDirector.ActiveProfile.TotalReturns}"
                 //     : string.Empty;
                 // topTimingText.text = string.Empty;
                 // topRuleText.text = string.Empty;
@@ -247,7 +299,7 @@ namespace Arkeum.Production.Presentation.UI
         {
             if(healthBar == null)
             {
-                Debug.LogWarning("HealthBar is Missing");
+                Debug.LogWarning("[HudPresenter] HealthBar is Missing");
                 return false;
             }
 
@@ -263,12 +315,12 @@ namespace Arkeum.Production.Presentation.UI
         {
             if (boundRun == null || boundRun.Player == null)
             {
-                Debug.LogWarning("Run Data is Not Valid");
+                Debug.LogWarning("[HudPresenter] Run Data is Not Valid");
                 return;
             }
             if (healthBar == null)
             {
-                Debug.LogWarning("Health Bar is Missing");
+                Debug.LogWarning("[HudPresenter] Health Bar is Missing");
                 return;
             }
             if (healthImages == null)
@@ -282,8 +334,6 @@ namespace Arkeum.Production.Presentation.UI
             //MAX HP ENSURE
             int maxHp = boundRun.Player.Stats.MaxHp;
             int curMaxHp = healthBar.transform.childCount;
-
-            Debug.Log($"curMaxHp = {curMaxHp}, maxHp = {maxHp}");
             
             if (curMaxHp > maxHp)
             {
@@ -308,12 +358,12 @@ namespace Arkeum.Production.Presentation.UI
         {
             if (boundRun == null || boundRun.Player == null)
             {
-                Debug.LogWarning("Run Data is Not Valid");
+                Debug.LogWarning("[HudPresenter] Run Data is Not Valid");
                 return;
             }
             if(healthSprites == null || healthSprites.Length < 2)
             {
-                Debug.LogWarning("HealthSprite is Missing");
+                Debug.LogWarning("[HudPresenter] HealthSprite is Missing");
                 return;
             }
             if (healthImages == null)
@@ -349,46 +399,30 @@ namespace Arkeum.Production.Presentation.UI
 
         public void UpdateGoldUi()
         {
-            if (boundRun == null)
+            if (gameDirector == null || gameDirector.ActiveProfile == null)
             {
-                Debug.LogWarning("Run Data is Not Valid");
+                Debug.LogWarning("[HudPresenter] Game Director is Not Valid");
                 return;
             }
             if (goldText == null)
             {
-                Debug.LogWarning("goldText is Missing");
+                Debug.LogWarning("[HudPresenter] goldText is Missing");
                 return;
             }
 
-            goldText.text = boundRun.Gold.ToString();
-        }
-
-        public void UpdateShardUi()
-        {
-            if (gameDirector == null || gameDirector.ActiveProfile == null)
-            {
-                Debug.LogWarning("Game Director is Not Valid");
-                return;
-            }
-            if(shardText == null)
-            {
-                Debug.LogWarning("shardText is Missing");
-                return;
-            }
-
-            shardText.text = gameDirector.ActiveProfile.Shard.ToString();
+            goldText.text = gameDirector.ActiveProfile.Gold.ToString();
         }
 
         public void UpdateInventoryUi()
         {
             if (boundRun == null)
             {
-                Debug.LogWarning("Run Data is Not Valid");
+                Debug.LogWarning("[HudPresenter] Run Data is Not Valid");
                 return;
             }
             if (inventoryImage == null)
             {
-                Debug.LogWarning("inventoryImage is Missing");
+                Debug.LogWarning("[HudPresenter] inventoryImage is Missing");
             }
 
             if (boundRun.IsTimingModeEnabled)

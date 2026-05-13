@@ -110,7 +110,8 @@ namespace Arkeum.Production.Core
                 Services.InteractionSystem,
                 Services.MapService,
                 Services.ActorRepository,
-                Services.TimingService);
+                Services.TimingService,
+                ActiveProfile);
 
             RunState runState = runController.CreateRunState(ActiveProfile, Services.RunDefinition?.StartingLoadout);
             runState.CurrentFloor = runFloor;
@@ -118,8 +119,8 @@ namespace Arkeum.Production.Core
             ActorEntity player = Services.ActorRepository.Player;
             runState.Player = player;
             //TODO :: 추후에는 다른 파일에서 값을 읽어올 수 있도록, 데이터를 관리하는 파일을 생성해야 함.
-            player.CurrentHp = PlayerMaxHP;
-            player.Stats.MaxHp = PlayerMaxHP;
+            player.SetMaxHp(PlayerMaxHP);
+            player.SetCurrentHp(PlayerMaxHP);
             player.Stats.AttackPower = runState.EffectiveAttack;
             runController.Begin(runState);
 
@@ -140,8 +141,7 @@ namespace Arkeum.Production.Core
                 return;
             }
 
-            int gleamGain = Services.ProgressionService.ApplyRunEnd(ActiveProfile, CurrentRunController.CurrentRun);
-            CurrentRunController.CurrentRun.GleamReward = gleamGain;
+            Services.ProgressionService.ApplyRunEnd(ActiveProfile, CurrentRunController.CurrentRun);
             Services.ProgressionService.BuildResultLines(
                 ActiveProfile,
                 CurrentRunController.CurrentRun,
@@ -317,8 +317,8 @@ namespace Arkeum.Production.Core
             runState.FloorExitUsed = false;
             runState.EndReason = RunEndReason.None;
             runState.Player = player;
-            player.CurrentHp = Mathf.Clamp(currentHp, 1, PlayerMaxHP);
-            player.Stats.MaxHp = PlayerMaxHP;
+            player.SetCurrentHp(currentHp);
+            player.SetMaxHp(PlayerMaxHP);
             player.Stats.AttackPower = runState.EffectiveAttack;
 
             Services.WorldPresenter.SetActorRepository(Services.ActorRepository);
@@ -342,23 +342,26 @@ namespace Arkeum.Production.Core
         {
             MapDefinition map = Services.MapService.CurrentMap;
             RunFloorDefinition floorDefinition = Services.MapService.CurrentRunFloor;
+            ActorStats playerStats = new ActorStats
+            {
+                AttackPower = 3,
+                Defense = 1,
+            };
+            playerStats.SetMaxHp(12);
+
+            ActorEntity player = new ActorEntity
+            {
+                Id = "player",
+                DisplayName = "Ash Knight",
+                GridPosition = map.PlayerSpawn,
+                IsEnemy = false,
+                Stats = playerStats,
+            };
+            player.SetCurrentHp(12);
+
             List<ActorEntity> actors = new List<ActorEntity>
             {
-                new ActorEntity
-                {
-                    Id = "player",
-                    DisplayName = "Ash Knight",
-                    GridPosition = map.PlayerSpawn,
-                    CurrentHp = 12,
-                    IsEnemy = false,
-                    Stats = new ActorStats
-                    {
-                        MaxHp = 12,
-                        AttackPower = 3,
-                        Defense = 1,
-                        ActionInterval = 1,
-                    },
-                },
+                player,
             };
 
             IReadOnlyList<EnemySpawnDefinition> enemySpawns = map.EnemySpawns;
@@ -500,38 +503,20 @@ namespace Arkeum.Production.Core
 
             EnemyDefinition enemyDefinition = spawnDefinition.EnemyDefinition;
             ActorStats stats = enemyDefinition.Stats.Clone();
-            ApplyLegacyEnemyTiming(stats);
-            return new ActorEntity
+            ActorEntity enemy = new ActorEntity
             {
                 Id = $"{enemyDefinition.EnemyId}_{index}",
                 DisplayName = enemyDefinition.DisplayName,
                 GridPosition = spawnDefinition.Position,
                 FacingDirection = Vector2Int.up,
-                CurrentHp = stats.MaxHp,
                 IsEnemy = true,
-                BloodReward = enemyDefinition.BloodReward,
+                Gold = enemyDefinition.BloodReward,
                 EnemyDefinition = enemyDefinition,
                 Stats = stats,
             };
-        }
 
-        private static void ApplyLegacyEnemyTiming(ActorStats stats)
-        {
-            if (stats == null || stats.ActionInterval <= 1)
-            {
-                return;
-            }
-
-            int preparationTurns = stats.ActionInterval - 1;
-            if (stats.AttackPreparationTurns == 0)
-            {
-                stats.AttackPreparationTurns = preparationTurns;
-            }
-
-            if (stats.MovePreparationTurns == 0)
-            {
-                stats.MovePreparationTurns = preparationTurns;
-            }
+            enemy.SetCurrentHp(stats.MaxHp);
+            return enemy;
         }
     }
 }
