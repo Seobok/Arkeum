@@ -102,6 +102,7 @@ namespace Arkeum.Production.Presentation.UI
         private void BindProfileGoldEvents()
         {
             UnbindProfileGoldEvents();
+            
             if (boundProfile != null)
             {
                 boundProfile.GoldChanged += UpdateGoldUi;
@@ -116,7 +117,6 @@ namespace Arkeum.Production.Presentation.UI
             }
 
             boundProfile.GoldChanged -= UpdateGoldUi;
-            boundProfile = null;
         }
 
         private void BindPlayerHpEvents()
@@ -139,7 +139,6 @@ namespace Arkeum.Production.Presentation.UI
 
             player.CurrentHpChanged -= UpdateCurrentHpUi;
             player.MaxHpChanged -= UpdateMaxHpUi;
-            player = null;
         }
 
         public void SetMessage(string message)
