@@ -23,6 +23,7 @@ namespace Arkeum.Production.Presentation.UI
         
         [Header("Inventory")]
         [SerializeField] private Image inventoryImage;
+        [SerializeField] private Image weaponIconImage;
         [SerializeField] private Sprite[] inventorySprites; // 0=>Normal, 1=>Active
         
         [Header("Top Status")]
@@ -51,8 +52,9 @@ namespace Arkeum.Production.Presentation.UI
 
         private GameDirector gameDirector;
         private RunState boundRun;
-        private ActorEntity player;
+        private ActorEntity boundPlayer;
         private SaveProfile boundProfile;
+        private RunController boundRunController;
         private bool missingReferencesLogged;
 
         public string CurrentMessage { get; private set; } = string.Empty;
@@ -81,10 +83,12 @@ namespace Arkeum.Production.Presentation.UI
         {
             boundRun = runState;
             boundProfile = gameDirector?.ActiveProfile;
-            player = boundRun?.Player;
+            boundPlayer = boundRun?.Player;
+            boundRunController = gameDirector?.CurrentRunController;
 
-            BindProfileGoldEvents();
-            BindPlayerHpEvents();
+            BindProfileEvents();
+            BindPlayerEvents();
+            BindRunControllerEvents();
             
             // Init HP UI
             ToggleHpUi(runState != null);
@@ -93,15 +97,17 @@ namespace Arkeum.Production.Presentation.UI
             {
                 UpdateMaxHpUi();
                 UpdateCurrentHpUi();
-                UpdateGoldUi();
             }
+            
+            UpdateGoldUi();
+            UpdateInventoryUi();
 
             Refresh();
         }
 
-        private void BindProfileGoldEvents()
+        private void BindProfileEvents()
         {
-            UnbindProfileGoldEvents();
+            UnbindProfileEvents();
             
             if (boundProfile != null)
             {
@@ -109,7 +115,7 @@ namespace Arkeum.Production.Presentation.UI
             }
         }
 
-        private void UnbindProfileGoldEvents()
+        private void UnbindProfileEvents()
         {
             if (boundProfile == null)
             {
@@ -119,26 +125,46 @@ namespace Arkeum.Production.Presentation.UI
             boundProfile.GoldChanged -= UpdateGoldUi;
         }
 
-        private void BindPlayerHpEvents()
+        private void BindPlayerEvents()
         {
-            UnbindPlayerHpEvents();
+            UnbindPlayerEvents();
 
-            if (player != null)
+            if (boundPlayer != null)
             {
-                player.CurrentHpChanged += UpdateCurrentHpUi;
-                player.MaxHpChanged += UpdateMaxHpUi;
+                boundPlayer.CurrentHpChanged += UpdateCurrentHpUi;
+                boundPlayer.MaxHpChanged += UpdateMaxHpUi;
             }
         }
 
-        private void UnbindPlayerHpEvents()
+        private void UnbindPlayerEvents()
         {
-            if (player == null)
+            if (boundPlayer == null)
             {
                 return;
             }
 
-            player.CurrentHpChanged -= UpdateCurrentHpUi;
-            player.MaxHpChanged -= UpdateMaxHpUi;
+            boundPlayer.CurrentHpChanged -= UpdateCurrentHpUi;
+            boundPlayer.MaxHpChanged -= UpdateMaxHpUi;
+        }
+
+        private void BindRunControllerEvents()
+        {
+            UnbindRunControllerEvents();
+
+            if (boundRunController != null)
+            {
+                boundRunController.WeaponPickedUp += UpdateInventoryUi;
+            }
+        }
+
+        private void UnbindRunControllerEvents()
+        {
+            if (boundRunController == null)
+            {
+                return;
+            }
+            
+            boundRunController.WeaponPickedUp -= UpdateInventoryUi;
         }
 
         public void SetMessage(string message)
@@ -191,8 +217,9 @@ namespace Arkeum.Production.Presentation.UI
                 preparedTargetToggle.onValueChanged.RemoveListener(OnPreparedTargetToggleChanged);
             }
 
-            UnbindPlayerHpEvents();
-            UnbindProfileGoldEvents();
+            UnbindPlayerEvents();
+            UnbindProfileEvents();
+            UnbindRunControllerEvents();
         }
 
         private void LateUpdate()
@@ -416,21 +443,47 @@ namespace Arkeum.Production.Presentation.UI
         {
             if (boundRun == null)
             {
+                inventoryImage?.gameObject.SetActive(false);
+                
                 Debug.LogWarning("[HudPresenter] Run Data is Not Valid");
                 return;
             }
-            if (inventoryImage == null)
+            
+            inventoryImage?.gameObject.SetActive(true);
+            
+            // 타이밍 UI Update
+            if (inventoryImage != null && inventorySprites != null && inventorySprites.Length >= 2)
             {
-                Debug.LogWarning("[HudPresenter] inventoryImage is Missing");
-            }
-
-            if (boundRun.IsTimingModeEnabled)
-            {
-                inventoryImage.sprite = inventorySprites[1];
+                if (boundRun.IsTimingModeEnabled)
+                {
+                    inventoryImage.sprite = inventorySprites[1];
+                }
+                else
+                {
+                    inventoryImage.sprite = inventorySprites[0];
+                }
             }
             else
             {
-                inventoryImage.sprite = inventorySprites[0];
+                Debug.LogWarning("[HudPresenter] inventoryImage is Missing");
+            }
+            
+            // 무기 아이콘 Update
+            if (weaponIconImage != null)
+            {
+                WeaponDefinition weapon = boundRun.EquippedWeapon;
+                bool hasWeaponIcon = boundRun.HasEquippedWeapon && weapon != null && weapon.Sprite != null;
+
+                weaponIconImage.gameObject.SetActive(hasWeaponIcon);
+                if (hasWeaponIcon)
+                {
+                    weaponIconImage.sprite = weapon.Sprite;
+                    weaponIconImage.color = weapon.Tint;
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[HudPresenter] weaponIconImage is Missing");
             }
         }
 

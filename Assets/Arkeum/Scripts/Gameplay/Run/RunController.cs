@@ -18,6 +18,8 @@ namespace Arkeum.Production.Gameplay.Run
         private readonly ActorRepository actorRepository;
         private readonly TimingService timingService;
         private readonly SaveProfile activeProfile;
+        
+        public event System.Action WeaponPickedUp;
 
         public RunState CurrentRun { get; private set; }
         public string LastMessage { get; private set; } = string.Empty;
@@ -307,6 +309,9 @@ namespace Arkeum.Production.Gameplay.Run
                 CurrentRun.HasEquippedWeapon = true;
                 CurrentRun.EquippedWeapon = weaponSpawn.Weapon;
                 CurrentRun.Player.Stats.AttackPower = CurrentRun.EffectiveAttack;
+                
+                WeaponPickedUp?.Invoke();
+                
                 SetMessage(BuildWeaponPickupMessage(weaponSpawn.Weapon));
                 return true;
             }
