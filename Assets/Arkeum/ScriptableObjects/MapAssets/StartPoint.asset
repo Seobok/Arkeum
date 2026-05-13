@@ -17,155 +17,113 @@ MonoBehaviour:
   PlayerSpawn: {x: 0, y: 0}
   FloorExitPosition: {x: 0, y: 0}
   DungeonEntrancePosition: {x: 0, y: 0}
-  TemporaryWeaponSpawns: []
+  WeaponSpawns:
+  - Weapon: {fileID: 11400000, guid: 21dd2760466112a44aebbc899378610d, type: 2}
+    Position: {x: -1, y: 2}
+  - Weapon: {fileID: 11400000, guid: 40f26cd0bdd49294989e0a4a09f9ec84, type: 2}
+    Position: {x: 0, y: 2}
+  - Weapon: {fileID: 11400000, guid: 667b642424e5f9a48ab9aad183891e3e, type: 2}
+    Position: {x: 1, y: 2}
+  EnemySpawns: []
   Cells:
   - Position: {x: -2, y: 1}
     Walkable: 1
-    Depth: 1
   - Position: {x: -2, y: 2}
     Walkable: 1
-    Depth: 1
   - Position: {x: -2, y: 0}
     Walkable: 1
-    Depth: 1
   - Position: {x: -2, y: -1}
     Walkable: 1
-    Depth: 1
   - Position: {x: -2, y: -2}
     Walkable: 1
-    Depth: 1
   - Position: {x: -1, y: -2}
     Walkable: 1
-    Depth: 1
   - Position: {x: 0, y: -2}
     Walkable: 1
-    Depth: 1
   - Position: {x: 1, y: -2}
     Walkable: 1
-    Depth: 1
   - Position: {x: 2, y: -2}
     Walkable: 1
-    Depth: 1
   - Position: {x: 3, y: -2}
     Walkable: 1
-    Depth: 1
   - Position: {x: 3, y: -1}
     Walkable: 1
-    Depth: 1
   - Position: {x: 3, y: 0}
     Walkable: 1
-    Depth: 1
   - Position: {x: 3, y: 1}
     Walkable: 1
-    Depth: 1
   - Position: {x: 2, y: 1}
     Walkable: 1
-    Depth: 1
   - Position: {x: 1, y: 1}
     Walkable: 1
-    Depth: 1
   - Position: {x: 0, y: 1}
     Walkable: 1
-    Depth: 1
   - Position: {x: -1, y: 1}
     Walkable: 1
-    Depth: 1
   - Position: {x: -3, y: 1}
     Walkable: 1
-    Depth: 1
   - Position: {x: -3, y: 0}
     Walkable: 1
-    Depth: 1
   - Position: {x: -3, y: -1}
     Walkable: 1
-    Depth: 1
   - Position: {x: -3, y: -2}
     Walkable: 1
-    Depth: 1
   - Position: {x: 2, y: -1}
     Walkable: 1
-    Depth: 1
   - Position: {x: 1, y: 0}
     Walkable: 1
-    Depth: 1
   - Position: {x: 0, y: 0}
     Walkable: 1
-    Depth: 1
   - Position: {x: 0, y: -3}
     Walkable: 1
-    Depth: 1
   - Position: {x: -1, y: -3}
     Walkable: 1
-    Depth: 1
   - Position: {x: -2, y: -3}
     Walkable: 1
-    Depth: 1
   - Position: {x: -1, y: -1}
     Walkable: 1
-    Depth: 1
   - Position: {x: 0, y: -1}
     Walkable: 1
-    Depth: 1
   - Position: {x: 1, y: -1}
     Walkable: 1
-    Depth: 1
   - Position: {x: 2, y: 0}
     Walkable: 1
-    Depth: 1
   - Position: {x: -1, y: 0}
     Walkable: 1
-    Depth: 1
   - Position: {x: -3, y: -3}
     Walkable: 1
-    Depth: 1
   - Position: {x: 1, y: -3}
     Walkable: 1
-    Depth: 1
   - Position: {x: 2, y: -3}
     Walkable: 1
-    Depth: 1
   - Position: {x: 3, y: -3}
     Walkable: 1
-    Depth: 1
   - Position: {x: 3, y: 2}
     Walkable: 1
-    Depth: 1
   - Position: {x: 2, y: 2}
     Walkable: 1
-    Depth: 1
   - Position: {x: 1, y: 2}
     Walkable: 1
-    Depth: 1
   - Position: {x: 0, y: 2}
     Walkable: 1
-    Depth: 1
   - Position: {x: -1, y: 2}
     Walkable: 1
-    Depth: 1
   - Position: {x: -3, y: 2}
     Walkable: 1
-    Depth: 1
   - Position: {x: -3, y: 3}
     Walkable: 1
-    Depth: 1
   - Position: {x: -2, y: 3}
     Walkable: 1
-    Depth: 1
   - Position: {x: -1, y: 3}
     Walkable: 1
-    Depth: 1
   - Position: {x: 0, y: 3}
     Walkable: 1
-    Depth: 1
   - Position: {x: 1, y: 3}
     Walkable: 1
-    Depth: 1
   - Position: {x: 2, y: 3}
     Walkable: 1
-    Depth: 1
   - Position: {x: 3, y: 3}
     Walkable: 1
-    Depth: 1
   Doors:
   - Position: {x: 3, y: 0}
     Direction: 3
