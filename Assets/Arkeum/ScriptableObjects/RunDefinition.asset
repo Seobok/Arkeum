@@ -25,7 +25,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 58b1416f9c8509d449a16657b43ab5fd, type: 2}
     SpecialRooms:
     - RoomType: 1
-      RoomAsset: {fileID: 0}
+      RoomAsset: {fileID: 11400000, guid: 684b0eb1ed1f4a749bfc649b04ad46ad, type: 2}
       Count: 1
     MinimumRoomCount: 6
     RoomGap: 5
