@@ -15,15 +15,14 @@ MonoBehaviour:
   enemyId: Bat
   displayName: "\uBC15\uC950"
   stats:
-    MaxHp: 1
+    maxHp: 1
     AttackPower: 1
     Defense: 0
-    ActionInterval: 1
     DetectionRange: 6
     MovementRange: 2
     AttackPreparationTurns: 1
     MovePreparationTurns: 1
   bloodReward: 1
   attackPattern: {fileID: 11400000, guid: 1f8489c89e66edf40b5892ec4d747e78, type: 2}
-  sprite: {fileID: 0}
+  sprite: {fileID: 21300000, guid: da4a2e61475af9f4dba9e6889a7a3b32, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
