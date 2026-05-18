@@ -312,7 +312,13 @@ namespace Arkeum.Production.Gameplay.Run
 
         private bool TryAutoPickupAtPlayerPosition()
         {
-            if (mapService.TryGetWeaponSpawn(CurrentRun.Player.GridPosition, out WeaponSpawnDefinition weaponSpawn))
+            bool hadEquippedWeapon = CurrentRun.HasEquippedWeapon;
+            WeaponDefinition droppedWeapon = CurrentRun.EquippedWeapon;
+            if (mapService.TryPickupWeaponAt(
+                    CurrentRun.Player.GridPosition,
+                    hadEquippedWeapon,
+                    droppedWeapon,
+                    out WeaponSpawnDefinition weaponSpawn))
             {
                 CurrentRun.HasEquippedWeapon = true;
                 CurrentRun.EquippedWeapon = weaponSpawn.Weapon;
@@ -320,21 +326,30 @@ namespace Arkeum.Production.Gameplay.Run
                 
                 WeaponPickedUp?.Invoke();
                 
-                SetMessage(BuildWeaponPickupMessage(weaponSpawn.Weapon));
+                SetMessage(BuildWeaponPickupMessage(weaponSpawn.Weapon, hadEquippedWeapon, droppedWeapon));
                 return true;
             }
 
             return false;
         }
 
-        private static string BuildWeaponPickupMessage(WeaponDefinition weapon)
+        private static string BuildWeaponPickupMessage(
+            WeaponDefinition weapon,
+            bool droppedPreviousWeapon,
+            WeaponDefinition droppedWeapon)
         {
+            string dropSuffix = droppedPreviousWeapon ? $" You drop {GetWeaponDisplayName(droppedWeapon)}." : string.Empty;
             if (weapon == null)
             {
-                return "You pick up a weapon.";
+                return $"You pick up a weapon.{dropSuffix}";
             }
 
-            return $"You pick up {weapon.DisplayName}. Attack rises by {weapon.AttackBonus} for this run.";
+            return $"You pick up {weapon.DisplayName}. Attack rises by {weapon.AttackBonus} for this run.{dropSuffix}";
+        }
+
+        private static string GetWeaponDisplayName(WeaponDefinition weapon)
+        {
+            return weapon != null ? weapon.DisplayName : "a weapon";
         }
 
         private void SetMessage(string message)

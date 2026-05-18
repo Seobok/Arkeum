@@ -89,6 +89,44 @@ namespace Arkeum.Production.Gameplay.Map
             return false;
         }
 
+        public bool TryPickupWeaponAt(
+            Vector2Int cell,
+            bool hasDroppedWeapon,
+            WeaponDefinition droppedWeapon,
+            out WeaponSpawnDefinition pickedUpWeaponSpawn)
+        {
+            if (CurrentMap?.WeaponSpawns == null)
+            {
+                pickedUpWeaponSpawn = null;
+                return false;
+            }
+
+            for (int i = 0; i < CurrentMap.WeaponSpawns.Count; i++)
+            {
+                WeaponSpawnDefinition weaponSpawn = CurrentMap.WeaponSpawns[i];
+                if (weaponSpawn == null || weaponSpawn.Position != cell)
+                {
+                    continue;
+                }
+
+                pickedUpWeaponSpawn = weaponSpawn;
+                CurrentMap.WeaponSpawns.RemoveAt(i);
+                if (hasDroppedWeapon)
+                {
+                    CurrentMap.WeaponSpawns.Add(new WeaponSpawnDefinition
+                    {
+                        Weapon = droppedWeapon,
+                        Position = cell,
+                    });
+                }
+
+                return true;
+            }
+
+            pickedUpWeaponSpawn = null;
+            return false;
+        }
+
         private void SetCurrentMap(MapDefinition mapDefinition)
         {
             CurrentMap = mapDefinition;
