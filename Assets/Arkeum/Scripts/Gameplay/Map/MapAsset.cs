@@ -37,6 +37,7 @@ namespace Arkeum.Production.Gameplay.Map
             if (TryGetCell(position, out MapCellData cell))
             {
                 cell.Walkable = walkable;
+                cell.HasWall = false;
                 return;
             }
 
@@ -44,6 +45,23 @@ namespace Arkeum.Production.Gameplay.Map
             {
                 Position = position,
                 Walkable = walkable,
+            });
+        }
+
+        public void SetWall(Vector2Int position, bool hasWall)
+        {
+            if (TryGetCell(position, out MapCellData cell))
+            {
+                cell.Walkable = true;
+                cell.HasWall = hasWall;
+                return;
+            }
+
+            Cells.Add(new MapCellData
+            {
+                Position = position,
+                Walkable = true,
+                HasWall = hasWall,
             });
         }
 

@@ -28,7 +28,7 @@ namespace Arkeum.Production.Gameplay.Actors
         {
             ActorEntity enemy = context.Enemy;
             ActorEntity player = context.Player;
-            enemy.TargetActorId = IsInDetectionRange(enemy, player.GridPosition) ? player.Id : null;
+            enemy.TargetActorId = IsInDetectionRange(enemy, player.GridPosition, context.MapService) ? player.Id : null;
             return BehaviorTreeStatus.Success;
         }
 
@@ -67,7 +67,7 @@ namespace Arkeum.Production.Gameplay.Actors
 
         public bool CanAttackTarget(EnemyBehaviorContext context)
         {
-            return HasPendingAttack(context) || CanAttack(context.Enemy, context.Player.GridPosition);
+            return HasPendingAttack(context) || CanAttack(context.Enemy, context.Player.GridPosition, context.MapService);
         }
 
         public BehaviorTreeStatus AttackTarget(EnemyBehaviorContext context)
@@ -81,7 +81,7 @@ namespace Arkeum.Production.Gameplay.Actors
                 targetCell = enemy.PendingEnemyTargetCell;
                 attackFacing = enemy.PendingEnemyFacingDirection;
             }
-            else if (!TryGetAttackTarget(enemy, player.GridPosition, out targetCell, out attackFacing))
+            else if (!TryGetAttackTarget(enemy, player.GridPosition, context.MapService, out targetCell, out attackFacing))
             {
                 return BehaviorTreeStatus.Failure;
             }
@@ -92,7 +92,7 @@ namespace Arkeum.Production.Gameplay.Actors
             }
 
             enemy.FacingDirection = enemy.PendingEnemyFacingDirection;
-            if (IsInPreparedAttackRange(enemy, player.GridPosition))
+            if (IsInPreparedAttackRange(enemy, player.GridPosition, context.MapService))
             {
                 combatSystem.ResolveEnemyAttack(enemy, player);
             }
@@ -259,15 +259,16 @@ namespace Arkeum.Production.Gameplay.Actors
         private static bool CanMoveTo(Vector2Int targetCell, Vector2Int playerPosition, MapService mapService, ActorRepository actorRepository)
         {
             return targetCell != playerPosition &&
-                   mapService.IsWalkableCell(targetCell) &&
+                   mapService.IsWalkable(targetCell) &&
                    !actorRepository.IsEnemyOccupied(targetCell);
         }
 
-        private static bool IsInDetectionRange(ActorEntity enemy, Vector2Int playerPosition)
+        private static bool IsInDetectionRange(ActorEntity enemy, Vector2Int playerPosition, MapService mapService)
         {
             int detectionRange = Mathf.Max(0, enemy.Stats.DetectionRange);
             Vector2Int delta = playerPosition - enemy.GridPosition;
-            return Mathf.Abs(delta.x) + Mathf.Abs(delta.y) <= detectionRange;
+            return Mathf.Abs(delta.x) + Mathf.Abs(delta.y) <= detectionRange &&
+                   !mapService.BlocksLineOfSightBetween(enemy.GridPosition, playerPosition);
         }
 
         private static bool TryCompletePreparation(ActorEntity enemy, EnemyActionType actionType, int requiredTurns, Vector2Int targetCell)
@@ -318,18 +319,25 @@ namespace Arkeum.Production.Gameplay.Actors
             enemy.HasPendingEnemyTargetCell = false;
         }
 
-        private static bool CanAttack(ActorEntity enemy, Vector2Int target)
+        private static bool CanAttack(ActorEntity enemy, Vector2Int target, MapService mapService)
         {
-            return TryGetAttackTarget(enemy, target, out _, out _);
+            return TryGetAttackTarget(enemy, target, mapService, out _, out _);
         }
 
         private static bool TryGetAttackTarget(
             ActorEntity enemy,
             Vector2Int target,
+            MapService mapService,
             out Vector2Int targetCell,
             out Vector2Int attackFacing)
         {
             targetCell = target;
+            if (mapService.BlocksAttackBetween(enemy.GridPosition, target))
+            {
+                attackFacing = enemy.FacingDirection;
+                return false;
+            }
+
             EnemyAttackPatternDefinition attackPattern = enemy.EnemyDefinition != null
                 ? enemy.EnemyDefinition.AttackPattern
                 : null;
@@ -349,8 +357,13 @@ namespace Arkeum.Production.Gameplay.Actors
             return false;
         }
 
-        private static bool IsInPreparedAttackRange(ActorEntity enemy, Vector2Int target)
+        private static bool IsInPreparedAttackRange(ActorEntity enemy, Vector2Int target, MapService mapService)
         {
+            if (mapService.BlocksAttackBetween(enemy.GridPosition, target))
+            {
+                return false;
+            }
+
             EnemyAttackPatternDefinition attackPattern = enemy.EnemyDefinition != null
                 ? enemy.EnemyDefinition.AttackPattern
                 : null;

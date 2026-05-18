@@ -19,6 +19,7 @@ namespace Arkeum.Editor
         private static readonly Color DungeonEntranceColor = new Color(0.62f, 0.29f, 0.22f);
         private static readonly Color DoorColor = new Color(0.22f, 0.5f, 0.84f);
         private static readonly Color EnemyColor = new Color(0.64f, 0.15f, 0.16f);
+        private static readonly Color WallColor = new Color(0.08f, 0.08f, 0.09f);
 
         private MapTool selectedTool = MapTool.Walkable;
         private MapAsset selectedAsset;
@@ -114,7 +115,7 @@ namespace Arkeum.Editor
         {
             EditorGUILayout.LabelField("Brushes", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Walkable/Erase edits terrain. Door stores explicit room exits for dungeon generation.",
+                "Walkable/Erase edits terrain. Wall places blocking objects. Door stores explicit room exits for dungeon generation.",
                 MessageType.None);
         }
 
@@ -218,7 +219,10 @@ namespace Arkeum.Editor
                 current.Use();
             }
             else if (current.type == EventType.MouseDrag && current.button == 0 &&
-                     (selectedTool == MapTool.Walkable || selectedTool == MapTool.Erase))
+                     (selectedTool == MapTool.Walkable ||
+                      selectedTool == MapTool.Erase ||
+                      selectedTool == MapTool.Wall ||
+                      selectedTool == MapTool.WallErase))
             {
                 ApplyTool(cell);
                 current.Use();
@@ -233,6 +237,18 @@ namespace Arkeum.Editor
             {
                 case MapTool.Walkable:
                     selectedAsset.SetCell(cell, true);
+                    break;
+                case MapTool.Wall:
+                    selectedAsset.SetWall(cell, true);
+                    RemoveMarkerIfMatches(ref selectedAsset.PlayerSpawn, cell);
+                    RemoveMarkerIfMatches(ref selectedAsset.FloorExitPosition, cell);
+                    RemoveMarkerIfMatches(ref selectedAsset.DungeonEntrancePosition, cell);
+                    RemoveWeaponSpawnsAt(cell);
+                    selectedAsset.EnemySpawns.RemoveAll(spawn => spawn != null && spawn.Position == cell);
+                    selectedAsset.RemoveDoorsAt(cell);
+                    break;
+                case MapTool.WallErase:
+                    selectedAsset.SetWall(cell, false);
                     break;
                 case MapTool.Erase:
                     selectedAsset.RemoveCell(cell);
@@ -360,7 +376,7 @@ namespace Arkeum.Editor
                 return Color.black;
             }
 
-            return WalkableColor;
+            return cellData.HasWall ? WallColor : WalkableColor;
         }
 
         private List<string> BuildValidationIssues(MapAsset asset)
@@ -372,9 +388,9 @@ namespace Arkeum.Editor
                 return issues;
             }
 
-            if (!IsWalkable(asset, asset.PlayerSpawn))
+            if (!IsNavigable(asset, asset.PlayerSpawn))
             {
-                issues.Add("Player spawn is not on a walkable cell.");
+                issues.Add("Player spawn is not on a navigable cell.");
             }
 
             AddReachabilityIssue(asset, asset.PlayerSpawn, asset.FloorExitPosition, "Floor exit", issues);
@@ -394,9 +410,9 @@ namespace Arkeum.Editor
                     issues.Add($"Weapon spawn {weaponSpawn.Position} has no WeaponDefinition.");
                 }
 
-                if (!IsWalkable(asset, weaponSpawn.Position))
+                if (!IsNavigable(asset, weaponSpawn.Position))
                 {
-                    issues.Add($"Weapon spawn {weaponSpawn.Position} is not on a walkable cell.");
+                    issues.Add($"Weapon spawn {weaponSpawn.Position} is not on a navigable cell.");
                 }
             }
 
@@ -414,9 +430,9 @@ namespace Arkeum.Editor
                     issues.Add($"Enemy spawn {enemySpawn.Position} has no EnemyDefinition.");
                 }
 
-                if (!IsWalkable(asset, enemySpawn.Position))
+                if (!IsNavigable(asset, enemySpawn.Position))
                 {
-                    issues.Add($"Enemy spawn {enemySpawn.Position} is not on a walkable cell.");
+                    issues.Add($"Enemy spawn {enemySpawn.Position} is not on a navigable cell.");
                 }
             }
 
@@ -434,9 +450,9 @@ namespace Arkeum.Editor
                     continue;
                 }
 
-                if (!IsWalkable(asset, door.Position))
+                if (!IsNavigable(asset, door.Position))
                 {
-                    issues.Add($"Door {door.Direction} at {door.Position} is not on a walkable cell.");
+                    issues.Add($"Door {door.Direction} at {door.Position} is not on a navigable cell.");
                 }
             }
 
@@ -450,9 +466,9 @@ namespace Arkeum.Editor
                 return;
             }
 
-            if (!IsWalkable(asset, target))
+            if (!IsNavigable(asset, target))
             {
-                issues.Add($"{label} is not on a walkable cell.");
+                issues.Add($"{label} is not on a navigable cell.");
                 return;
             }
 
@@ -467,6 +483,11 @@ namespace Arkeum.Editor
             return asset.TryGetCell(cell, out MapCellData cellData) && cellData.Walkable;
         }
 
+        private static bool IsNavigable(MapAsset asset, Vector2Int cell)
+        {
+            return asset.TryGetCell(cell, out MapCellData cellData) && cellData.Walkable && !cellData.HasWall;
+        }
+
         private static bool CanReach(MapAsset asset, Vector2Int origin, Vector2Int target)
         {
             if (origin == target)
@@ -474,7 +495,7 @@ namespace Arkeum.Editor
                 return true;
             }
 
-            if (!IsWalkable(asset, origin) || !IsWalkable(asset, target))
+            if (!IsNavigable(asset, origin) || !IsNavigable(asset, target))
             {
                 return false;
             }
@@ -497,7 +518,7 @@ namespace Arkeum.Editor
                 for (int i = 0; i < directions.Length; i++)
                 {
                     Vector2Int next = current + directions[i];
-                    if (!visited.Add(next) || !IsWalkable(asset, next))
+                    if (!visited.Add(next) || !IsNavigable(asset, next))
                     {
                         continue;
                     }
@@ -640,6 +661,8 @@ namespace Arkeum.Editor
         private enum MapTool
         {
             Walkable,
+            Wall,
+            WallErase,
             Erase,
             Door,
             DoorErase,

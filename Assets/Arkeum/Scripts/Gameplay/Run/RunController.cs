@@ -157,7 +157,9 @@ namespace Arkeum.Production.Gameplay.Run
             WeaponDefinition weapon = CurrentRun.EquippedWeapon;
             if (weapon == null || weapon.AttackOffsets == null || weapon.AttackOffsets.Count == 0)
             {
-                if (!actorRepository.TryGetEnemyAt(CurrentRun.Player.GridPosition + facing, out enemy))
+                Vector2Int targetCell = CurrentRun.Player.GridPosition + facing;
+                if (mapService.BlocksAttackBetween(CurrentRun.Player.GridPosition, targetCell) ||
+                    !actorRepository.TryGetEnemyAt(targetCell, out enemy))
                 {
                     return false;
                 }
@@ -180,7 +182,13 @@ namespace Arkeum.Production.Gameplay.Run
                     targetOffset = EnemyAttackPatternDefinition.RotateOffset(weaponOffset, facing);
                 }
 
-                if (actorRepository.TryGetEnemyAt(CurrentRun.Player.GridPosition + targetOffset, out enemy))
+                Vector2Int targetCell = CurrentRun.Player.GridPosition + targetOffset;
+                if (mapService.BlocksAttackBetween(CurrentRun.Player.GridPosition, targetCell))
+                {
+                    continue;
+                }
+
+                if (actorRepository.TryGetEnemyAt(targetCell, out enemy))
                 {
                     attackContext = BuildWeaponAttackContext(enemy, weapon, facing, weaponOffset);
                     return true;

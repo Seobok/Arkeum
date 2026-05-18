@@ -8,6 +8,8 @@ namespace Arkeum.Production.Presentation.World
         [Header("Tiles")]
         [SerializeField] private Sprite floorSprite;
         [SerializeField] private Color floorTint = new Color(0.16f, 0.13f, 0.14f);
+        [SerializeField] private Sprite wallSprite;
+        [SerializeField] private Color wallTint = new Color(0.08f, 0.08f, 0.09f);
 
         [Header("Actors")]
         [SerializeField] private Sprite playerSprite;
@@ -31,6 +33,8 @@ namespace Arkeum.Production.Presentation.World
 
         public Sprite FloorSprite => floorSprite;
         public Color FloorTint => floorTint;
+        public Sprite WallSprite => wallSprite;
+        public Color WallTint => wallTint;
         public Sprite PlayerSprite => playerSprite;
         public Color PlayerTint => playerTint;
         public Sprite DefaultEnemySprite => defaultEnemySprite;

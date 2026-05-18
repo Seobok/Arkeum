@@ -16,9 +16,16 @@ namespace Arkeum.Production.Gameplay.Run
         public int PlacementAttempts = 300;
     }
 
+    public enum RunSpecialRoomType
+    {
+        Generic,
+        FloorExit,
+    }
+
     [Serializable]
     public sealed class RunSpecialRoomDefinition
     {
+        public RunSpecialRoomType RoomType = RunSpecialRoomType.Generic;
         public MapAsset RoomAsset;
         public int Count = 1;
     }

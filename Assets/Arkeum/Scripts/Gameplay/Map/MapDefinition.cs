@@ -13,6 +13,7 @@ namespace Arkeum.Production.Gameplay.Map
         public Vector2Int FloorExitPosition;
         public Vector2Int DungeonEntrancePosition;
         public List<Vector2Int> WalkableCells = new List<Vector2Int>();
+        public List<Vector2Int> WallCells = new List<Vector2Int>();
         public List<WeaponSpawnDefinition> WeaponSpawns = new List<WeaponSpawnDefinition>();
         public List<EnemySpawnDefinition> EnemySpawns = new List<EnemySpawnDefinition>();
         public List<DungeonRoomDefinition> Rooms = new List<DungeonRoomDefinition>();
@@ -35,6 +36,7 @@ namespace Arkeum.Production.Gameplay.Map
         public Vector2Int Min;
         public Vector2Int Max;
         public bool IsSpecialRoom;
+        public RunSpecialRoomType SpecialRoomType;
         public List<Vector2Int> Cells = new List<Vector2Int>();
         public List<DungeonDoorDefinition> Doors = new List<DungeonDoorDefinition>();
     }

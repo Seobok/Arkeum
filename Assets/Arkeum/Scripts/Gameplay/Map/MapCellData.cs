@@ -8,5 +8,6 @@ namespace Arkeum.Production.Gameplay.Map
     {
         public Vector2Int Position;
         public bool Walkable = true;
+        public bool HasWall;
     }
 }

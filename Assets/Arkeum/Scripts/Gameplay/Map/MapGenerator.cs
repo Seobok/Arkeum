@@ -158,6 +158,7 @@ namespace Arkeum.Production.Gameplay.Map
                 return CreateFallbackDungeonMap(roomTemplates, settings);
             }
 
+            AttachExitRoom(map, rooms, roomTemplates.ExitRoom, settings);
             ApplyRunMarkers(map, rooms);
             Debug.Log($"[MapGenerator] Dungeon generated floor={settings.Floor}, rooms={map.Rooms.Count}, corridors={map.Corridors.Count}, cells={map.WalkableCells.Count}");
             return map;
@@ -204,6 +205,7 @@ namespace Arkeum.Production.Gameplay.Map
                 AddCorridor(map, previous.Id, room.Id, connection, corridorCells, settings.Floor);
             }
 
+            AttachExitRoom(map, rooms, roomTemplates.ExitRoom, settings);
             ApplyRunMarkers(map, rooms);
             Debug.LogWarning($"[MapGenerator] Fallback dungeon generated floor={settings.Floor}, rooms={map.Rooms.Count}, specialRooms={CountSpecialRooms(rooms)}/{roomTemplates.SpecialRoomSlots.Count}, corridors={map.Corridors.Count}, cells={map.WalkableCells.Count}");
             return map;
@@ -211,7 +213,9 @@ namespace Arkeum.Production.Gameplay.Map
 
         private static RoomTemplateSet CreateRoomTemplates(RunFloorDefinition floorDefinition, MapAsset startRoomAsset)
         {
-            RoomTemplate startRoom = CreateRoomTemplate(startRoomAsset, false);
+            RoomTemplate startRoom = CreateRoomTemplate(startRoomAsset, RunSpecialRoomType.Generic, false);
+            RoomTemplate exitRoom = null;
+            MapAsset exitRoomAsset = null;
             List<MapAsset> roomAssets = new List<MapAsset>();
             List<MapAsset> specialRoomAssets = new List<MapAsset>();
             List<RoomTemplate> specialRoomSlots = new List<RoomTemplate>();
@@ -226,10 +230,21 @@ namespace Arkeum.Production.Gameplay.Map
                         continue;
                     }
 
+                    if (specialRoom.RoomType == RunSpecialRoomType.FloorExit)
+                    {
+                        if (exitRoom == null)
+                        {
+                            exitRoomAsset = specialRoom.RoomAsset;
+                            exitRoom = CreateRoomTemplate(specialRoom.RoomAsset, RunSpecialRoomType.FloorExit, true);
+                        }
+
+                        continue;
+                    }
+
                     AddUniqueAsset(specialRoomAssets, specialRoom.RoomAsset);
                     for (int count = 0; count < specialRoom.Count; count++)
                     {
-                        specialRoomSlots.Add(CreateRoomTemplate(specialRoom.RoomAsset, true));
+                        specialRoomSlots.Add(CreateRoomTemplate(specialRoom.RoomAsset, specialRoom.RoomType, true));
                     }
                 }
             }
@@ -238,14 +253,14 @@ namespace Arkeum.Production.Gameplay.Map
             {
                 for (int i = 0; i < floorDefinition.RoomAssets.Count; i++)
                 {
-                    AddUniqueNonSpecialAsset(roomAssets, specialRoomAssets, floorDefinition.RoomAssets[i]);
+                    AddUniqueNonSpecialAsset(roomAssets, specialRoomAssets, exitRoomAsset, floorDefinition.RoomAssets[i]);
                 }
             }
 
             List<RoomTemplate> rooms = new List<RoomTemplate>();
             for (int i = 0; i < roomAssets.Count; i++)
             {
-                rooms.Add(CreateRoomTemplate(roomAssets[i], false));
+                rooms.Add(CreateRoomTemplate(roomAssets[i], RunSpecialRoomType.Generic, false));
             }
 
             if (rooms.Count == 0)
@@ -256,9 +271,10 @@ namespace Arkeum.Production.Gameplay.Map
             Debug.Log(
                 $"[MapGenerator] Room templates ready. startAsset={DescribeAsset(startRoomAsset)}, " +
                 $"startCells={startRoom.Cells.Count}, startDoors={startRoom.Doors.Count}, roomTemplates={rooms.Count}, " +
-                $"specialRoomTypes={specialRoomAssets.Count}, specialRoomSlots={specialRoomSlots.Count}");
+                $"specialRoomTypes={specialRoomAssets.Count}, specialRoomSlots={specialRoomSlots.Count}, " +
+                $"exitRoom={(exitRoom != null ? "set" : "null")}");
 
-            return new RoomTemplateSet(startRoom, rooms, specialRoomSlots);
+            return new RoomTemplateSet(startRoom, rooms, specialRoomSlots, exitRoom);
         }
 
         private static void AddUniqueAsset(List<MapAsset> assets, MapAsset asset)
@@ -271,9 +287,9 @@ namespace Arkeum.Production.Gameplay.Map
             assets.Add(asset);
         }
 
-        private static void AddUniqueNonSpecialAsset(List<MapAsset> assets, List<MapAsset> specialAssets, MapAsset asset)
+        private static void AddUniqueNonSpecialAsset(List<MapAsset> assets, List<MapAsset> specialAssets, MapAsset exitAsset, MapAsset asset)
         {
-            if (asset == null || specialAssets.Contains(asset) || assets.Contains(asset))
+            if (asset == null || asset == exitAsset || specialAssets.Contains(asset) || assets.Contains(asset))
             {
                 return;
             }
@@ -368,18 +384,22 @@ namespace Arkeum.Production.Gameplay.Map
             return count;
         }
 
-        private static RoomTemplate CreateRoomTemplate(MapAsset asset, bool specialRoom)
+        private static RoomTemplate CreateRoomTemplate(MapAsset asset, RunSpecialRoomType specialRoomType, bool specialRoom)
         {
             List<TemplateCell> cells = new List<TemplateCell>();
             List<TemplateDoor> doors = new List<TemplateDoor>();
+            List<Vector2Int> wallCells = new List<Vector2Int>();
             List<TemplateEnemySpawn> enemySpawns = new List<TemplateEnemySpawn>();
             List<TemplateWeaponSpawn> weaponSpawns = new List<TemplateWeaponSpawn>();
             Vector2Int origin = asset != null ? asset.PlayerSpawn : Vector2Int.zero;
+            bool hasFloorExit = asset != null && asset.FloorExitPosition != Vector2Int.zero;
+            Vector2Int floorExitPosition = hasFloorExit ? asset.FloorExitPosition - origin : Vector2Int.zero;
             int ignoredDoors = 0;
 
             if (asset != null)
             {
                 HashSet<Vector2Int> walkablePositions = new HashSet<Vector2Int>();
+                HashSet<Vector2Int> wallPositions = new HashSet<Vector2Int>();
                 for (int i = 0; i < asset.Cells.Count; i++)
                 {
                     MapCellData cell = asset.Cells[i];
@@ -391,6 +411,11 @@ namespace Arkeum.Production.Gameplay.Map
                     Vector2Int position = cell.Position - origin;
                     cells.Add(new TemplateCell(position));
                     walkablePositions.Add(position);
+                    if (cell.HasWall)
+                    {
+                        wallCells.Add(position);
+                        wallPositions.Add(position);
+                    }
                 }
 
                 for (int i = 0; i < asset.Doors.Count; i++)
@@ -402,7 +427,7 @@ namespace Arkeum.Production.Gameplay.Map
                     }
 
                     Vector2Int position = door.Position - origin;
-                    if (!walkablePositions.Contains(position))
+                    if (!walkablePositions.Contains(position) || wallPositions.Contains(position))
                     {
                         ignoredDoors++;
                         continue;
@@ -419,7 +444,13 @@ namespace Arkeum.Production.Gameplay.Map
                         continue;
                     }
 
-                    enemySpawns.Add(new TemplateEnemySpawn(enemySpawn.EnemyDefinition, enemySpawn.Position - origin));
+                    Vector2Int position = enemySpawn.Position - origin;
+                    if (wallPositions.Contains(position))
+                    {
+                        continue;
+                    }
+
+                    enemySpawns.Add(new TemplateEnemySpawn(enemySpawn.EnemyDefinition, position));
                 }
 
                 for (int i = 0; i < asset.WeaponSpawns.Count; i++)
@@ -430,7 +461,13 @@ namespace Arkeum.Production.Gameplay.Map
                         continue;
                     }
 
-                    weaponSpawns.Add(new TemplateWeaponSpawn(weaponSpawn.Weapon, weaponSpawn.Position - origin));
+                    Vector2Int position = weaponSpawn.Position - origin;
+                    if (wallPositions.Contains(position))
+                    {
+                        continue;
+                    }
+
+                    weaponSpawns.Add(new TemplateWeaponSpawn(weaponSpawn.Weapon, position));
                 }
 
             }
@@ -457,7 +494,7 @@ namespace Arkeum.Production.Gameplay.Map
                 Debug.LogWarning($"[MapGenerator] Ignored doors outside walkable cells. asset={DescribeAsset(asset)}, ignoredDoors={ignoredDoors}, validDoors={doors.Count}");
             }
 
-            return new RoomTemplate(cells, doors, enemySpawns, weaponSpawns, specialRoom);
+            return new RoomTemplate(cells, wallCells, doors, enemySpawns, weaponSpawns, specialRoom, specialRoomType, hasFloorExit, floorExitPosition);
         }
 
         private static PlacedRoom CreatePlacedRoom(int id, RoomTemplate template, Vector2Int origin, Vector2Int gridPosition)
@@ -469,9 +506,11 @@ namespace Arkeum.Production.Gameplay.Map
                 Min = template.Min + origin,
                 Max = template.Max + origin,
                 IsSpecialRoom = template.IsSpecialRoom,
+                SpecialRoomType = template.SpecialRoomType,
             };
 
             HashSet<Vector2Int> cellSet = new HashSet<Vector2Int>();
+            List<Vector2Int> wallCells = new List<Vector2Int>();
             List<DungeonDoorDefinition> doorCandidates = new List<DungeonDoorDefinition>();
             List<EnemySpawnDefinition> enemySpawns = new List<EnemySpawnDefinition>();
             List<WeaponSpawnDefinition> weaponSpawns = new List<WeaponSpawnDefinition>();
@@ -481,6 +520,11 @@ namespace Arkeum.Production.Gameplay.Map
                 Vector2Int cell = templateCell.Position + origin;
                 definition.Cells.Add(cell);
                 cellSet.Add(cell);
+            }
+
+            for (int i = 0; i < template.WallCells.Count; i++)
+            {
+                wallCells.Add(template.WallCells[i] + origin);
             }
 
             for (int i = 0; i < template.Doors.Count; i++)
@@ -513,7 +557,7 @@ namespace Arkeum.Production.Gameplay.Map
                 });
             }
 
-            return new PlacedRoom(id, gridPosition, definition, cellSet, doorCandidates, enemySpawns, weaponSpawns);
+            return new PlacedRoom(id, gridPosition, definition, cellSet, wallCells, doorCandidates, enemySpawns, weaponSpawns);
         }
 
         private static bool TryBuildDoorConnection(PlacedRoom from, PlacedRoom to, out DoorConnection connection)
@@ -682,6 +726,11 @@ namespace Arkeum.Production.Gameplay.Map
                 occupiedRoomCells.Add(cell);
             }
 
+            for (int i = 0; i < room.WallCells.Count; i++)
+            {
+                AddWallCell(map, room.WallCells[i]);
+            }
+
             for (int i = 0; i < room.EnemySpawns.Count; i++)
             {
                 map.EnemySpawns.Add(room.EnemySpawns[i]);
@@ -715,9 +764,237 @@ namespace Arkeum.Production.Gameplay.Map
             map.Corridors.Add(corridor);
         }
 
+        private static bool AttachExitRoom(MapDefinition map, List<PlacedRoom> rooms, RoomTemplate exitRoomTemplate, DungeonGenerationSettings settings)
+        {
+            if (map == null || rooms == null || exitRoomTemplate == null)
+            {
+                return false;
+            }
+
+            if (!TryFindFarthestRoomId(map, 0, out int parentRoomId) ||
+                !TryGetPlacedRoom(rooms, parentRoomId, out PlacedRoom parent))
+            {
+                return false;
+            }
+
+            HashSet<Vector2Int> occupiedRoomCells = CreateOccupiedRoomCellSet(rooms);
+            HashSet<Vector2Int> occupiedGridPositions = CreateOccupiedGridPositionSet(rooms);
+            DoorDirection[] directions =
+            {
+                DoorDirection.Up,
+                DoorDirection.Down,
+                DoorDirection.Left,
+                DoorDirection.Right,
+            };
+
+            for (int i = 0; i < directions.Length; i++)
+            {
+                DoorDirection direction = directions[i];
+                Vector2Int candidateGrid = parent.GridPosition + ToVector(direction);
+                if (occupiedGridPositions.Contains(candidateGrid))
+                {
+                    continue;
+                }
+
+                Vector2Int candidateOrigin = CalculateCandidateOrigin(parent, exitRoomTemplate, direction, settings.RoomGap);
+                PlacedRoom candidate = CreatePlacedRoom(rooms.Count, exitRoomTemplate, candidateOrigin, candidateGrid);
+                if (OverlapsAnyRoom(candidate, rooms))
+                {
+                    continue;
+                }
+
+                if (!TryBuildDoorConnection(parent, candidate, out DoorConnection connection))
+                {
+                    continue;
+                }
+
+                if (!TryBuildCorridorCells(connection.FromDoor.Position, connection.FromDoor.Direction, connection.ToDoor.Position, connection.ToDoor.Direction, out List<Vector2Int> corridorCells))
+                {
+                    continue;
+                }
+
+                if (!IsCorridorValid(corridorCells, connection.FromDoor.Position, connection.ToDoor.Position, occupiedRoomCells, candidate.CellSet))
+                {
+                    continue;
+                }
+
+                rooms.Add(candidate);
+                AddPlacedRoom(map, candidate, occupiedRoomCells);
+                AddDoor(parent.Definition, connection.FromDoor);
+                AddDoor(candidate.Definition, connection.ToDoor);
+                AddCorridor(map, parent.Id, candidate.Id, connection, corridorCells, settings.Floor);
+                map.FloorExitPosition = exitRoomTemplate.HasFloorExit
+                    ? exitRoomTemplate.FloorExitPosition + candidateOrigin
+                    : PickExitCell(candidate.Definition);
+                Debug.Log($"[MapGenerator] Exit room attached. parentRoom={parent.Id}, exitRoom={candidate.Id}, floorExit={map.FloorExitPosition}");
+                return true;
+            }
+
+            Debug.LogWarning($"[MapGenerator] Failed to attach exit room to farthest room {parent.Id}. Falling back to in-room floor exit.");
+            return false;
+        }
+
         private static void ApplyRunMarkers(MapDefinition map, IReadOnlyList<PlacedRoom> rooms)
         {
             map.PlayerSpawn = Vector2Int.zero;
+            if (map.FloorExitPosition != Vector2Int.zero)
+            {
+                return;
+            }
+
+            if (TryFindFarthestRoomId(map, 0, out int exitRoomId) &&
+                TryGetRoom(map.Rooms, exitRoomId, out DungeonRoomDefinition exitRoom))
+            {
+                map.FloorExitPosition = PickExitCell(exitRoom);
+            }
+        }
+
+        private static bool TryFindFarthestRoomId(MapDefinition map, int startRoomId, out int farthestRoomId)
+        {
+            farthestRoomId = startRoomId;
+            if (map == null || map.Rooms == null || map.Rooms.Count == 0)
+            {
+                return false;
+            }
+
+            Dictionary<int, List<int>> adjacency = new Dictionary<int, List<int>>();
+            for (int i = 0; i < map.Rooms.Count; i++)
+            {
+                adjacency[map.Rooms[i].Id] = new List<int>();
+            }
+
+            for (int i = 0; i < map.Corridors.Count; i++)
+            {
+                DungeonCorridorDefinition corridor = map.Corridors[i];
+                if (!adjacency.ContainsKey(corridor.FromRoomId) || !adjacency.ContainsKey(corridor.ToRoomId))
+                {
+                    continue;
+                }
+
+                adjacency[corridor.FromRoomId].Add(corridor.ToRoomId);
+                adjacency[corridor.ToRoomId].Add(corridor.FromRoomId);
+            }
+
+            if (!adjacency.ContainsKey(startRoomId))
+            {
+                return false;
+            }
+
+            Queue<int> queue = new Queue<int>();
+            Dictionary<int, int> distances = new Dictionary<int, int>();
+            queue.Enqueue(startRoomId);
+            distances[startRoomId] = 0;
+
+            int farthestDistance = 0;
+            while (queue.Count > 0)
+            {
+                int roomId = queue.Dequeue();
+                int distance = distances[roomId];
+                if (distance > farthestDistance)
+                {
+                    farthestDistance = distance;
+                    farthestRoomId = roomId;
+                }
+
+                List<int> connectedRooms = adjacency[roomId];
+                for (int i = 0; i < connectedRooms.Count; i++)
+                {
+                    int connectedRoomId = connectedRooms[i];
+                    if (distances.ContainsKey(connectedRoomId))
+                    {
+                        continue;
+                    }
+
+                    distances[connectedRoomId] = distance + 1;
+                    queue.Enqueue(connectedRoomId);
+                }
+            }
+
+            return true;
+        }
+
+        private static bool TryGetPlacedRoom(IReadOnlyList<PlacedRoom> rooms, int roomId, out PlacedRoom room)
+        {
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                if (rooms[i].Id == roomId)
+                {
+                    room = rooms[i];
+                    return true;
+                }
+            }
+
+            room = null;
+            return false;
+        }
+
+        private static bool TryGetRoom(IReadOnlyList<DungeonRoomDefinition> rooms, int roomId, out DungeonRoomDefinition room)
+        {
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                if (rooms[i].Id == roomId)
+                {
+                    room = rooms[i];
+                    return true;
+                }
+            }
+
+            room = null;
+            return false;
+        }
+
+        private static Vector2Int PickExitCell(DungeonRoomDefinition room)
+        {
+            if (room == null || room.Cells.Count == 0)
+            {
+                return Vector2Int.zero;
+            }
+
+            Vector2Int center = new Vector2Int(
+                (room.Min.x + room.Max.x) / 2,
+                (room.Min.y + room.Max.y) / 2);
+            Vector2Int bestCell = room.Cells[0];
+            int bestDistance = int.MaxValue;
+
+            for (int i = 0; i < room.Cells.Count; i++)
+            {
+                Vector2Int cell = room.Cells[i];
+                int distance = Mathf.Abs(cell.x - center.x) + Mathf.Abs(cell.y - center.y);
+                if (distance >= bestDistance)
+                {
+                    continue;
+                }
+
+                bestCell = cell;
+                bestDistance = distance;
+            }
+
+            return bestCell;
+        }
+
+        private static HashSet<Vector2Int> CreateOccupiedRoomCellSet(IReadOnlyList<PlacedRoom> rooms)
+        {
+            HashSet<Vector2Int> cells = new HashSet<Vector2Int>();
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                foreach (Vector2Int cell in rooms[i].CellSet)
+                {
+                    cells.Add(cell);
+                }
+            }
+
+            return cells;
+        }
+
+        private static HashSet<Vector2Int> CreateOccupiedGridPositionSet(IReadOnlyList<PlacedRoom> rooms)
+        {
+            HashSet<Vector2Int> positions = new HashSet<Vector2Int>();
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                positions.Add(rooms[i].GridPosition);
+            }
+
+            return positions;
         }
 
         private static bool OverlapsAnyRoom(PlacedRoom candidate, IReadOnlyList<PlacedRoom> rooms)
@@ -789,6 +1066,14 @@ namespace Arkeum.Production.Gameplay.Map
             }
         }
 
+        private static void AddWallCell(MapDefinition map, Vector2Int cell)
+        {
+            if (!map.WallCells.Contains(cell))
+            {
+                map.WallCells.Add(cell);
+            }
+        }
+
         private static void AddDoor(DungeonRoomDefinition room, DungeonDoorDefinition door)
         {
             for (int i = 0; i < room.Doors.Count; i++)
@@ -857,6 +1142,10 @@ namespace Arkeum.Production.Gameplay.Map
                 }
 
                 AddWalkableCell(map, cell.Position);
+                if (cell.HasWall)
+                {
+                    AddWallCell(map, cell.Position);
+                }
             }
 
             return map.WalkableCells.Count > 0;
@@ -952,6 +1241,7 @@ namespace Arkeum.Production.Gameplay.Map
         private sealed class RoomTemplate
         {
             public readonly List<TemplateCell> Cells;
+            public readonly List<Vector2Int> WallCells;
             public readonly List<TemplateDoor> Doors;
             public readonly List<TemplateEnemySpawn> EnemySpawns;
             public readonly List<TemplateWeaponSpawn> WeaponSpawns;
@@ -960,19 +1250,30 @@ namespace Arkeum.Production.Gameplay.Map
             public readonly int Width;
             public readonly int Height;
             public readonly bool IsSpecialRoom;
+            public readonly RunSpecialRoomType SpecialRoomType;
+            public readonly bool HasFloorExit;
+            public readonly Vector2Int FloorExitPosition;
 
             public RoomTemplate(
                 List<TemplateCell> cells,
+                List<Vector2Int> wallCells,
                 List<TemplateDoor> doors,
                 List<TemplateEnemySpawn> enemySpawns,
                 List<TemplateWeaponSpawn> weaponSpawns,
-                bool isSpecialRoom)
+                bool isSpecialRoom,
+                RunSpecialRoomType specialRoomType,
+                bool hasFloorExit,
+                Vector2Int floorExitPosition)
             {
                 Cells = cells;
+                WallCells = wallCells;
                 Doors = doors;
                 EnemySpawns = enemySpawns;
                 WeaponSpawns = weaponSpawns;
                 IsSpecialRoom = isSpecialRoom;
+                SpecialRoomType = specialRoomType;
+                HasFloorExit = hasFloorExit;
+                FloorExitPosition = floorExitPosition;
                 Min = cells[0].Position;
                 Max = cells[0].Position;
 
@@ -993,12 +1294,14 @@ namespace Arkeum.Production.Gameplay.Map
             public readonly RoomTemplate StartRoom;
             public readonly List<RoomTemplate> Rooms;
             public readonly List<RoomTemplate> SpecialRoomSlots;
+            public readonly RoomTemplate ExitRoom;
 
-            public RoomTemplateSet(RoomTemplate startRoom, List<RoomTemplate> rooms, List<RoomTemplate> specialRoomSlots)
+            public RoomTemplateSet(RoomTemplate startRoom, List<RoomTemplate> rooms, List<RoomTemplate> specialRoomSlots, RoomTemplate exitRoom)
             {
                 StartRoom = startRoom;
                 Rooms = rooms;
                 SpecialRoomSlots = specialRoomSlots;
+                ExitRoom = exitRoom;
             }
         }
 
@@ -1054,6 +1357,7 @@ namespace Arkeum.Production.Gameplay.Map
             public readonly Vector2Int GridPosition;
             public readonly DungeonRoomDefinition Definition;
             public readonly HashSet<Vector2Int> CellSet;
+            public readonly List<Vector2Int> WallCells;
             public readonly List<DungeonDoorDefinition> DoorCandidates;
             public readonly List<EnemySpawnDefinition> EnemySpawns;
             public readonly List<WeaponSpawnDefinition> WeaponSpawns;
@@ -1063,6 +1367,7 @@ namespace Arkeum.Production.Gameplay.Map
                 Vector2Int gridPosition,
                 DungeonRoomDefinition definition,
                 HashSet<Vector2Int> cellSet,
+                List<Vector2Int> wallCells,
                 List<DungeonDoorDefinition> doorCandidates,
                 List<EnemySpawnDefinition> enemySpawns,
                 List<WeaponSpawnDefinition> weaponSpawns)
@@ -1071,6 +1376,7 @@ namespace Arkeum.Production.Gameplay.Map
                 GridPosition = gridPosition;
                 Definition = definition;
                 CellSet = cellSet;
+                WallCells = wallCells;
                 DoorCandidates = doorCandidates;
                 EnemySpawns = enemySpawns;
                 WeaponSpawns = weaponSpawns;
@@ -1087,7 +1393,7 @@ namespace Arkeum.Production.Gameplay.Map
             private DungeonGenerationSettings(int floor, int minimumRoomCount, int specialRoomSlotCount, int roomGap, int placementAttempts)
             {
                 Floor = floor;
-                MinimumRoomCount = Mathf.Max(6, Mathf.Max(minimumRoomCount, Mathf.Max(0, specialRoomSlotCount) + 1));
+                MinimumRoomCount = Mathf.Max(minimumRoomCount, Mathf.Max(0, specialRoomSlotCount) + 1);
                 RoomGap = Mathf.Max(1, roomGap);
                 PlacementAttempts = Mathf.Max(MinimumRoomCount, placementAttempts);
             }

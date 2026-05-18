@@ -100,6 +100,18 @@ namespace Arkeum.Production.Presentation.World
                     0));
             }
 
+            for (int i = 0; i < map.WallCells.Count; i++)
+            {
+                Vector2Int wallCell = map.WallCells[i];
+                spawnedViews.Add(viewFactory.CreateCell(
+                    markerRoot,
+                    wallCell,
+                    GetWallSprite(),
+                    GetWallTint(),
+                    $"Wall_{wallCell.x}_{wallCell.y}",
+                    1));
+            }
+
             for (int i = 0; i < map.WeaponSpawns.Count; i++)
             {
                 WeaponSpawnDefinition weaponSpawn = map.WeaponSpawns[i];
@@ -336,6 +348,16 @@ namespace Arkeum.Production.Presentation.World
         private Color GetFloorTint()
         {
             return visualSet != null ? visualSet.FloorTint : new Color(0.16f, 0.13f, 0.14f);
+        }
+
+        private Sprite GetWallSprite()
+        {
+            return visualSet != null ? visualSet.WallSprite : null;
+        }
+
+        private Color GetWallTint()
+        {
+            return visualSet != null ? visualSet.WallTint : new Color(0.08f, 0.08f, 0.09f);
         }
 
         private Sprite GetPlayerSprite()
