@@ -25,5 +25,11 @@ namespace Arkeum.Production.Gameplay.Actors
                                 new BehaviorTreeActionNode(context => context.Actions.AttackTarget(context))),
                             new BehaviorTreeActionNode(context => context.Actions.ChaseMove(context))))));
         }
+
+        public IBehaviorTreeNode CreateBossTree()
+        {
+            return new BehaviorTreeSequenceNode(
+                );
+        }
     }
 }

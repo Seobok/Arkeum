@@ -30,3 +30,16 @@ MonoBehaviour:
     MinimumRoomCount: 6
     RoomGap: 5
     PlacementAttempts: 300
+  - FloorIndex: 2
+    MapAsset: {fileID: 11400000, guid: 836ccaf5697137347af45c686329152f, type: 2}
+    RoomAssets: []
+    SpecialRooms:
+    - RoomType: 1
+      RoomAsset: {fileID: 11400000, guid: 684b0eb1ed1f4a749bfc649b04ad46ad, type: 2}
+      Count: 1
+    - RoomType: 2
+      RoomAsset: {fileID: 11400000, guid: 785636b9b2c5c834aaecef3daa491a12, type: 2}
+      Count: 1
+    MinimumRoomCount: 6
+    RoomGap: 5
+    PlacementAttempts: 300

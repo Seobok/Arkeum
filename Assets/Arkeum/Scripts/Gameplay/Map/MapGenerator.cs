@@ -42,7 +42,9 @@ namespace Arkeum.Production.Gameplay.Map
 
             RoomTemplateSet roomTemplates = CreateRoomTemplates(floorDefinition, floorMapAsset);
             DungeonGenerationSettings settings = DungeonGenerationSettings.From(floorDefinition, floor, roomTemplates.SpecialRoomSlots.Count);
-            MapDefinition map = CreateDungeonMap(roomTemplates, settings);
+            MapDefinition map = roomTemplates.BossRoom != null
+                ? CreateBossDungeonMap(roomTemplates, settings)
+                : CreateDungeonMap(roomTemplates, settings);
             map.RunFloor = floor;
             return map;
         }
@@ -164,6 +166,57 @@ namespace Arkeum.Production.Gameplay.Map
             return map;
         }
 
+        private static MapDefinition CreateBossDungeonMap(RoomTemplateSet roomTemplates, DungeonGenerationSettings settings)
+        {
+            if (roomTemplates.BossRoom == null || roomTemplates.ExitRoom == null)
+            {
+                Debug.LogWarning("[MapGenerator] Boss floor requires both Boss and FloorExit special rooms. Falling back to regular dungeon generation.");
+                return CreateDungeonMap(roomTemplates, settings);
+            }
+
+            MapDefinition map = new MapDefinition
+            {
+                RunFloor = settings.Floor,
+                PlayerSpawn = Vector2Int.zero,
+            };
+
+            List<PlacedRoom> rooms = new List<PlacedRoom>();
+            HashSet<Vector2Int> occupiedRoomCells = new HashSet<Vector2Int>();
+
+            PlacedRoom startRoom = CreatePlacedRoom(0, roomTemplates.StartRoom, Vector2Int.zero, Vector2Int.zero);
+            rooms.Add(startRoom);
+            AddPlacedRoom(map, startRoom, occupiedRoomCells);
+
+            Vector2Int bossOrigin = CalculateCandidateOrigin(startRoom, roomTemplates.BossRoom, DoorDirection.Up, settings.RoomGap);
+            PlacedRoom bossRoom = CreatePlacedRoom(1, roomTemplates.BossRoom, bossOrigin, Vector2Int.up);
+            if (!TryConnectBossFloorRooms(map, rooms, occupiedRoomCells, startRoom, bossRoom, out DoorConnection bossEntranceConnection))
+            {
+                Debug.LogWarning("[MapGenerator] Boss floor failed to connect start room to boss room. Falling back to regular dungeon generation.");
+                return CreateDungeonMap(roomTemplates, settings);
+            }
+
+            Vector2Int exitOrigin = CalculateCandidateOrigin(bossRoom, roomTemplates.ExitRoom, DoorDirection.Up, settings.RoomGap);
+            PlacedRoom exitRoom = CreatePlacedRoom(2, roomTemplates.ExitRoom, exitOrigin, Vector2Int.up * 2);
+            if (!TryConnectBossFloorRooms(map, rooms, occupiedRoomCells, bossRoom, exitRoom, out _))
+            {
+                Debug.LogWarning("[MapGenerator] Boss floor failed to connect boss room to exit room. Falling back to regular dungeon generation.");
+                return CreateDungeonMap(roomTemplates, settings);
+            }
+
+            map.BossRoomId = bossRoom.Id;
+            AddBossEntranceBlockCell(map, bossEntranceConnection);
+            map.FloorExitPosition = roomTemplates.ExitRoom.HasFloorExit
+                ? roomTemplates.ExitRoom.FloorExitPosition + exitOrigin
+                : PickExitCell(exitRoom.Definition);
+            ApplyRunMarkers(map, rooms);
+
+            Debug.Log(
+                $"[MapGenerator] Boss dungeon generated floor={settings.Floor}, rooms={map.Rooms.Count}, " +
+                $"corridors={map.Corridors.Count}, bossRoom={map.BossRoomId}, floorExit={map.FloorExitPosition}, " +
+                $"bossEntranceBlockCells={map.BossEntranceBlockCells.Count}");
+            return map;
+        }
+
         private static MapDefinition CreateFallbackDungeonMap(RoomTemplateSet roomTemplates, DungeonGenerationSettings settings)
         {
             MapDefinition map = new MapDefinition
@@ -215,6 +268,7 @@ namespace Arkeum.Production.Gameplay.Map
         {
             RoomTemplate startRoom = CreateRoomTemplate(startRoomAsset, RunSpecialRoomType.Generic, false);
             RoomTemplate exitRoom = null;
+            RoomTemplate bossRoom = null;
             MapAsset exitRoomAsset = null;
             List<MapAsset> roomAssets = new List<MapAsset>();
             List<MapAsset> specialRoomAssets = new List<MapAsset>();
@@ -238,6 +292,17 @@ namespace Arkeum.Production.Gameplay.Map
                             exitRoom = CreateRoomTemplate(specialRoom.RoomAsset, RunSpecialRoomType.FloorExit, true);
                         }
 
+                        continue;
+                    }
+
+                    if (specialRoom.RoomType == RunSpecialRoomType.Boss)
+                    {
+                        if (bossRoom == null)
+                        {
+                            bossRoom = CreateRoomTemplate(specialRoom.RoomAsset, RunSpecialRoomType.Boss, true);
+                        }
+
+                        AddUniqueAsset(specialRoomAssets, specialRoom.RoomAsset);
                         continue;
                     }
 
@@ -272,9 +337,10 @@ namespace Arkeum.Production.Gameplay.Map
                 $"[MapGenerator] Room templates ready. startAsset={DescribeAsset(startRoomAsset)}, " +
                 $"startCells={startRoom.Cells.Count}, startDoors={startRoom.Doors.Count}, roomTemplates={rooms.Count}, " +
                 $"specialRoomTypes={specialRoomAssets.Count}, specialRoomSlots={specialRoomSlots.Count}, " +
-                $"exitRoom={(exitRoom != null ? "set" : "null")}");
+                $"exitRoom={(exitRoom != null ? "set" : "null")}, " +
+                $"bossRoom={(bossRoom != null ? "set" : "null")}");
 
-            return new RoomTemplateSet(startRoom, rooms, specialRoomSlots, exitRoom);
+            return new RoomTemplateSet(startRoom, rooms, specialRoomSlots, exitRoom, bossRoom);
         }
 
         private static void AddUniqueAsset(List<MapAsset> assets, MapAsset asset)
@@ -762,6 +828,52 @@ namespace Arkeum.Production.Gameplay.Map
             }
 
             map.Corridors.Add(corridor);
+        }
+
+        private static bool TryConnectBossFloorRooms(
+            MapDefinition map,
+            List<PlacedRoom> rooms,
+            HashSet<Vector2Int> occupiedRoomCells,
+            PlacedRoom from,
+            PlacedRoom to,
+            out DoorConnection connection)
+        {
+            connection = default;
+            if (OverlapsAnyRoom(to, rooms))
+            {
+                return false;
+            }
+
+            if (!TryBuildDoorConnection(from, to, out connection))
+            {
+                return false;
+            }
+
+            if (!TryBuildCorridorCells(connection.FromDoor.Position, connection.FromDoor.Direction, connection.ToDoor.Position, connection.ToDoor.Direction, out List<Vector2Int> corridorCells))
+            {
+                return false;
+            }
+
+            if (!IsCorridorValid(corridorCells, connection.FromDoor.Position, connection.ToDoor.Position, occupiedRoomCells, to.CellSet))
+            {
+                return false;
+            }
+
+            rooms.Add(to);
+            AddPlacedRoom(map, to, occupiedRoomCells);
+            AddDoor(from.Definition, connection.FromDoor);
+            AddDoor(to.Definition, connection.ToDoor);
+            AddCorridor(map, from.Id, to.Id, connection, corridorCells, map.RunFloor);
+            return true;
+        }
+
+        private static void AddBossEntranceBlockCell(MapDefinition map, DoorConnection entranceConnection)
+        {
+            Vector2Int blockCell = entranceConnection.ToDoor.Position + ToVector(entranceConnection.ToDoor.Direction);
+            if (map.WalkableCells.Contains(blockCell) && !map.BossEntranceBlockCells.Contains(blockCell))
+            {
+                map.BossEntranceBlockCells.Add(blockCell);
+            }
         }
 
         private static bool AttachExitRoom(MapDefinition map, List<PlacedRoom> rooms, RoomTemplate exitRoomTemplate, DungeonGenerationSettings settings)
@@ -1295,13 +1407,15 @@ namespace Arkeum.Production.Gameplay.Map
             public readonly List<RoomTemplate> Rooms;
             public readonly List<RoomTemplate> SpecialRoomSlots;
             public readonly RoomTemplate ExitRoom;
+            public readonly RoomTemplate BossRoom;
 
-            public RoomTemplateSet(RoomTemplate startRoom, List<RoomTemplate> rooms, List<RoomTemplate> specialRoomSlots, RoomTemplate exitRoom)
+            public RoomTemplateSet(RoomTemplate startRoom, List<RoomTemplate> rooms, List<RoomTemplate> specialRoomSlots, RoomTemplate exitRoom, RoomTemplate bossRoom)
             {
                 StartRoom = startRoom;
                 Rooms = rooms;
                 SpecialRoomSlots = specialRoomSlots;
                 ExitRoom = exitRoom;
+                BossRoom = bossRoom;
             }
         }
 

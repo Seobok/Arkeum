@@ -249,3 +249,57 @@
 
 ### 확인하지 못한 사항 또는 후속 점검 사항
 - Unity Play Mode에서 실제 무기 교체 시 바닥 무기 표시가 즉시 바뀌는지, 같은 위치에 기존 무기가 정상 표시되는지는 아직 직접 확인하지 못했다.
+
+## 2026-05-19 보스층 고정 구조 및 보스방 입구 봉쇄 구현
+
+### 사용자의 요청 개요
+- 특수한 층에서 시작방/보스방/출구방만 생성되는 보스방 구조를 만들고, 보스방 진입 시 입구를 벽으로 막은 뒤 모든 몬스터가 죽으면 벽이 사라지도록 구현 요청.
+
+### 핵심 요구사항
+- 보스층에는 시작방, 보스방, 출구방만 존재한다.
+- 방 배치는 위에서부터 출구방, 보스방, 시작방 순서로 고정한다.
+- 문 구조는 시작방 위쪽 문, 보스방 아래/위 문, 출구방 아래 문을 사용한다.
+- 보스방에 들어가면 입구가 벽으로 막힌다.
+- 해당 층에는 보스방 외 몬스터가 없다는 전제이므로, 모든 몬스터가 죽으면 벽이 사라지는 방식으로 처리한다.
+
+### 이번 작업 범위
+- `Boss` 특수방 타입을 추가했다.
+- `Boss` 특수방이 지정된 층은 일반 랜덤 던전 생성 대신 시작방-보스방-출구방 고정 배치 생성 경로를 사용하도록 변경했다.
+- 보스방 진입/클리어 상태와 보스방 입구 봉쇄 셀 정보를 런타임 데이터에 추가했다.
+- 기존 벽 시스템을 재사용해 보스방 입구 벽을 런타임에 추가/제거하도록 구현했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunFloorDefinition.cs`
+  - `RunSpecialRoomType.Boss` 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunState.cs`
+  - 보스방 진입 여부와 클리어 여부를 저장하는 `BossRoomEntered`, `BossRoomCleared` 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Map/MapDefinition.cs`
+  - 생성된 보스방 ID와 보스방 입구 봉쇄용 셀 목록을 저장하는 `BossRoomId`, `BossEntranceBlockCells` 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Map/MapGenerator.cs`
+  - 보스방 특수방 템플릿 감지.
+  - 보스층 고정 3방 생성 로직 추가.
+  - 시작방-보스방 연결 통로의 보스방 입구 쪽 셀을 봉쇄 대상 셀로 기록.
+- `Assets/Arkeum/Scripts/Gameplay/Map/MapService.cs`
+  - 런타임 중 벽 셀을 추가/제거하는 `SetRuntimeWall()` 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs`
+  - 플레이어가 보스방에 처음 진입하면 보스방 입구 봉쇄 벽을 추가.
+  - 보스방 진입 후 살아있는 적이 0명이 되면 봉쇄 벽을 제거.
+
+### 실제 수행한 작업 요약
+- `SpecialRooms`에 `RoomType == Boss`인 방이 있으면 해당 층은 보스층으로 간주한다.
+- 보스층 생성 시 시작방은 원점, 보스방은 시작방 위, 출구방은 보스방 위에 배치한다.
+- 세 방은 기존 문/통로 연결 검증을 그대로 사용하므로 각 `MapAsset`에 필요한 방향의 문이 있어야 한다.
+- 보스방 아래 문 바로 바깥쪽 통로 셀을 입구 봉쇄 셀로 기록한다.
+- 플레이어가 보스방 셀에 처음 들어가면 해당 봉쇄 셀에 런타임 벽을 추가한다.
+- 보스방 진입 후 `ActorRepository.GetAliveEnemies()` 결과가 0명이 되면 런타임 벽을 제거한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 보스층 생성 결과, 입구 봉쇄 표시, 몬스터 전멸 후 벽 제거 동작은 아직 직접 확인하지 못했다.
+- Unity Inspector에서 보스층으로 사용할 `RunFloorDefinition.SpecialRooms`에 `Boss` 타입 보스방과 `FloorExit` 타입 출구방을 지정해야 한다.
+- 시작방/보스방/출구방 `MapAsset`에는 요구된 방향의 문이 있어야 한다. 문이 맞지 않으면 보스층 생성은 일반 던전 생성 fallback으로 돌아간다.
+- PowerShell 환경에서 `git` 명령을 찾지 못해 git diff는 확인하지 못했다.

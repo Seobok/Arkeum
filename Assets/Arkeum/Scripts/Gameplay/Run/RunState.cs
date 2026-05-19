@@ -13,6 +13,8 @@ namespace Arkeum.Production.Gameplay.Run
         public int BandageCount;
         public int AttackBonus;
         public bool FloorExitUsed;
+        public bool BossRoomEntered;
+        public bool BossRoomCleared;
         public bool HasEquippedWeapon;
         public WeaponDefinition EquippedWeapon;
         public bool IsTimingModeEnabled;

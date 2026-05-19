@@ -61,6 +61,29 @@ namespace Arkeum.Production.Gameplay.Map
             return wallCells.Contains(cell);
         }
 
+        public bool SetRuntimeWall(Vector2Int cell, bool hasWall)
+        {
+            if (CurrentMap == null || !walkableCells.Contains(cell))
+            {
+                return false;
+            }
+
+            if (hasWall)
+            {
+                bool added = wallCells.Add(cell);
+                if (!CurrentMap.WallCells.Contains(cell))
+                {
+                    CurrentMap.WallCells.Add(cell);
+                }
+
+                return added;
+            }
+
+            bool removed = wallCells.Remove(cell);
+            CurrentMap.WallCells.RemoveAll(wallCell => wallCell == cell);
+            return removed;
+        }
+
         public bool BlocksLineOfSightBetween(Vector2Int from, Vector2Int to)
         {
             return HasBlockingCellBetween(from, to, BlocksLineOfSight);

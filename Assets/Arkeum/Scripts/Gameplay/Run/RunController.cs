@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Arkeum.Production.Gameplay.Actors;
 using Arkeum.Production.Gameplay.Combat;
 using Arkeum.Production.Gameplay.Interaction;
@@ -59,6 +60,8 @@ namespace Arkeum.Production.Gameplay.Run
                 BandageCount = startingLoadout != null ? startingLoadout.BandageCount : 0,
                 AttackBonus = 0,
                 FloorExitUsed = false,
+                BossRoomEntered = false,
+                BossRoomCleared = false,
                 HasEquippedWeapon = startingLoadout?.Weapon != null,
                 EquippedWeapon = startingLoadout != null ? startingLoadout.Weapon : null,
                 IsTimingModeEnabled = false,
@@ -98,7 +101,8 @@ namespace Arkeum.Production.Gameplay.Run
             }
 
             CurrentRun.Player.GridPosition = targetCell;
-            if (!TryAutoPickupAtPlayerPosition())
+            bool sealedBossRoom = TrySealBossRoomIfNeeded();
+            if (!sealedBossRoom && !TryAutoPickupAtPlayerPosition())
             {
                 SetMessage(string.Empty);
             }
@@ -146,6 +150,7 @@ namespace Arkeum.Production.Gameplay.Run
                 SetMessage($"{enemy.DisplayName} falls. You gain {enemy.Gold} gold.");
             }
 
+            TryClearBossRoomIfNeeded();
             ConsumeTurn();
         }
 
@@ -307,7 +312,92 @@ namespace Arkeum.Production.Gameplay.Run
             {
                 EndRun(RunEndReason.Death);
                 SetMessage("Death is not the end, only the start of reckoning.");
+                return;
             }
+
+            TryClearBossRoomIfNeeded();
+        }
+
+        private bool TrySealBossRoomIfNeeded()
+        {
+            if (CurrentRun == null ||
+                CurrentRun.BossRoomEntered ||
+                CurrentRun.BossRoomCleared ||
+                CurrentRun.Player == null ||
+                mapService.CurrentMap == null ||
+                !IsBossRoomCell(CurrentRun.Player.GridPosition))
+            {
+                return false;
+            }
+
+            bool sealedAny = SetBossEntranceWalls(true);
+            CurrentRun.BossRoomEntered = true;
+            if (sealedAny)
+            {
+                SetMessage("The entrance seals behind you.");
+            }
+
+            return sealedAny;
+        }
+
+        private bool TryClearBossRoomIfNeeded()
+        {
+            if (CurrentRun == null ||
+                !CurrentRun.BossRoomEntered ||
+                CurrentRun.BossRoomCleared ||
+                mapService.CurrentMap == null)
+            {
+                return false;
+            }
+
+            IReadOnlyList<ActorEntity> aliveEnemies = actorRepository.GetAliveEnemies();
+            if (aliveEnemies.Count > 0)
+            {
+                return false;
+            }
+
+            CurrentRun.BossRoomCleared = true;
+            bool openedAny = SetBossEntranceWalls(false);
+            if (openedAny)
+            {
+                SetMessage("All monsters fall. The sealed entrance opens.");
+            }
+
+            return openedAny;
+        }
+
+        private bool SetBossEntranceWalls(bool hasWall)
+        {
+            List<Vector2Int> blockCells = mapService.CurrentMap.BossEntranceBlockCells;
+            bool changedAny = false;
+            for (int i = 0; i < blockCells.Count; i++)
+            {
+                changedAny |= mapService.SetRuntimeWall(blockCells[i], hasWall);
+            }
+
+            return changedAny;
+        }
+
+        private bool IsBossRoomCell(Vector2Int cell)
+        {
+            MapDefinition map = mapService.CurrentMap;
+            if (map == null || map.BossRoomId < 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < map.Rooms.Count; i++)
+            {
+                DungeonRoomDefinition room = map.Rooms[i];
+                if (room == null || room.Id != map.BossRoomId)
+                {
+                    continue;
+                }
+
+                return room.Cells.Contains(cell);
+            }
+
+            return false;
         }
 
         private bool TryAutoPickupAtPlayerPosition()

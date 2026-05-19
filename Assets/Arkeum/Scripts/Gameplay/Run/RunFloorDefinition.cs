@@ -20,6 +20,7 @@ namespace Arkeum.Production.Gameplay.Run
     {
         Generic,
         FloorExit,
+        Boss,
     }
 
     [Serializable]
