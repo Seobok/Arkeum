@@ -10,6 +10,7 @@ namespace Arkeum.Production.Gameplay.Map
         private readonly TileOccupancyService tileOccupancyService;
         private readonly HashSet<Vector2Int> walkableCells = new HashSet<Vector2Int>();
         private readonly HashSet<Vector2Int> wallCells = new HashSet<Vector2Int>();
+        private readonly HashSet<Vector2Int> shopCells = new HashSet<Vector2Int>();
 
         public MapDefinition CurrentMap { get; private set; }
         public RunFloorDefinition CurrentRunFloor { get; private set; }
@@ -46,6 +47,11 @@ namespace Arkeum.Production.Gameplay.Map
             return walkableCells.Contains(cell) && !wallCells.Contains(cell) && !tileOccupancyService.IsOccupied(cell);
         }
 
+        public bool IsEnemyWalkable(Vector2Int cell)
+        {
+            return IsWalkable(cell) && !shopCells.Contains(cell);
+        }
+
         public bool IsWalkableCell(Vector2Int cell)
         {
             return walkableCells.Contains(cell);
@@ -54,6 +60,11 @@ namespace Arkeum.Production.Gameplay.Map
         public bool BlocksLineOfSight(Vector2Int cell)
         {
             return wallCells.Contains(cell);
+        }
+
+        public bool IsPlayerHiddenFromEnemies(Vector2Int playerCell)
+        {
+            return shopCells.Contains(playerCell);
         }
 
         public bool BlocksAttack(Vector2Int cell)
@@ -112,6 +123,62 @@ namespace Arkeum.Production.Gameplay.Map
             return false;
         }
 
+        public bool TryGetShopOffer(Vector2Int cell, out ShopOfferDefinition shopOffer)
+        {
+            if (CurrentMap?.ShopOffers != null)
+            {
+                for (int i = 0; i < CurrentMap.ShopOffers.Count; i++)
+                {
+                    shopOffer = CurrentMap.ShopOffers[i];
+                    if (shopOffer != null && shopOffer.Position == cell)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            shopOffer = null;
+            return false;
+        }
+
+        public bool TryBuyShopOffer(Vector2Int cell, out ShopOfferDefinition shopOffer)
+        {
+            if (CurrentMap?.ShopOffers == null)
+            {
+                shopOffer = null;
+                return false;
+            }
+
+            for (int i = 0; i < CurrentMap.ShopOffers.Count; i++)
+            {
+                shopOffer = CurrentMap.ShopOffers[i];
+                if (shopOffer == null || shopOffer.Position != cell)
+                {
+                    continue;
+                }
+
+                CurrentMap.ShopOffers.RemoveAt(i);
+                return true;
+            }
+
+            shopOffer = null;
+            return false;
+        }
+
+        public void DropWeapon(Vector2Int cell, WeaponDefinition weapon)
+        {
+            if (weapon == null || CurrentMap?.WeaponSpawns == null)
+            {
+                return;
+            }
+
+            CurrentMap.WeaponSpawns.Add(new WeaponSpawnDefinition
+            {
+                Weapon = weapon,
+                Position = cell,
+            });
+        }
+
         public bool TryPickupWeaponAt(
             Vector2Int cell,
             bool hasDroppedWeapon,
@@ -155,6 +222,7 @@ namespace Arkeum.Production.Gameplay.Map
             CurrentMap = mapDefinition;
             walkableCells.Clear();
             wallCells.Clear();
+            shopCells.Clear();
             tileOccupancyService.Clear();
 
             if (mapDefinition == null)
@@ -173,10 +241,16 @@ namespace Arkeum.Production.Gameplay.Map
                 wallCells.Add(mapDefinition.WallCells[i]);
             }
 
+            for (int i = 0; i < mapDefinition.ShopCells.Count; i++)
+            {
+                shopCells.Add(mapDefinition.ShopCells[i]);
+            }
+
             Debug.Log(
                 $"[MapService] Current map set. floor={mapDefinition.RunFloor}, " +
                 $"walkableCells={walkableCells.Count}, " +
                 $"wallCells={wallCells.Count}, " +
+                $"shopCells={shopCells.Count}, " +
                 $"rooms={mapDefinition.Rooms.Count}, corridors={mapDefinition.Corridors.Count}, " +
                 $"playerSpawn={mapDefinition.PlayerSpawn}, floorExit={mapDefinition.FloorExitPosition}");
         }

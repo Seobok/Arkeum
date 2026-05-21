@@ -16,7 +16,9 @@ namespace Arkeum.Production.Gameplay.Map
         public List<Vector2Int> BossEntranceBlockCells = new List<Vector2Int>();
         public List<Vector2Int> WalkableCells = new List<Vector2Int>();
         public List<Vector2Int> WallCells = new List<Vector2Int>();
+        public List<Vector2Int> ShopCells = new List<Vector2Int>();
         public List<WeaponSpawnDefinition> WeaponSpawns = new List<WeaponSpawnDefinition>();
+        public List<ShopOfferDefinition> ShopOffers = new List<ShopOfferDefinition>();
         public List<EnemySpawnDefinition> EnemySpawns = new List<EnemySpawnDefinition>();
         public List<DungeonRoomDefinition> Rooms = new List<DungeonRoomDefinition>();
         public List<DungeonCorridorDefinition> Corridors = new List<DungeonCorridorDefinition>();

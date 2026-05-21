@@ -94,6 +94,11 @@ namespace Arkeum.Production.Gameplay.Run
                 return PlayerActionResultType.Handled;
             }
 
+            if (TryHandleShopOfferAt(targetCell))
+            {
+                return PlayerActionResultType.Handled;
+            }
+
             if (!mapService.IsWalkable(targetCell))
             {
                 SetMessage("The path is blocked.");
@@ -102,7 +107,9 @@ namespace Arkeum.Production.Gameplay.Run
 
             CurrentRun.Player.GridPosition = targetCell;
             bool sealedBossRoom = TrySealBossRoomIfNeeded();
-            if (!sealedBossRoom && !TryAutoPickupAtPlayerPosition())
+            if (!sealedBossRoom &&
+                !TryAutoPickupAtPlayerPosition() &&
+                !TryDescribeAdjacentShopOffer())
             {
                 SetMessage(string.Empty);
             }
@@ -260,7 +267,11 @@ namespace Arkeum.Production.Gameplay.Run
                 return;
             }
 
-            SetMessage("You wait and listen.");
+            if (!TryDescribeAdjacentShopOffer())
+            {
+                SetMessage("You wait and listen.");
+            }
+
             ConsumeTurn();
         }
 
@@ -302,6 +313,81 @@ namespace Arkeum.Production.Gameplay.Run
             }
 
             return true;
+        }
+
+        private bool TryHandleShopOfferAt(Vector2Int targetCell)
+        {
+            if (!mapService.TryGetShopOffer(targetCell, out ShopOfferDefinition shopOffer))
+            {
+                return false;
+            }
+
+            if (shopOffer.Weapon == null)
+            {
+                SetMessage("This shelf is empty.");
+                return true;
+            }
+
+            int price = Mathf.Max(0, shopOffer.Price);
+            int currentGold = activeProfile != null ? activeProfile.Gold : 0;
+            if (activeProfile == null || currentGold < price)
+            {
+                SetMessage($"Need {price} gold for {shopOffer.DisplayName}. {shopOffer.Summary}.");
+                return true;
+            }
+
+            if (!mapService.TryBuyShopOffer(targetCell, out ShopOfferDefinition purchasedOffer))
+            {
+                SetMessage("The shelf is empty.");
+                return true;
+            }
+
+            bool hadEquippedWeapon = CurrentRun.HasEquippedWeapon;
+            WeaponDefinition droppedWeapon = CurrentRun.EquippedWeapon;
+            activeProfile.SetGold(currentGold - price);
+            CurrentRun.HasEquippedWeapon = true;
+            CurrentRun.EquippedWeapon = purchasedOffer.Weapon;
+            CurrentRun.Player.Stats.AttackPower = CurrentRun.EffectiveAttack;
+
+            if (hadEquippedWeapon)
+            {
+                mapService.DropWeapon(CurrentRun.Player.GridPosition, droppedWeapon);
+            }
+
+            WeaponPickedUp?.Invoke();
+            SetMessage(BuildShopPurchaseMessage(purchasedOffer, price, hadEquippedWeapon, droppedWeapon));
+            ConsumeTurn();
+            return true;
+        }
+
+        private bool TryDescribeAdjacentShopOffer()
+        {
+            if (CurrentRun?.Player == null)
+            {
+                return false;
+            }
+
+            Vector2Int playerCell = CurrentRun.Player.GridPosition;
+            Vector2Int[] directions =
+            {
+                Vector2Int.up,
+                Vector2Int.down,
+                Vector2Int.left,
+                Vector2Int.right,
+            };
+
+            for (int i = 0; i < directions.Length; i++)
+            {
+                if (!mapService.TryGetShopOffer(playerCell + directions[i], out ShopOfferDefinition shopOffer))
+                {
+                    continue;
+                }
+
+                SetMessage($"{shopOffer.DisplayName}: {shopOffer.Price} gold. {shopOffer.Summary}.");
+                return true;
+            }
+
+            return false;
         }
 
         private void ConsumeTurn()
@@ -435,6 +521,16 @@ namespace Arkeum.Production.Gameplay.Run
             }
 
             return $"You pick up {weapon.DisplayName}. Attack rises by {weapon.AttackBonus} for this run.{dropSuffix}";
+        }
+
+        private static string BuildShopPurchaseMessage(
+            ShopOfferDefinition shopOffer,
+            int price,
+            bool droppedPreviousWeapon,
+            WeaponDefinition droppedWeapon)
+        {
+            string dropSuffix = droppedPreviousWeapon ? $" You drop {GetWeaponDisplayName(droppedWeapon)}." : string.Empty;
+            return $"You buy {shopOffer.DisplayName} for {price} gold. {shopOffer.Summary}.{dropSuffix}";
         }
 
         private static string GetWeaponDisplayName(WeaponDefinition weapon)

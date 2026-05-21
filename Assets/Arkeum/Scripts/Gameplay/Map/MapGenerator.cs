@@ -457,6 +457,7 @@ namespace Arkeum.Production.Gameplay.Map
             List<Vector2Int> wallCells = new List<Vector2Int>();
             List<TemplateEnemySpawn> enemySpawns = new List<TemplateEnemySpawn>();
             List<TemplateWeaponSpawn> weaponSpawns = new List<TemplateWeaponSpawn>();
+            List<TemplateShopOffer> shopOffers = new List<TemplateShopOffer>();
             Vector2Int origin = asset != null ? asset.PlayerSpawn : Vector2Int.zero;
             bool hasFloorExit = asset != null && asset.FloorExitPosition != Vector2Int.zero;
             Vector2Int floorExitPosition = hasFloorExit ? asset.FloorExitPosition - origin : Vector2Int.zero;
@@ -536,6 +537,30 @@ namespace Arkeum.Production.Gameplay.Map
                     weaponSpawns.Add(new TemplateWeaponSpawn(weaponSpawn.Weapon, position));
                 }
 
+                if (asset.ShopOffers != null)
+                {
+                    for (int i = 0; i < asset.ShopOffers.Count; i++)
+                    {
+                        ShopOfferDefinition shopOffer = asset.ShopOffers[i];
+                        if (shopOffer == null)
+                        {
+                            continue;
+                        }
+
+                        Vector2Int position = shopOffer.Position - origin;
+                        if (wallPositions.Contains(position))
+                        {
+                            continue;
+                        }
+
+                        shopOffers.Add(new TemplateShopOffer(
+                            position,
+                            shopOffer.Weapon,
+                            shopOffer.Price,
+                            shopOffer.EffectSummary));
+                    }
+                }
+
             }
 
             if (cells.Count == 0)
@@ -560,7 +585,7 @@ namespace Arkeum.Production.Gameplay.Map
                 Debug.LogWarning($"[MapGenerator] Ignored doors outside walkable cells. asset={DescribeAsset(asset)}, ignoredDoors={ignoredDoors}, validDoors={doors.Count}");
             }
 
-            return new RoomTemplate(cells, wallCells, doors, enemySpawns, weaponSpawns, specialRoom, specialRoomType, hasFloorExit, floorExitPosition);
+            return new RoomTemplate(cells, wallCells, doors, enemySpawns, weaponSpawns, shopOffers, specialRoom, specialRoomType, hasFloorExit, floorExitPosition);
         }
 
         private static PlacedRoom CreatePlacedRoom(int id, RoomTemplate template, Vector2Int origin, Vector2Int gridPosition)
@@ -580,6 +605,7 @@ namespace Arkeum.Production.Gameplay.Map
             List<DungeonDoorDefinition> doorCandidates = new List<DungeonDoorDefinition>();
             List<EnemySpawnDefinition> enemySpawns = new List<EnemySpawnDefinition>();
             List<WeaponSpawnDefinition> weaponSpawns = new List<WeaponSpawnDefinition>();
+            List<ShopOfferDefinition> shopOffers = new List<ShopOfferDefinition>();
             for (int i = 0; i < template.Cells.Count; i++)
             {
                 TemplateCell templateCell = template.Cells[i];
@@ -623,7 +649,19 @@ namespace Arkeum.Production.Gameplay.Map
                 });
             }
 
-            return new PlacedRoom(id, gridPosition, definition, cellSet, wallCells, doorCandidates, enemySpawns, weaponSpawns);
+            for (int i = 0; i < template.ShopOffers.Count; i++)
+            {
+                TemplateShopOffer templateShopOffer = template.ShopOffers[i];
+                shopOffers.Add(new ShopOfferDefinition
+                {
+                    Weapon = templateShopOffer.Weapon,
+                    Position = templateShopOffer.Position + origin,
+                    Price = templateShopOffer.Price,
+                    EffectSummary = templateShopOffer.EffectSummary,
+                });
+            }
+
+            return new PlacedRoom(id, gridPosition, definition, cellSet, wallCells, doorCandidates, enemySpawns, weaponSpawns, shopOffers);
         }
 
         private static bool TryBuildDoorConnection(PlacedRoom from, PlacedRoom to, out DoorConnection connection)
@@ -797,7 +835,8 @@ namespace Arkeum.Production.Gameplay.Map
                 AddWallCell(map, room.WallCells[i]);
             }
 
-            for (int i = 0; i < room.EnemySpawns.Count; i++)
+            bool isShopRoom = room.Definition.SpecialRoomType == RunSpecialRoomType.Shop;
+            for (int i = 0; i < room.EnemySpawns.Count && !isShopRoom; i++)
             {
                 map.EnemySpawns.Add(room.EnemySpawns[i]);
             }
@@ -805,6 +844,22 @@ namespace Arkeum.Production.Gameplay.Map
             for (int i = 0; i < room.WeaponSpawns.Count; i++)
             {
                 map.WeaponSpawns.Add(room.WeaponSpawns[i]);
+            }
+
+            for (int i = 0; i < room.ShopOffers.Count; i++)
+            {
+                map.ShopOffers.Add(room.ShopOffers[i]);
+            }
+
+            if (isShopRoom)
+            {
+                foreach (Vector2Int cell in room.CellSet)
+                {
+                    if (!map.ShopCells.Contains(cell))
+                    {
+                        map.ShopCells.Add(cell);
+                    }
+                }
             }
         }
 
@@ -1230,6 +1285,26 @@ namespace Arkeum.Production.Gameplay.Map
                 });
             }
 
+            if (asset.ShopOffers != null)
+            {
+                for (int i = 0; i < asset.ShopOffers.Count; i++)
+                {
+                    ShopOfferDefinition shopOffer = asset.ShopOffers[i];
+                    if (shopOffer == null)
+                    {
+                        continue;
+                    }
+
+                    map.ShopOffers.Add(new ShopOfferDefinition
+                    {
+                        Weapon = shopOffer.Weapon,
+                        Position = shopOffer.Position,
+                        Price = shopOffer.Price,
+                        EffectSummary = shopOffer.EffectSummary,
+                    });
+                }
+            }
+
             for (int i = 0; i < asset.EnemySpawns.Count; i++)
             {
                 EnemySpawnDefinition enemySpawn = asset.EnemySpawns[i];
@@ -1357,6 +1432,7 @@ namespace Arkeum.Production.Gameplay.Map
             public readonly List<TemplateDoor> Doors;
             public readonly List<TemplateEnemySpawn> EnemySpawns;
             public readonly List<TemplateWeaponSpawn> WeaponSpawns;
+            public readonly List<TemplateShopOffer> ShopOffers;
             public readonly Vector2Int Min;
             public readonly Vector2Int Max;
             public readonly int Width;
@@ -1372,6 +1448,7 @@ namespace Arkeum.Production.Gameplay.Map
                 List<TemplateDoor> doors,
                 List<TemplateEnemySpawn> enemySpawns,
                 List<TemplateWeaponSpawn> weaponSpawns,
+                List<TemplateShopOffer> shopOffers,
                 bool isSpecialRoom,
                 RunSpecialRoomType specialRoomType,
                 bool hasFloorExit,
@@ -1382,6 +1459,7 @@ namespace Arkeum.Production.Gameplay.Map
                 Doors = doors;
                 EnemySpawns = enemySpawns;
                 WeaponSpawns = weaponSpawns;
+                ShopOffers = shopOffers;
                 IsSpecialRoom = isSpecialRoom;
                 SpecialRoomType = specialRoomType;
                 HasFloorExit = hasFloorExit;
@@ -1465,6 +1543,22 @@ namespace Arkeum.Production.Gameplay.Map
             }
         }
 
+        private readonly struct TemplateShopOffer
+        {
+            public readonly Vector2Int Position;
+            public readonly WeaponDefinition Weapon;
+            public readonly int Price;
+            public readonly string EffectSummary;
+
+            public TemplateShopOffer(Vector2Int position, WeaponDefinition weapon, int price, string effectSummary)
+            {
+                Position = position;
+                Weapon = weapon;
+                Price = price;
+                EffectSummary = effectSummary;
+            }
+        }
+
         private sealed class PlacedRoom
         {
             public readonly int Id;
@@ -1475,6 +1569,7 @@ namespace Arkeum.Production.Gameplay.Map
             public readonly List<DungeonDoorDefinition> DoorCandidates;
             public readonly List<EnemySpawnDefinition> EnemySpawns;
             public readonly List<WeaponSpawnDefinition> WeaponSpawns;
+            public readonly List<ShopOfferDefinition> ShopOffers;
 
             public PlacedRoom(
                 int id,
@@ -1484,7 +1579,8 @@ namespace Arkeum.Production.Gameplay.Map
                 List<Vector2Int> wallCells,
                 List<DungeonDoorDefinition> doorCandidates,
                 List<EnemySpawnDefinition> enemySpawns,
-                List<WeaponSpawnDefinition> weaponSpawns)
+                List<WeaponSpawnDefinition> weaponSpawns,
+                List<ShopOfferDefinition> shopOffers)
             {
                 Id = id;
                 GridPosition = gridPosition;
@@ -1494,6 +1590,7 @@ namespace Arkeum.Production.Gameplay.Map
                 DoorCandidates = doorCandidates;
                 EnemySpawns = enemySpawns;
                 WeaponSpawns = weaponSpawns;
+                ShopOffers = shopOffers;
             }
         }
 

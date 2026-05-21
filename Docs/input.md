@@ -303,3 +303,76 @@
 - Unity Inspector에서 보스층으로 사용할 `RunFloorDefinition.SpecialRooms`에 `Boss` 타입 보스방과 `FloorExit` 타입 출구방을 지정해야 한다.
 - 시작방/보스방/출구방 `MapAsset`에는 요구된 방향의 문이 있어야 한다. 문이 맞지 않으면 보스층 생성은 일반 던전 생성 fallback으로 돌아간다.
 - PowerShell 환경에서 `git` 명령을 찾지 못해 git diff는 확인하지 못했다.
+
+## 2026-05-21 상점 특수방 및 진열대 구매 기본 구현
+
+### 사용자의 요청 개요
+- 특수 방 중 하나로 상점을 만들고, 상점 내부에서는 적이 들어오거나 플레이어를 탐지하지 못하게 해 안전한 재화 파밍 악용을 막는 구조를 요청했다.
+- 상점에는 여러 진열대가 존재하고, 진열대 앞에 서면 가격/효과를 짧게 보여주며, 방향키로 진열대와 상호작용하면 골드가 충분할 때 아이템을 구매하는 흐름을 요청했다.
+- 무기를 이미 장착한 상태에서 무기를 구매하면 새 무기를 장착하고 기존 무기는 바닥에 떨어지도록 요청했다.
+
+### 핵심 요구사항
+- `Shop` 특수방 타입을 추가한다.
+- 상점 방 셀은 플레이어가 이동할 수 있지만 적은 이동할 수 없어야 한다.
+- 플레이어가 상점 방에 들어오면 적 탐지 대상에서 제외되어야 한다.
+- 상점 진열대는 가격, 효과 요약, 구매 대상 무기를 데이터로 가진다.
+- 플레이어가 진열대에 인접하면 HUD 메시지로 가격/효과를 표시한다.
+- 방향키로 진열대를 향해 입력하면 구매를 시도하고, 골드가 충분하면 차감 후 무기를 장착한다.
+- 기존 장착 무기가 있으면 플레이어 위치에 바닥 무기로 드롭한다.
+
+### 이번 작업 범위
+- 실제 방 형식의 상점 특수방을 우선 구현했다.
+- 구매 대상은 현재 아이템 시스템 중 실제 장착/드롭 흐름이 존재하는 무기로 한정했다.
+- 상점 진열대 배치는 `MapAsset.ShopOffers`에 수동으로 등록하는 방식으로 추가했다.
+- 별도 상점 UI 패널은 만들지 않고 기존 HUD 메시지 라인을 사용해 가격/효과를 표시했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunFloorDefinition.cs`
+  - `RunSpecialRoomType.Shop` 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Run/ShopOfferDefinition.cs`
+  - 상점 진열대의 위치, 무기, 가격, 효과 요약을 담는 직렬화 데이터 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Map/MapAsset.cs`
+  - 방 에셋에 상점 진열대 목록 `ShopOffers` 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Map/MapDefinition.cs`
+  - 생성된 맵에 `ShopCells`, `ShopOffers` 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Map/MapGenerator.cs`
+  - 상점 특수방의 셀과 진열대 데이터를 생성된 맵 좌표로 변환하도록 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Map/MapService.cs`
+  - 적 이동 금지용 `IsEnemyWalkable()`, 플레이어 은닉 판정, 상점 진열대 조회/구매/무기 드롭 API 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Actors/EnemyBehaviorActions.cs`
+  - 플레이어가 상점 셀에 있으면 적 타겟과 준비 행동을 해제하고, 적 이동은 상점 셀을 제외하도록 변경.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs`
+  - 진열대 인접 설명, 구매 처리, 골드 차감, 구매 무기 장착, 기존 무기 바닥 드롭 처리 추가.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 상점 진열대를 월드에 무기 아이콘 기반 마커로 표시.
+- `Assembly-CSharp.csproj`
+  - 새 `ShopOfferDefinition.cs` 컴파일 항목 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Run/ShopOfferDefinition.cs.meta`
+  - Unity 스크립트 메타 파일 추가.
+- `Docs/input.md`
+  - 이번 작업 기록 추가.
+
+### 실제 수행한 작업 요약
+- `RunSpecialRoomType.Shop` 타입을 추가해 기존 특수방 슬롯 시스템에서 상점 방을 배치할 수 있게 했다.
+- `MapAsset.ShopOffers`에 등록된 진열대 데이터를 런타임 `MapDefinition.ShopOffers`로 복사하도록 했다.
+- 상점 방으로 배치된 방의 모든 셀을 `ShopCells`로 기록하고, 적 AI 이동 판정에서 해당 셀을 제외했다.
+- 적 AI가 타겟 갱신 시 플레이어가 상점 셀에 있으면 탐지하지 않고 기존 준비 공격/이동도 취소하도록 했다.
+- 플레이어가 진열대 옆에 서거나 대기하면 `이름: 가격 gold. 효과` 형식 메시지를 보여준다.
+- 플레이어가 진열대 방향으로 입력하면 골드를 확인하고, 충분하면 골드 차감 후 무기를 장착하며 기존 무기는 플레이어 위치에 드롭한다.
+- 구매가 완료된 진열대는 맵의 `ShopOffers`에서 제거되어 다시 구매할 수 없게 했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 상점 특수방 생성, 진열대 표시, 구매 흐름, 골드 차감, 기존 무기 드롭, 적 진입/탐지 차단은 직접 확인하지 못했다.
+- Inspector에서 각 층의 `SpecialRooms`에 `Shop` 타입 방 에셋을 추가하고, 해당 `MapAsset.ShopOffers`에 초기 진열대 3개를 배치해야 한다.
+- 현재 구매 대상은 무기만 지원한다. 회복, 버프, 소모품 등 다른 아이템을 판매하려면 공통 아이템/효과 구매 처리 구조가 추가로 필요하다.
+- 별도 상점 UI 패널은 아직 없고 HUD 메시지로 가격/효과를 표시한다.
+- PowerShell 환경에서 `git` 명령을 찾지 못해 git diff/status는 확인하지 못했다.
+
+### 추가 보강
+- 상점 특수방 에셋에 적 스폰이 실수로 포함되어 있어도 런타임 맵 생성 시 해당 상점 방의 적 스폰은 등록하지 않도록 보강했다.
+- 보강 후 `dotnet build Assembly-CSharp.csproj -nologo`, `dotnet build Assembly-CSharp-Editor.csproj -nologo`를 다시 실행했고 모두 경고 0개, 오류 0개로 성공했다.

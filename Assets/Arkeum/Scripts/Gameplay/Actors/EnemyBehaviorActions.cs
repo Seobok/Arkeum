@@ -28,6 +28,13 @@ namespace Arkeum.Production.Gameplay.Actors
         {
             ActorEntity enemy = context.Enemy;
             ActorEntity player = context.Player;
+            if (context.MapService.IsPlayerHiddenFromEnemies(player.GridPosition))
+            {
+                enemy.TargetActorId = null;
+                ClearPreparation(enemy);
+                return BehaviorTreeStatus.Success;
+            }
+
             enemy.TargetActorId = IsInDetectionRange(enemy, player.GridPosition, context.MapService) ? player.Id : null;
             return BehaviorTreeStatus.Success;
         }
@@ -259,7 +266,7 @@ namespace Arkeum.Production.Gameplay.Actors
         private static bool CanMoveTo(Vector2Int targetCell, Vector2Int playerPosition, MapService mapService, ActorRepository actorRepository)
         {
             return targetCell != playerPosition &&
-                   mapService.IsWalkable(targetCell) &&
+                   mapService.IsEnemyWalkable(targetCell) &&
                    !actorRepository.IsEnemyOccupied(targetCell);
         }
 

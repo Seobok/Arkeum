@@ -129,6 +129,23 @@ namespace Arkeum.Production.Presentation.World
                     4));
             }
 
+            for (int i = 0; i < map.ShopOffers.Count; i++)
+            {
+                ShopOfferDefinition shopOffer = map.ShopOffers[i];
+                if (shopOffer == null)
+                {
+                    continue;
+                }
+
+                spawnedViews.Add(viewFactory.CreateCell(
+                    markerRoot,
+                    shopOffer.Position,
+                    GetWeaponSprite(shopOffer.Weapon),
+                    GetShopOfferTint(shopOffer.Weapon),
+                    $"ShopOffer_{i}",
+                    5));
+            }
+
             if (map.FloorExitPosition != Vector2Int.zero)
             {
                 spawnedViews.Add(viewFactory.CreateCell(
@@ -408,6 +425,12 @@ namespace Arkeum.Production.Presentation.World
             }
 
             return visualSet != null ? visualSet.DefaultWeaponTint : new Color(0.75f, 0.43f, 0.18f);
+        }
+
+        private Color GetShopOfferTint(WeaponDefinition weapon)
+        {
+            Color tint = GetWeaponTint(weapon);
+            return Color.Lerp(tint, new Color(1f, 0.82f, 0.22f), 0.35f);
         }
 
         private Sprite GetFloorExitSprite()

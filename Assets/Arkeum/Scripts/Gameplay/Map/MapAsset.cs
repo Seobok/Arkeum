@@ -13,6 +13,7 @@ namespace Arkeum.Production.Gameplay.Map
         public Vector2Int FloorExitPosition;
         public Vector2Int DungeonEntrancePosition;
         public List<WeaponSpawnDefinition> WeaponSpawns = new List<WeaponSpawnDefinition>();
+        public List<ShopOfferDefinition> ShopOffers = new List<ShopOfferDefinition>();
         public List<EnemySpawnDefinition> EnemySpawns = new List<EnemySpawnDefinition>();
         public List<MapCellData> Cells = new List<MapCellData>();
         public List<MapDoorData> Doors = new List<MapDoorData>();
