@@ -1,3 +1,4 @@
+using Arkeum.Production.Presentation.UI;
 using UnityEngine;
 
 namespace Arkeum.Production.Gameplay.Timing
@@ -5,6 +6,7 @@ namespace Arkeum.Production.Gameplay.Timing
     public abstract class TimingChallengeDefinition : ScriptableObject
     {
         [SerializeField] private string displayName = "Timing";
+        [SerializeField] private TimingChallengePresenterBase presenterPrefab;
         [SerializeField] private float durationSeconds = 1.2f;
         [SerializeField] private float goodDamageMultiplier = 1.35f;
         [SerializeField] private float perfectDamageMultiplier = 1.75f;
@@ -13,6 +15,7 @@ namespace Arkeum.Production.Gameplay.Timing
         [SerializeField] private int perfectFlatDamageBonus;
 
         public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? name : displayName;
+        public TimingChallengePresenterBase PresenterPrefab => presenterPrefab;
         public float DurationSeconds => Mathf.Max(0.1f, durationSeconds);
         public float GoodDamageMultiplier => Mathf.Max(0f, goodDamageMultiplier);
         public float PerfectDamageMultiplier => Mathf.Max(0f, perfectDamageMultiplier);

@@ -1,20 +1,15 @@
 using Arkeum.Production.Gameplay.Timing;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace Arkeum.Production.Presentation.UI
 {
     public sealed class TimingPopupPresenter : MonoBehaviour
     {
-        [SerializeField] private GameObject popupPanel;
-        [SerializeField] private Text titleText;
-        [SerializeField] private RectTransform trackRect;
-        [SerializeField] private RectTransform goodZoneRect;
-        [SerializeField] private RectTransform perfectZoneRect;
-        [SerializeField] private RectTransform markerRect;
+        [SerializeField] private Transform presenterRoot;
 
         private TimingSession session;
-        private bool missingReferencesLogged;
+        private TimingChallengePresenterBase activePresenter;
+        private bool missingPresenterLogged;
 
         public bool IsVisible => session != null;
 
@@ -26,22 +21,35 @@ namespace Arkeum.Production.Presentation.UI
         public void Show(TimingSession timingSession)
         {
             session = timingSession;
-            if (!HasRequiredReferences())
+            if (session == null)
             {
+                Hide();
                 return;
             }
 
-            popupPanel.SetActive(session != null);
-            Refresh();
+            TimingChallengePresenterBase presenterPrefab = session.Definition != null
+                ? session.Definition.PresenterPrefab
+                : null;
+
+            if (presenterPrefab == null)
+            {
+                if (!missingPresenterLogged)
+                {
+                    missingPresenterLogged = true;
+                    Debug.LogWarning("[TimingPopupPresenter] Timing challenge has no presenter prefab assigned.", this);
+                }
+
+                return;
+            }
+
+            CreatePresenter(presenterPrefab);
+            activePresenter.Show(session);
         }
 
         public void Hide()
         {
             session = null;
-            if (popupPanel != null)
-            {
-                popupPanel.SetActive(false);
-            }
+            DestroyActivePresenter();
         }
 
         private void LateUpdate()
@@ -51,69 +59,32 @@ namespace Arkeum.Production.Presentation.UI
 
         private void Refresh()
         {
-            if (session == null || !HasRequiredReferences())
+            if (session == null || activePresenter == null)
             {
                 return;
             }
 
-            ITimingChallengeRuntime runtime = session.Runtime;
-            popupPanel.SetActive(runtime != null);
-            if (runtime == null)
-            {
-                return;
-            }
-
-            titleText.text = session.Definition != null ? session.Definition.DisplayName : "Timing";
-            SetZone(goodZoneRect, runtime.GoodZoneMin, runtime.GoodZoneMax);
-            SetZone(perfectZoneRect, runtime.PerfectZoneMin, runtime.PerfectZoneMax);
-            SetMarker(runtime.NormalizedPosition);
+            activePresenter.Refresh(session);
         }
 
-        private bool HasRequiredReferences()
+        private void CreatePresenter(TimingChallengePresenterBase presenterPrefab)
         {
-            bool hasReferences =
-                popupPanel != null &&
-                titleText != null &&
-                trackRect != null &&
-                goodZoneRect != null &&
-                perfectZoneRect != null &&
-                markerRect != null;
+            DestroyActivePresenter();
 
-            if (!hasReferences && !missingReferencesLogged)
-            {
-                missingReferencesLogged = true;
-                Debug.LogWarning("[TimingPopupPresenter] UGUI references are not fully assigned. Create the timing popup manually and wire the serialized fields in the Inspector.", this);
-            }
-
-            return hasReferences;
+            // The host only chooses the prefab; each prefab owns its own layout and widgets.
+            Transform root = presenterRoot != null ? presenterRoot : transform;
+            activePresenter = Instantiate(presenterPrefab, root);
         }
 
-        private void SetZone(RectTransform zoneRect, float min, float max)
+        private void DestroyActivePresenter()
         {
-            float clampedMin = Mathf.Clamp01(min);
-            float clampedMax = Mathf.Clamp01(max);
-            float width = trackRect.rect.width;
-            if (width <= 0f)
+            if (activePresenter == null)
             {
                 return;
             }
 
-            float zoneWidth = Mathf.Max(1f, (clampedMax - clampedMin) * width);
-            float center = ((clampedMin + clampedMax) * 0.5f - 0.5f) * width;
-            zoneRect.sizeDelta = new Vector2(zoneWidth, zoneRect.sizeDelta.y);
-            zoneRect.anchoredPosition = new Vector2(center, zoneRect.anchoredPosition.y);
-        }
-
-        private void SetMarker(float normalizedPosition)
-        {
-            float width = trackRect.rect.width;
-            if (width <= 0f)
-            {
-                return;
-            }
-
-            float x = (Mathf.Clamp01(normalizedPosition) - 0.5f) * width;
-            markerRect.anchoredPosition = new Vector2(x, markerRect.anchoredPosition.y);
+            Destroy(activePresenter.gameObject);
+            activePresenter = null;
         }
     }
 }

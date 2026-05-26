@@ -376,3 +376,65 @@
 ### 추가 보강
 - 상점 특수방 에셋에 적 스폰이 실수로 포함되어 있어도 런타임 맵 생성 시 해당 상점 방의 적 스폰은 등록하지 않도록 보강했다.
 - 보강 후 `dotnet build Assembly-CSharp.csproj -nologo`, `dotnet build Assembly-CSharp-Editor.csproj -nologo`를 다시 실행했고 모두 경고 0개, 오류 0개로 성공했다.
+
+## 2026-05-26 타이밍 챌린지 Presenter 프리팹 분리
+
+### 사용자의 요청 개요
+- 무기별로 다른 타이밍 UI를 보여줄 수 있도록 `TimingChallengePresenterBase` 프리팹 형태로 Presenter를 관리하는 구조로 변경 요청.
+- 코드로 구조를 읽어볼 수 있도록 필요한 부분에 주석을 추가해 달라는 요청.
+
+### 핵심 요구사항
+- 무기별 `TimingChallengeDefinition`에서 사용할 Presenter 프리팹을 지정할 수 있어야 한다.
+- 기존 단일 입력 타이밍 UI는 별도 Presenter로 분리한다.
+- `TimingPopupPresenter`는 특정 UI 구현을 직접 들고 있지 않고, 현재 타이밍 세션에 맞는 Presenter 프리팹을 생성/위임해야 한다.
+
+### 이번 작업 범위
+- 타이밍 UI Presentation 구조만 분리했다.
+- 타이밍 입력 규칙 자체는 기존 단일 입력 구조를 유지했다.
+- 실제 Unity UI 프리팹/에셋 생성 및 Inspector 연결은 이번 작업 범위에 포함하지 않았다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Timing/TimingChallengeDefinition.cs`
+  - 타이밍 챌린지별 Presenter 프리팹을 지정할 수 있도록 `TimingChallengePresenterBase presenterPrefab` 참조와 공개 프로퍼티를 추가.
+- `Assets/Arkeum/Scripts/Presentation/UI/TimingChallengePresenterBase.cs`
+  - 모든 타이밍 Presenter 프리팹이 상속할 기본 클래스 추가.
+  - `Show`, `Refresh`, `Hide` 흐름을 공통화하고, 구체적인 화면 갱신은 하위 Presenter가 담당하도록 분리.
+- `Assets/Arkeum/Scripts/Presentation/UI/SinglePressTimingChallengePresenter.cs`
+  - 기존 `TimingPopupPresenter`에 있던 단일 입력 게이지 UI 표시 로직을 별도 Presenter로 이동.
+  - `track`, `goodZone`, `perfectZone`, `marker` 기반 표시를 유지.
+- `Assets/Arkeum/Scripts/Presentation/UI/TimingPopupPresenter.cs`
+  - 특정 타이밍 UI를 직접 표시하던 구조에서, 세션의 `Definition.PresenterPrefab`을 인스턴스화하고 갱신을 위임하는 호스트 구조로 변경.
+- `Assets/Arkeum/Scripts/Presentation/UI/TimingChallengePresenterBase.cs.meta`
+  - 신규 Unity 스크립트 메타 파일 추가.
+- `Assets/Arkeum/Scripts/Presentation/UI/SinglePressTimingChallengePresenter.cs.meta`
+  - 신규 Unity 스크립트 메타 파일 추가.
+- `Assembly-CSharp.csproj`
+  - 로컬 `dotnet build`가 신규 스크립트를 포함하도록 Compile 항목 추가.
+- `Docs/input.md`
+  - 이번 작업 기록 추가.
+
+### 실제 수행한 작업 요약
+- `TimingChallengeDefinition`에 Presenter 프리팹 참조를 추가해, 타이밍 규칙 데이터가 사용할 UI 프리팹을 선언할 수 있게 했다.
+- `TimingPopupPresenter`는 현재 세션의 Presenter 프리팹을 찾아 생성하고, 이후 매 프레임 `Refresh()`를 위임하도록 변경했다.
+- 기존 단일 입력 타이밍 UI는 `SinglePressTimingChallengePresenter`로 분리했다.
+- 하위 Presenter가 각자 레이아웃과 위젯을 소유한다는 의도를 주석으로 남겼다.
+
+### 빌드/테스트 여부
+- 최초 `dotnet build Assembly-CSharp.csproj -nologo`는 사용자 홈 `.dotnet` sentinel 접근 권한 문제로 실패했다.
+- 이후 `$env:DOTNET_CLI_HOME='D:\Unity\Private\.dotnet'; $env:HOME='D:\Unity\Private\.dotnet'; dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 타이밍 팝업 표시와 프리팹 생성 흐름은 직접 확인하지 못했다.
+- 각 `TimingChallengeDefinition` 에셋에 실제 `TimingChallengePresenterBase` 기반 프리팹을 Inspector에서 연결해야 한다.
+- 기존 무기 에셋의 `timingChallenge`가 비어 있으므로, 무기별 타이밍을 테스트하려면 타이밍 챌린지 에셋과 Presenter 프리팹 연결이 추가로 필요하다.
+- 현재 입력/런타임 구조는 여전히 단일 입력 완료 방식이다. 여러 번 누르기나 버튼별 입력을 지원하려면 `ITimingChallengeRuntime`과 입력 전달 구조를 별도로 확장해야 한다.
+- PowerShell 환경에서 `git` 명령을 찾지 못해 git diff/status는 확인하지 못했다.
+
+### 추가 정리
+- `TimingPopupPresenter`의 `activePresenterPrefab` 필드를 제거했다.
+- `activePresenter`는 Inspector 연결 대상이 아니라 런타임에 생성한 Presenter 프리팹 인스턴스 참조로만 유지한다.
+- `Show()` 호출 시 기존 Presenter 인스턴스를 제거하고 현재 세션의 `PresenterPrefab`을 새로 생성하도록 단순화했다.
+- `Hide()` 호출 시 활성 Presenter 인스턴스를 제거하고 참조를 비우도록 정리했다.
+- `$env:DOTNET_CLI_HOME='D:\Unity\Private\.dotnet'; $env:HOME='D:\Unity\Private\.dotnet'; dotnet build Assembly-CSharp.csproj -nologo` 재실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
