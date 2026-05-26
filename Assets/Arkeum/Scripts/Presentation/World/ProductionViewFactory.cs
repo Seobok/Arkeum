@@ -27,7 +27,7 @@ namespace Arkeum.Production.Presentation.World
             return tile;
         }
 
-        public GameObject CreateActor(
+        public ActorView CreateActor(
             Transform parent,
             string name,
             Vector2Int cell,
@@ -40,12 +40,16 @@ namespace Arkeum.Production.Presentation.World
             actor.transform.position = new Vector3(cell.x, cell.y, -0.1f);
 
             SpriteRenderer renderer = actor.AddComponent<SpriteRenderer>();
-            renderer.sprite = sprite != null ? sprite : GetSquareSprite();
+            Sprite fallbackSprite = GetSquareSprite();
+            renderer.sprite = sprite != null ? sprite : fallbackSprite;
             renderer.color = tint;
             renderer.sortingOrder = sortingOrder;
             actor.transform.localScale = new Vector3(0.72f, 0.72f, 1f);
 
-            return actor;
+            ActorView actorView = actor.AddComponent<ActorView>();
+            actorView.Initialize(renderer, fallbackSprite);
+            actorView.SetPositionImmediate(cell);
+            return actorView;
         }
 
         private Sprite GetSquareSprite()

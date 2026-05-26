@@ -10,7 +10,10 @@ namespace Arkeum.Production.Presentation.World
     {
         [SerializeField] private WorldVisualSet visualSet;
 
-        private readonly List<GameObject> spawnedViews = new List<GameObject>();
+        private readonly List<GameObject> floorViews = new List<GameObject>();
+        private readonly List<GameObject> markerViews = new List<GameObject>();
+        private readonly Dictionary<string, ActorView> actorViews = new Dictionary<string, ActorView>();
+        private readonly HashSet<string> activeActorIds = new HashSet<string>();
         private readonly ProductionViewFactory viewFactory = new ProductionViewFactory();
 
         private Camera mainCamera;
@@ -19,6 +22,7 @@ namespace Arkeum.Production.Presentation.World
         private Transform actorRoot;
         private Transform markerRoot;
         private ActorRepository actorRepository;
+        private MapDefinition renderedFloorMap;
 
         public MapDefinition CurrentMap { get; private set; }
         public RunState CurrentRun { get; private set; }
@@ -41,12 +45,14 @@ namespace Arkeum.Production.Presentation.World
             CurrentMap = mapDefinition;
             CurrentRun = null;
             HubPlayerPosition = hubPlayerPosition;
+            MarkFloorDirtyIfMapChanged(mapDefinition);
         }
 
         public void BindRun(RunState runState, MapDefinition mapDefinition)
         {
             CurrentRun = runState;
             CurrentMap = mapDefinition;
+            MarkFloorDirtyIfMapChanged(mapDefinition);
         }
 
         public void Refresh()
@@ -57,23 +63,26 @@ namespace Arkeum.Production.Presentation.World
                 BuildWorldRoots();
             }
 
-            ClearViews();
             if (CurrentMap == null)
             {
+                ClearAllViews();
                 return;
             }
 
-            DrawMap(CurrentMap);
+            RefreshFloor(CurrentMap);
+            ClearMarkerViews();
             if (CurrentRun != null && actorRepository != null)
             {
+                DrawMapMarkers(CurrentMap);
                 DrawEnemyPreparedTargetMarkers();
-                DrawRunActors();
+                RefreshRunActors();
                 FocusCamera(CurrentRun.Player != null ? CurrentRun.Player.GridPosition : CurrentMap.PlayerSpawn);
                 return;
             }
 
+            DrawMapMarkers(CurrentMap);
             DrawHubMarkers();
-            DrawHubPlayer();
+            RefreshHubPlayer();
             FocusCamera(HubPlayerPosition);
         }
 
@@ -87,11 +96,23 @@ namespace Arkeum.Production.Presentation.World
             ShowEnemyPreparedTargetMarkers = show;
         }
 
-        private void DrawMap(MapDefinition map)
+        private void RefreshFloor(MapDefinition map)
+        {
+            if (renderedFloorMap == map)
+            {
+                return;
+            }
+
+            ClearFloorViews();
+            DrawFloor(map);
+            renderedFloorMap = map;
+        }
+
+        private void DrawFloor(MapDefinition map)
         {
             foreach (Vector2Int cell in map.WalkableCells)
             {
-                spawnedViews.Add(viewFactory.CreateCell(
+                floorViews.Add(viewFactory.CreateCell(
                     floorRoot,
                     cell,
                     GetFloorSprite(),
@@ -99,11 +120,14 @@ namespace Arkeum.Production.Presentation.World
                     $"Cell_{cell.x}_{cell.y}",
                     0));
             }
+        }
 
+        private void DrawMapMarkers(MapDefinition map)
+        {
             for (int i = 0; i < map.WallCells.Count; i++)
             {
                 Vector2Int wallCell = map.WallCells[i];
-                spawnedViews.Add(viewFactory.CreateCell(
+                markerViews.Add(viewFactory.CreateCell(
                     markerRoot,
                     wallCell,
                     GetWallSprite(),
@@ -120,7 +144,7 @@ namespace Arkeum.Production.Presentation.World
                     continue;
                 }
 
-                spawnedViews.Add(viewFactory.CreateCell(
+                markerViews.Add(viewFactory.CreateCell(
                     markerRoot,
                     weaponSpawn.Position,
                     GetWeaponSprite(weaponSpawn.Weapon),
@@ -137,7 +161,7 @@ namespace Arkeum.Production.Presentation.World
                     continue;
                 }
 
-                spawnedViews.Add(viewFactory.CreateCell(
+                markerViews.Add(viewFactory.CreateCell(
                     markerRoot,
                     shopOffer.Position,
                     GetWeaponSprite(shopOffer.Weapon),
@@ -148,7 +172,7 @@ namespace Arkeum.Production.Presentation.World
 
             if (map.FloorExitPosition != Vector2Int.zero)
             {
-                spawnedViews.Add(viewFactory.CreateCell(
+                markerViews.Add(viewFactory.CreateCell(
                     markerRoot,
                     map.FloorExitPosition,
                     GetFloorExitSprite(),
@@ -162,7 +186,7 @@ namespace Arkeum.Production.Presentation.World
         {
             if (IsMarkerEnabled(CurrentMap.DungeonEntrancePosition))
             {
-                spawnedViews.Add(viewFactory.CreateCell(
+                markerViews.Add(viewFactory.CreateCell(
                     markerRoot,
                     CurrentMap.DungeonEntrancePosition,
                     GetDungeonEntranceSprite(),
@@ -173,19 +197,16 @@ namespace Arkeum.Production.Presentation.World
 
         }
 
-        private void DrawHubPlayer()
+        private void RefreshHubPlayer()
         {
-            spawnedViews.Add(viewFactory.CreateActor(
-                actorRoot,
-                "HubPlayer",
-                HubPlayerPosition,
-                GetPlayerSprite(),
-                GetPlayerTint(),
-                20));
+            activeActorIds.Clear();
+            RefreshActorView("HubPlayer", "HubPlayer", HubPlayerPosition, true, GetPlayerSprite(), GetPlayerTint(), 20);
+            RemoveInactiveActorViews();
         }
 
-        private void DrawRunActors()
+        private void RefreshRunActors()
         {
+            activeActorIds.Clear();
             IReadOnlyList<ActorEntity> actors = actorRepository.Actors;
             for (int i = 0; i < actors.Count; i++)
             {
@@ -211,8 +232,37 @@ namespace Arkeum.Production.Presentation.World
                     sortingOrder = 10;
                 }
 
-                spawnedViews.Add(viewFactory.CreateActor(actorRoot, actor.DisplayName, actor.GridPosition, sprite, tint, sortingOrder));
+                RefreshActorView(actor.Id, actor.DisplayName, actor.GridPosition, actor.IsPlayer, sprite, tint, sortingOrder);
             }
+
+            RemoveInactiveActorViews();
+        }
+
+        private void RefreshActorView(
+            string actorId,
+            string displayName,
+            Vector2Int position,
+            bool isPlayer,
+            Sprite sprite,
+            Color tint,
+            int sortingOrder)
+        {
+            if (string.IsNullOrEmpty(actorId))
+            {
+                return;
+            }
+
+            activeActorIds.Add(actorId);
+            if (!actorViews.TryGetValue(actorId, out ActorView actorView) || actorView == null)
+            {
+                actorView = viewFactory.CreateActor(actorRoot, displayName, position, sprite, tint, sortingOrder);
+                actorViews[actorId] = actorView;
+                return;
+            }
+
+            actorView.name = displayName;
+            actorView.SetVisual(sprite, tint, sortingOrder);
+            actorView.MoveTo(position, isPlayer);
         }
 
         private void DrawEnemyPreparedTargetMarkers()
@@ -258,7 +308,7 @@ namespace Arkeum.Production.Presentation.World
             if (attackPattern == null)
             {
                 string fallbackMarkerName = $"Pending_{actor.PendingEnemyAction}_{actor.Id}";
-                spawnedViews.Add(viewFactory.CreateCell(
+                markerViews.Add(viewFactory.CreateCell(
                     markerRoot,
                     actor.PendingEnemyTargetCell,
                     GetEnemyAttackMarkerSprite(),
@@ -281,7 +331,7 @@ namespace Arkeum.Production.Presentation.World
                 }
 
                 string markerName = $"Pending_{actor.PendingEnemyAction}_{actor.Id}_{markerCell.x}_{markerCell.y}";
-                spawnedViews.Add(viewFactory.CreateCell(
+                markerViews.Add(viewFactory.CreateCell(
                     markerRoot,
                     markerCell,
                     GetEnemyAttackMarkerSprite(),
@@ -294,7 +344,7 @@ namespace Arkeum.Production.Presentation.World
         private void DrawEnemyPreparedMoveMarker(ActorEntity actor)
         {
             string markerName = $"Pending_{actor.PendingEnemyAction}_{actor.Id}";
-            spawnedViews.Add(viewFactory.CreateCell(
+            markerViews.Add(viewFactory.CreateCell(
                 markerRoot,
                 actor.PendingEnemyTargetCell,
                 GetEnemyMoveMarkerSprite(),
@@ -339,17 +389,91 @@ namespace Arkeum.Production.Presentation.World
             }
         }
 
-        private void ClearViews()
+        private void MarkFloorDirtyIfMapChanged(MapDefinition mapDefinition)
         {
-            for (int i = 0; i < spawnedViews.Count; i++)
+            if (renderedFloorMap != mapDefinition)
             {
-                if (spawnedViews[i] != null)
+                renderedFloorMap = null;
+            }
+        }
+
+        private void ClearAllViews()
+        {
+            ClearFloorViews();
+            ClearMarkerViews();
+            ClearActorViews();
+            renderedFloorMap = null;
+        }
+
+        private void ClearFloorViews()
+        {
+            DestroyViews(floorViews);
+        }
+
+        private void ClearMarkerViews()
+        {
+            DestroyViews(markerViews);
+        }
+
+        private void ClearActorViews()
+        {
+            foreach (ActorView actorView in actorViews.Values)
+            {
+                if (actorView != null)
                 {
-                    Destroy(spawnedViews[i]);
+                    Destroy(actorView.gameObject);
                 }
             }
 
-            spawnedViews.Clear();
+            actorViews.Clear();
+            activeActorIds.Clear();
+        }
+
+        private void RemoveInactiveActorViews()
+        {
+            List<string> removedActorIds = null;
+            foreach (KeyValuePair<string, ActorView> entry in actorViews)
+            {
+                if (activeActorIds.Contains(entry.Key))
+                {
+                    continue;
+                }
+
+                if (entry.Value != null)
+                {
+                    Destroy(entry.Value.gameObject);
+                }
+
+                if (removedActorIds == null)
+                {
+                    removedActorIds = new List<string>();
+                }
+
+                removedActorIds.Add(entry.Key);
+            }
+
+            if (removedActorIds == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < removedActorIds.Count; i++)
+            {
+                actorViews.Remove(removedActorIds[i]);
+            }
+        }
+
+        private void DestroyViews(List<GameObject> views)
+        {
+            for (int i = 0; i < views.Count; i++)
+            {
+                if (views[i] != null)
+                {
+                    Destroy(views[i]);
+                }
+            }
+
+            views.Clear();
         }
 
         private static bool IsMarkerEnabled(Vector2Int position)
