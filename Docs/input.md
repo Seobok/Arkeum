@@ -438,3 +438,54 @@
 - `Hide()` 호출 시 활성 Presenter 인스턴스를 제거하고 참조를 비우도록 정리했다.
 - `$env:DOTNET_CLI_HOME='D:\Unity\Private\.dotnet'; $env:HOME='D:\Unity\Private\.dotnet'; dotnet build Assembly-CSharp.csproj -nologo` 재실행 성공.
 - 빌드 결과: 경고 0개, 오류 0개.
+
+## 2026-05-26 월드 액터 View 재사용 및 이동 애니메이션 기본 구현
+
+### 사용자의 요청 개요
+- 현재 월드 표시가 입력 처리마다 액터 프레젠트를 삭제하고 다시 생성하는 방식이라 비효율적이며, 이동 애니메이션과 좌우 flip 처리를 넣기 위한 구조 변경 요청.
+
+### 핵심 요구사항
+- 매 입력마다 액터 표시 오브젝트를 삭제/재생성하지 않고 재사용한다.
+- 플레이어 이동은 이동 방향으로 부드럽게 보간한다.
+- 몬스터 이동은 이동 방향 보간에 더해 y 방향으로 약 0.5 정도 올라갔다 내려오는 기본 점프 느낌을 적용한다.
+- 모든 액터 스프라이트는 기본 +x 방향을 바라본다고 보고, -x 이동 시 `SpriteRenderer.flipX`로 좌우를 구분한다.
+
+### 이번 작업 범위
+- 월드 표시 구조 중 액터 View 생명주기를 우선 분리했다.
+- 바닥 타일은 맵이 바뀔 때만 재생성하도록 분리했다.
+- 벽, 무기, 상점, 출구, 적 예고 마커는 상태 변화 반영을 위해 기존처럼 `Refresh()`마다 재생성하되, 액터는 재사용하도록 변경했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/World/ActorView.cs`
+  - 액터 표시용 컴포넌트 추가.
+  - 현재 grid 위치, 스프라이트 표시, 좌우 flip, 플레이어/몬스터 이동 애니메이션을 담당.
+- `Assets/Arkeum/Scripts/Presentation/World/ActorView.cs.meta`
+  - 신규 Unity 스크립트 메타 파일 추가.
+- `Assets/Arkeum/Scripts/Presentation/World/ProductionViewFactory.cs`
+  - 액터 생성 시 `ActorView`를 붙여 반환하도록 변경.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 기존 `spawnedViews` 일괄 삭제 구조를 `floorViews`, `markerViews`, `actorViews`로 분리.
+  - 액터는 `ActorEntity.Id` 또는 허브 플레이어 고정 ID 기준으로 재사용하고, 사라진 액터만 제거하도록 변경.
+  - 액터 위치 갱신 시 `ActorView.MoveTo()`를 호출해 이동 애니메이션이 실행되도록 변경.
+- `Assembly-CSharp.csproj`
+  - 신규 `ActorView.cs` 컴파일 항목 추가.
+- `Docs/input.md`
+  - 이번 작업 기록 추가.
+
+### 실제 수행한 작업 요약
+- `WorldPresenter.Refresh()`가 더 이상 모든 월드 표시 오브젝트를 한 번에 삭제하지 않도록 구조를 나눴다.
+- 맵 바닥은 `renderedFloorMap` 기준으로 맵 변경 시에만 다시 그린다.
+- 동적 마커는 매 refresh마다 재생성해 런타임 벽, 무기 획득, 상점 구매, 예고 마커 표시 변화가 유지되도록 했다.
+- 액터 View는 딕셔너리에 보관하며, 살아있는 액터 목록에 없는 View만 제거한다.
+- 액터 이동 시 x 방향 이동값을 기준으로 `flipX`를 갱신하고, 상하 이동에서는 기존 좌우 방향을 유지한다.
+
+### 빌드/테스트 여부
+- `$env:DOTNET_CLI_HOME='D:\Unity\Private\.dotnet'; $env:HOME='D:\Unity\Private\.dotnet'; dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `$env:DOTNET_CLI_HOME='D:\Unity\Private\.dotnet'; $env:HOME='D:\Unity\Private\.dotnet'; dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 두 빌드 모두 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 이동 애니메이션 체감, 카메라 추적 타이밍, 입력 연속 처리 시 애니메이션 중단/재시작 느낌은 아직 직접 확인하지 못했다.
+- 현재 카메라는 액터 애니메이션 완료를 기다리지 않고 논리 위치 기준으로 즉시 이동한다. 필요하면 카메라에도 부드러운 추적 처리가 필요하다.
+- 몬스터 타입별 고유 이동 애니메이션은 아직 분기하지 않았고, 모든 몬스터에 기본 점프 이동을 적용했다.
+- PowerShell 환경에서 `git` 명령을 찾지 못해 git status/diff는 확인하지 못했다.
