@@ -38,6 +38,11 @@ namespace Arkeum.Production.Presentation.World
             spriteRenderer.flipX = facingLeft;
         }
 
+        public void SetFacing(Vector2Int direction)
+        {
+            ApplyFacing(direction);
+        }
+
         public void SetPositionImmediate(Vector2Int cell)
         {
             StopMoveRoutine();
@@ -55,6 +60,22 @@ namespace Arkeum.Production.Presentation.World
             }
 
             Vector2Int direction = cell - gridPosition;
+            ApplyFacing(direction);
+
+            if (direction == Vector2Int.zero)
+            {
+                return;
+            }
+
+            StopMoveRoutine();
+            Vector3 from = transform.position;
+            Vector3 to = ToWorldPosition(cell);
+            gridPosition = cell;
+            moveRoutine = StartCoroutine(AnimateMove(from, to, isPlayer));
+        }
+
+        private void ApplyFacing(Vector2Int direction)
+        {
             if (direction.x < 0)
             {
                 facingLeft = true;
@@ -68,17 +89,6 @@ namespace Arkeum.Production.Presentation.World
             {
                 spriteRenderer.flipX = facingLeft;
             }
-
-            if (direction == Vector2Int.zero)
-            {
-                return;
-            }
-
-            StopMoveRoutine();
-            Vector3 from = transform.position;
-            Vector3 to = ToWorldPosition(cell);
-            gridPosition = cell;
-            moveRoutine = StartCoroutine(AnimateMove(from, to, isPlayer));
         }
 
         private IEnumerator AnimateMove(Vector3 from, Vector3 to, bool isPlayer)

@@ -220,6 +220,7 @@ namespace Arkeum.Production.Core
 
             if (actionResult == PlayerActionResultType.TimingChallengeStarted)
             {
+                Services.WorldPresenter.Refresh();
                 Services.TimingPopupPresenter.Show(Services.TimingService.CurrentSession);
                 Services.HudPresenter.SetMessage(CurrentRunController.LastMessage);
                 CurrentState = GameState.TimingChallenge;

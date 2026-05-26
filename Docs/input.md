@@ -521,3 +521,79 @@
 - 현재 카메라는 액터 애니메이션 완료를 기다리지 않고 논리 위치 기준으로 즉시 이동한다. 필요하면 카메라에도 부드러운 추적 처리가 필요하다.
 - 몬스터 타입별 고유 이동 애니메이션은 아직 분기하지 않았고, 모든 몬스터에 기본 점프 이동을 적용했다.
 - PowerShell 환경에서 `git` 명령을 찾지 못해 git status/diff는 확인하지 못했다.
+
+## 2026-05-26 플레이어 이동 애니메이션 기반 카메라 추적 수정
+
+### 사용자의 요청 개요
+- 플레이어가 이동 애니메이션으로 부드럽게 움직이는데 카메라는 별도로 즉시 움직여 부자연스러우므로, 카메라가 플레이어를 따라 움직이도록 수정 요청.
+
+### 핵심 요구사항
+- 카메라가 플레이어의 논리 좌표가 아니라 실제 화면상 플레이어 위치를 따라가야 한다.
+- 플레이어 이동 보간 애니메이션 중에도 카메라가 같은 흐름으로 이동해야 한다.
+- 기존 월드 표시 및 액터 이동 애니메이션 구조를 크게 바꾸지 않는다.
+
+### 이번 작업 범위
+- `WorldPresenter`의 카메라 위치 갱신 방식만 수정했다.
+- 플레이어/허브 플레이어 `ActorView`를 카메라 추적 대상으로 지정하고, `LateUpdate()`에서 해당 `Transform` 위치를 따라가도록 변경했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 즉시 좌표 이동 대신 실행 중 플레이어 또는 허브 플레이어 `ActorView`를 카메라 추적 대상으로 설정하도록 변경.
+  - `LateUpdate()`에서 추적 대상의 실제 `Transform.position`을 기준으로 카메라 위치를 갱신하도록 추가.
+  - `EnsureCamera()`가 매 Refresh마다 카메라를 원점으로 되돌리지 않고, 새로 생성된 카메라 또는 z 위치만 보정하도록 수정.
+- `Docs/input.md`
+  - 이번 작업 요청, 변경 범위, 빌드 결과, 후속 점검 사항을 기록.
+
+### 실제 수행한 작업 요약
+- 런 상태에서는 `CurrentRun.Player.Id`에 해당하는 `ActorView`를 카메라 추적 대상으로 연결했다.
+- 허브 상태에서는 `"HubPlayer"` `ActorView`를 카메라 추적 대상으로 연결했다.
+- 플레이어 이동 애니메이션이 `ActorView`의 실제 `Transform`을 움직이면 카메라가 같은 프레임 흐름에서 해당 위치를 따라가게 했다.
+- 추적 대상이 없는 경우에는 fallback 셀 위치로 카메라를 즉시 이동하도록 했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 플레이어 이동 시 카메라 추적 감각과 화면 흔들림 여부는 직접 확인하지 못했다.
+- 카메라가 플레이어를 정확히 고정 추적하므로, 추후 더 부드러운 지연 추적이 필요하면 damping 값을 둔 보간 방식으로 조정할 수 있다.
+
+## 2026-05-26 공격 방향 기반 액터 flip 반영
+
+### 사용자의 요청 개요
+- 플레이어가 공격하는 방향에 맞춰 좌우 flip이 바뀌도록 수정 요청.
+
+### 핵심 요구사항
+- 공격 입력 방향이 좌우 방향이면 플레이어 스프라이트의 `flipX`가 해당 방향을 반영해야 한다.
+- 이동이 없는 공격 행동에서도 flip이 갱신되어야 한다.
+- 타이밍 챌린지 공격 시작 시에도 공격 방향이 즉시 화면에 반영되어야 한다.
+
+### 이번 작업 범위
+- 플레이어 공격 판정이 성공한 시점에 `ActorEntity.FacingDirection`을 공격 방향으로 갱신했다.
+- `WorldPresenter`가 액터 view 갱신 시 `FacingDirection`을 함께 전달하도록 변경했다.
+- `ActorView`가 위치 이동과 별개로 facing 방향만 받아 좌우 flip을 갱신할 수 있게 했다.
+- 타이밍 챌린지 시작 직전에 월드 표시를 갱신해 공격 방향 flip이 팝업 전에도 반영되도록 했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs`
+  - 공격 대상이 확인되면 플레이어 `FacingDirection`을 공격 컨텍스트의 `FacingDirection`으로 갱신.
+- `Assets/Arkeum/Scripts/Presentation/World/ActorView.cs`
+  - `SetFacing()`을 추가해 이동하지 않는 상태에서도 x 방향에 따라 `SpriteRenderer.flipX`를 갱신.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 액터 refresh 시 `ActorEntity.FacingDirection`을 `ActorView`에 전달.
+- `Assets/Arkeum/Scripts/Core/GameDirector.cs`
+  - 타이밍 챌린지 시작 전에 `WorldPresenter.Refresh()`를 호출해 공격 방향 flip을 즉시 반영.
+- `Docs/input.md`
+  - 이번 작업 요청, 변경 범위, 빌드 결과, 후속 점검 사항을 기록.
+
+### 실제 수행한 작업 요약
+- 공격 행동은 플레이어 위치가 바뀌지 않아 기존 이동 기반 flip만으로는 방향 전환이 발생하지 않았으므로, facing 기반 flip 갱신 경로를 분리했다.
+- 좌우 공격 방향은 `ActorView.SetFacing()`을 통해 즉시 `flipX`에 반영된다.
+- 상하 공격 방향은 기존 좌우 facing을 유지한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 공격 입력별 좌우 flip 변화와 타이밍 챌린지 팝업 직전 표시 상태는 직접 확인하지 못했다.

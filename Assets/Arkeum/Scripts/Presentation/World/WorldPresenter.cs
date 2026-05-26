@@ -8,6 +8,8 @@ namespace Arkeum.Production.Presentation.World
 {
     public sealed class WorldPresenter : MonoBehaviour
     {
+        private const float CameraZ = -10f;
+
         [SerializeField] private WorldVisualSet visualSet;
 
         private readonly List<GameObject> floorViews = new List<GameObject>();
@@ -21,6 +23,7 @@ namespace Arkeum.Production.Presentation.World
         private Transform floorRoot;
         private Transform actorRoot;
         private Transform markerRoot;
+        private Transform cameraFollowTarget;
         private ActorRepository actorRepository;
         private MapDefinition renderedFloorMap;
 
@@ -76,14 +79,14 @@ namespace Arkeum.Production.Presentation.World
                 DrawMapMarkers(CurrentMap);
                 DrawEnemyPreparedTargetMarkers();
                 RefreshRunActors();
-                FocusCamera(CurrentRun.Player != null ? CurrentRun.Player.GridPosition : CurrentMap.PlayerSpawn);
+                FollowRunPlayer();
                 return;
             }
 
             DrawMapMarkers(CurrentMap);
             DrawHubMarkers();
             RefreshHubPlayer();
-            FocusCamera(HubPlayerPosition);
+            FollowHubPlayer();
         }
 
         public void UpdateHubPlayerPosition(Vector2Int hubPlayerPosition)
@@ -200,7 +203,15 @@ namespace Arkeum.Production.Presentation.World
         private void RefreshHubPlayer()
         {
             activeActorIds.Clear();
-            RefreshActorView("HubPlayer", "HubPlayer", HubPlayerPosition, true, GetPlayerSprite(), GetPlayerTint(), 20);
+            RefreshActorView(
+                "HubPlayer",
+                "HubPlayer",
+                HubPlayerPosition,
+                Vector2Int.zero,
+                true,
+                GetPlayerSprite(),
+                GetPlayerTint(),
+                20);
             RemoveInactiveActorViews();
         }
 
@@ -232,7 +243,15 @@ namespace Arkeum.Production.Presentation.World
                     sortingOrder = 10;
                 }
 
-                RefreshActorView(actor.Id, actor.DisplayName, actor.GridPosition, actor.IsPlayer, sprite, tint, sortingOrder);
+                RefreshActorView(
+                    actor.Id,
+                    actor.DisplayName,
+                    actor.GridPosition,
+                    actor.FacingDirection,
+                    actor.IsPlayer,
+                    sprite,
+                    tint,
+                    sortingOrder);
             }
 
             RemoveInactiveActorViews();
@@ -242,6 +261,7 @@ namespace Arkeum.Production.Presentation.World
             string actorId,
             string displayName,
             Vector2Int position,
+            Vector2Int facingDirection,
             bool isPlayer,
             Sprite sprite,
             Color tint,
@@ -256,12 +276,14 @@ namespace Arkeum.Production.Presentation.World
             if (!actorViews.TryGetValue(actorId, out ActorView actorView) || actorView == null)
             {
                 actorView = viewFactory.CreateActor(actorRoot, displayName, position, sprite, tint, sortingOrder);
+                actorView.SetFacing(facingDirection);
                 actorViews[actorId] = actorView;
                 return;
             }
 
             actorView.name = displayName;
             actorView.SetVisual(sprite, tint, sortingOrder);
+            actorView.SetFacing(facingDirection);
             actorView.MoveTo(position, isPlayer);
         }
 
@@ -356,18 +378,29 @@ namespace Arkeum.Production.Presentation.World
         private void EnsureCamera()
         {
             mainCamera = Camera.main;
+            bool createdCamera = false;
             if (mainCamera == null)
             {
                 GameObject cameraObject = new GameObject("Main Camera");
                 cameraObject.tag = "MainCamera";
                 mainCamera = cameraObject.AddComponent<Camera>();
                 cameraObject.AddComponent<AudioListener>();
+                createdCamera = true;
             }
 
             mainCamera.orthographic = true;
             mainCamera.orthographicSize = 5.5f;
             mainCamera.backgroundColor = new Color(0.03f, 0.02f, 0.03f);
-            mainCamera.transform.position = new Vector3(0f, 0f, -10f);
+            if (createdCamera)
+            {
+                mainCamera.transform.position = new Vector3(0f, 0f, CameraZ);
+            }
+            else if (!Mathf.Approximately(mainCamera.transform.position.z, CameraZ))
+            {
+                Vector3 position = mainCamera.transform.position;
+                position.z = CameraZ;
+                mainCamera.transform.position = position;
+            }
         }
 
         private void BuildWorldRoots()
@@ -381,11 +414,65 @@ namespace Arkeum.Production.Presentation.World
             markerRoot.SetParent(worldRoot, false);
         }
 
-        private void FocusCamera(Vector2Int cell)
+        private void FollowRunPlayer()
         {
+            if (CurrentRun?.Player == null)
+            {
+                SetCameraFollowTarget(null, CurrentMap != null ? CurrentMap.PlayerSpawn : Vector2Int.zero);
+                return;
+            }
+
+            SetCameraFollowTargetByActorId(CurrentRun.Player.Id, CurrentRun.Player.GridPosition);
+        }
+
+        private void FollowHubPlayer()
+        {
+            SetCameraFollowTargetByActorId("HubPlayer", HubPlayerPosition);
+        }
+
+        private void SetCameraFollowTargetByActorId(string actorId, Vector2Int fallbackCell)
+        {
+            if (!string.IsNullOrEmpty(actorId) &&
+                actorViews.TryGetValue(actorId, out ActorView actorView) &&
+                actorView != null)
+            {
+                SetCameraFollowTarget(actorView.transform, fallbackCell);
+                return;
+            }
+
+            SetCameraFollowTarget(null, fallbackCell);
+        }
+
+        private void SetCameraFollowTarget(Transform target, Vector2Int fallbackCell)
+        {
+            cameraFollowTarget = target;
+            if (cameraFollowTarget == null)
+            {
+                MoveCameraTo(new Vector3(fallbackCell.x, fallbackCell.y, CameraZ));
+            }
+        }
+
+        private void LateUpdate()
+        {
+            if (cameraFollowTarget == null)
+            {
+                return;
+            }
+
+            Vector3 targetPosition = cameraFollowTarget.position;
+            MoveCameraTo(new Vector3(targetPosition.x, targetPosition.y, CameraZ));
+        }
+
+        private void MoveCameraTo(Vector3 position)
+        {
+            if (mainCamera == null)
+            {
+                EnsureCamera();
+            }
+
             if (mainCamera != null)
             {
-                mainCamera.transform.position = new Vector3(cell.x, cell.y, -10f);
+                mainCamera.transform.position = position;
             }
         }
 

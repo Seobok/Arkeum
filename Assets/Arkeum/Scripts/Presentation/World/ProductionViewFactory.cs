@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.UI;
 
 namespace Arkeum.Production.Presentation.World
 {
@@ -49,6 +50,9 @@ namespace Arkeum.Production.Presentation.World
             ActorView actorView = actor.AddComponent<ActorView>();
             actorView.Initialize(renderer, fallbackSprite);
             actorView.SetPositionImmediate(cell);
+
+            var outline = actorView.gameObject.AddComponent<Outline>();
+            outline.effectColor = Color.yellow;
             return actorView;
         }
 

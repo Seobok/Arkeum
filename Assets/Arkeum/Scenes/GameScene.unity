@@ -905,12 +905,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1881505ae9a3410419237d25a110ad0b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Presentation.UI.TimingPopupPresenter
-  popupPanel: {fileID: 0}
-  titleText: {fileID: 0}
-  trackRect: {fileID: 0}
-  goodZoneRect: {fileID: 0}
-  perfectZoneRect: {fileID: 0}
-  markerRect: {fileID: 0}
+  presenterRoot: {fileID: 0}
 --- !u!1001 &1912830459
 PrefabInstance:
   m_ObjectHideFlags: 0

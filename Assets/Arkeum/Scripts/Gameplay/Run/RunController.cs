@@ -79,6 +79,7 @@ namespace Arkeum.Production.Gameplay.Run
             Vector2Int targetCell = CurrentRun.Player.GridPosition + direction;
             if (TryGetPlayerAttackTarget(direction, out ActorEntity enemy, out WeaponAttackContext attackContext))
             {
+                CurrentRun.Player.FacingDirection = attackContext.FacingDirection;
                 if (timingService != null && timingService.TryBegin(CurrentRun, attackContext, out TimingSession _))
                 {
                     SetMessage("Time your strike.");
