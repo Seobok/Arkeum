@@ -376,3 +376,36 @@
 ### 추가 보강
 - 상점 특수방 에셋에 적 스폰이 실수로 포함되어 있어도 런타임 맵 생성 시 해당 상점 방의 적 스폰은 등록하지 않도록 보강했다.
 - 보강 후 `dotnet build Assembly-CSharp.csproj -nologo`, `dotnet build Assembly-CSharp-Editor.csproj -nologo`를 다시 실행했고 모두 경고 0개, 오류 0개로 성공했다.
+
+## 2026-05-25 보스방 진입 시 출구방 방향 봉쇄 추가
+
+### 사용자의 요청 개요
+- 보스맵 스테이지에서 보스방에 들어가면 입구방 방향은 닫히는 것을 확인했으며, 출구방 방향도 함께 닫히도록 수정 요청.
+
+### 핵심 요구사항
+- 보스방 진입 시 기존 입구 봉쇄와 동일한 타이밍에 출구방으로 이어지는 경로도 벽으로 막는다.
+- 보스방 클리어 시 기존 봉쇄 해제 흐름으로 입구/출구 방향 벽이 함께 제거되도록 한다.
+
+### 이번 작업 범위
+- 보스층 고정 배치 생성 로직에서 보스방의 입구 문과 출구 문 양쪽에 봉쇄 대상 셀을 등록하도록 수정.
+- 런타임 봉쇄/해제 처리 로직은 기존 `BossEntranceBlockCells`와 `SetBossEntranceWalls()` 흐름을 그대로 사용.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Map/MapGenerator.cs`
+  - 보스방과 출구방 연결 정보를 보존하고, 보스방 출구 문 바깥 셀도 보스방 봉쇄 셀 목록에 추가.
+  - 기존 입구 전용 helper를 보스방 문 공통 helper로 변경.
+- `Docs/input.md`
+  - 이번 작업 요청, 변경 범위, 빌드 결과, 후속 점검 사항 기록.
+
+### 실제 수행한 작업 요약
+- `CreateBossDungeonMap()`에서 `boss -> exit` 연결의 `DoorConnection`을 받아오도록 변경.
+- 보스방 입구는 `bossEntranceConnection.ToDoor`, 보스방 출구는 `bossExitConnection.FromDoor` 기준으로 문 바깥 셀을 `BossEntranceBlockCells`에 등록.
+- 보스방 진입 시 기존 `SetBossEntranceWalls(true)`가 두 봉쇄 셀을 모두 벽으로 만들고, 클리어 시 `SetBossEntranceWalls(false)`가 함께 해제하도록 구성.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 보스방 진입 시 입구/출구 방향이 모두 시각적으로 막히는지 직접 확인하지 못했다.
+- 보스방 클리어 후 입구/출구 방향 벽이 모두 제거되고 출구방 진입 및 층 이동이 정상 동작하는지 Play Mode 확인이 필요하다.

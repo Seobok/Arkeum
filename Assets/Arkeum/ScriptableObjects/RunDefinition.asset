@@ -27,6 +27,9 @@ MonoBehaviour:
     - RoomType: 1
       RoomAsset: {fileID: 11400000, guid: 684b0eb1ed1f4a749bfc649b04ad46ad, type: 2}
       Count: 1
+    - RoomType: 3
+      RoomAsset: {fileID: 11400000, guid: 9119d5ecf3f6b7846a9f77b13a862252, type: 2}
+      Count: 1
     MinimumRoomCount: 6
     RoomGap: 5
     PlacementAttempts: 300
@@ -35,7 +38,7 @@ MonoBehaviour:
     RoomAssets: []
     SpecialRooms:
     - RoomType: 1
-      RoomAsset: {fileID: 11400000, guid: 684b0eb1ed1f4a749bfc649b04ad46ad, type: 2}
+      RoomAsset: {fileID: 11400000, guid: 319991cf12f057647b761c6f8eaee2e0, type: 2}
       Count: 1
     - RoomType: 2
       RoomAsset: {fileID: 11400000, guid: 785636b9b2c5c834aaecef3daa491a12, type: 2}

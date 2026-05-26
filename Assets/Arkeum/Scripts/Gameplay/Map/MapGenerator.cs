@@ -197,14 +197,15 @@ namespace Arkeum.Production.Gameplay.Map
 
             Vector2Int exitOrigin = CalculateCandidateOrigin(bossRoom, roomTemplates.ExitRoom, DoorDirection.Up, settings.RoomGap);
             PlacedRoom exitRoom = CreatePlacedRoom(2, roomTemplates.ExitRoom, exitOrigin, Vector2Int.up * 2);
-            if (!TryConnectBossFloorRooms(map, rooms, occupiedRoomCells, bossRoom, exitRoom, out _))
+            if (!TryConnectBossFloorRooms(map, rooms, occupiedRoomCells, bossRoom, exitRoom, out DoorConnection bossExitConnection))
             {
                 Debug.LogWarning("[MapGenerator] Boss floor failed to connect boss room to exit room. Falling back to regular dungeon generation.");
                 return CreateDungeonMap(roomTemplates, settings);
             }
 
             map.BossRoomId = bossRoom.Id;
-            AddBossEntranceBlockCell(map, bossEntranceConnection);
+            AddBossRoomDoorBlockCell(map, bossEntranceConnection.ToDoor);
+            AddBossRoomDoorBlockCell(map, bossExitConnection.FromDoor);
             map.FloorExitPosition = roomTemplates.ExitRoom.HasFloorExit
                 ? roomTemplates.ExitRoom.FloorExitPosition + exitOrigin
                 : PickExitCell(exitRoom.Definition);
@@ -922,9 +923,9 @@ namespace Arkeum.Production.Gameplay.Map
             return true;
         }
 
-        private static void AddBossEntranceBlockCell(MapDefinition map, DoorConnection entranceConnection)
+        private static void AddBossRoomDoorBlockCell(MapDefinition map, DungeonDoorDefinition bossRoomDoor)
         {
-            Vector2Int blockCell = entranceConnection.ToDoor.Position + ToVector(entranceConnection.ToDoor.Direction);
+            Vector2Int blockCell = bossRoomDoor.Position + ToVector(bossRoomDoor.Direction);
             if (map.WalkableCells.Contains(blockCell) && !map.BossEntranceBlockCells.Contains(blockCell))
             {
                 map.BossEntranceBlockCells.Add(blockCell);
