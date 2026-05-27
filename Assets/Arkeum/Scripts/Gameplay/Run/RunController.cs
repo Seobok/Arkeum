@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Arkeum.Production.Gameplay.Actors;
 using Arkeum.Production.Gameplay.Combat;
 using Arkeum.Production.Gameplay.Interaction;
@@ -76,41 +76,53 @@ namespace Arkeum.Production.Gameplay.Run
                 return PlayerActionResultType.NotHandled;
             }
 
+            // 상호작용할 Cell 선정
             Vector2Int targetCell = CurrentRun.Player.GridPosition + direction;
-            if (TryGetPlayerAttackTarget(direction, out ActorEntity enemy, out WeaponAttackContext attackContext))
+
+            // 해당 셀을 기준으로 공격이 가능하다면
+            if (TryGetPlayerAttackTargets(direction, out List<WeaponAttackContext> attackContexts))
             {
+                WeaponAttackContext attackContext = attackContexts[0];
                 CurrentRun.Player.FacingDirection = attackContext.FacingDirection;
-                if (timingService != null && timingService.TryBegin(CurrentRun, attackContext, out TimingSession _))
+
+                // 타이밍 활성화 되어있는지 확인
+                if (timingService != null && timingService.TryBegin(CurrentRun, attackContexts, out TimingSession _))
                 {
                     SetMessage("Time your strike.");
                     return PlayerActionResultType.TimingChallengeStarted;
                 }
 
-                ResolvePlayerAttack(enemy, attackContext);
+                // 일반 공격
+                ResolvePlayerAttacks(attackContexts);
                 return PlayerActionResultType.Handled;
             }
 
+            // 해당 셀에 인터렉션이 가능한 물체가 있다면
             if (TryHandleRunInteractionAt(targetCell))
             {
                 return PlayerActionResultType.Handled;
             }
 
+            // 해당 셀에 진열대가 있다면
             if (TryHandleShopOfferAt(targetCell))
             {
                 return PlayerActionResultType.Handled;
             }
 
+            // 해당 셀이 이동 불가능한 셀이라면
             if (!mapService.IsWalkable(targetCell))
             {
                 SetMessage("The path is blocked.");
                 return PlayerActionResultType.NotHandled;
             }
 
+            // 해당 셀으로 이동
             CurrentRun.Player.GridPosition = targetCell;
-            bool sealedBossRoom = TrySealBossRoomIfNeeded();
+
+            bool sealedBossRoom = TrySealBossRoomIfNeeded(); // 보스룸 입장인지 확인
             if (!sealedBossRoom &&
-                !TryAutoPickupAtPlayerPosition() &&
-                !TryDescribeAdjacentShopOffer())
+                !TryAutoPickupAtPlayerPosition() && // 자리에 있는 아이템 픽업
+                !TryDescribeAdjacentShopOffer()) // 근처에 있는 진열대 정보 표시
             {
                 SetMessage(string.Empty);
             }
@@ -122,17 +134,24 @@ namespace Arkeum.Production.Gameplay.Run
         public bool ResolveTimedAttack(TimingAttackResult timingResult)
         {
             TimingSession session = timingService?.CurrentSession;
-            WeaponAttackContext attackContext = session?.AttackContext;
-            ActorEntity enemy = attackContext?.Defender;
-            if (attackContext == null || enemy == null || CurrentRun?.Player == null)
+            IReadOnlyList<WeaponAttackContext> attackContexts = session?.AttackContexts;
+            if (attackContexts == null || attackContexts.Count == 0 || CurrentRun?.Player == null)
             {
                 timingService?.CancelCurrent();
                 return false;
             }
 
             timingService.CompleteCurrent(timingResult.Grade);
-            attackContext.TimingResult = timingResult;
-            ResolvePlayerAttack(enemy, attackContext);
+            for (int i = 0; i < attackContexts.Count; i++)
+            {
+                WeaponAttackContext attackContext = attackContexts[i];
+                if (attackContext != null)
+                {
+                    attackContext.TimingResult = timingResult;
+                }
+            }
+
+            ResolvePlayerAttacks(attackContexts);
             return true;
         }
 
@@ -147,40 +166,59 @@ namespace Arkeum.Production.Gameplay.Run
             SetMessage(CurrentRun.IsTimingModeEnabled ? "Timing enabled." : "Timing disabled.");
         }
 
-        private void ResolvePlayerAttack(ActorEntity enemy, WeaponAttackContext attackContext)
+        private void ResolvePlayerAttacks(IReadOnlyList<WeaponAttackContext> attackContexts)
         {
-            int damage = combatSystem.ResolvePlayerAttack(CurrentRun, CurrentRun.Player, enemy, attackContext);
-            string resultPrefix = FormatTimingResultPrefix(attackContext);
-            SetMessage($"{resultPrefix}You strike {enemy.DisplayName} for {damage} damage.");
-            if (!enemy.IsAlive)
+            if (attackContexts == null || attackContexts.Count == 0)
             {
-                activeProfile?.AddGold(enemy.Gold);
-                SetMessage($"{enemy.DisplayName} falls. You gain {enemy.Gold} gold.");
+                return;
             }
 
+            for (int i = 0; i < attackContexts.Count; i++)
+            {
+                WeaponAttackContext attackContext = attackContexts[i];
+                ActorEntity enemy = attackContext?.Defender;
+                if (enemy == null || !enemy.IsAlive)
+                {
+                    continue;
+                }
+
+                // 데미지 계산
+                int damage = combatSystem.ResolvePlayerAttack(CurrentRun, CurrentRun.Player, enemy, attackContext);
+
+                // 공격한 적이 죽었을 때
+                if (!enemy.IsAlive)
+                {
+                    activeProfile?.AddGold(enemy.Gold);
+                }
+            }
+
+            // 보스방일 때 모든 적이 죽었다면 문을 개방 
             TryClearBossRoomIfNeeded();
             ConsumeTurn();
         }
 
-        private bool TryGetPlayerAttackTarget(Vector2Int direction, out ActorEntity enemy, out WeaponAttackContext attackContext)
+        // 플레이어 공격 범위 안에 있는 모든 대상을 수집하는 함수
+        private bool TryGetPlayerAttackTargets(Vector2Int direction, out List<WeaponAttackContext> attackContexts)
         {
-            enemy = null;
-            attackContext = null;
+            attackContexts = new List<WeaponAttackContext>();
             Vector2Int facing = EnemyAttackPatternDefinition.NormalizeFacing(direction);
             WeaponDefinition weapon = CurrentRun.EquippedWeapon;
+            
+            // 무기가 없을 때는 전방 한칸 공격
             if (weapon == null || weapon.AttackOffsets == null || weapon.AttackOffsets.Count == 0)
             {
                 Vector2Int targetCell = CurrentRun.Player.GridPosition + facing;
                 if (mapService.BlocksAttackBetween(CurrentRun.Player.GridPosition, targetCell) ||
-                    !actorRepository.TryGetEnemyAt(targetCell, out enemy))
+                    !actorRepository.TryGetEnemyAt(targetCell, out ActorEntity enemy))
                 {
                     return false;
                 }
 
-                attackContext = BuildWeaponAttackContext(enemy, null, facing, Vector2Int.right);
+                attackContexts.Add(BuildWeaponAttackContext(enemy, null, facing, Vector2Int.right));
                 return true;
             }
 
+            // 무기가 있을 때는 무기 범위 조사
             for (int i = 0; i < weapon.AttackOffsets.Count; i++)
             {
                 Vector2Int weaponOffset = weapon.AttackOffsets[i];
@@ -189,21 +227,43 @@ namespace Arkeum.Production.Gameplay.Run
                     continue;
                 }
 
+                // 바라보는 방향 기준으로 회전
                 Vector2Int targetOffset = weaponOffset;
                 if (weapon.RotateAttackByFacing)
                 {
                     targetOffset = EnemyAttackPatternDefinition.RotateOffset(weaponOffset, facing);
                 }
 
+                // 공격범위 사이에 가로막는 벽이 있는지 확인 (정규 격자만 확인)
                 Vector2Int targetCell = CurrentRun.Player.GridPosition + targetOffset;
                 if (mapService.BlocksAttackBetween(CurrentRun.Player.GridPosition, targetCell))
                 {
                     continue;
                 }
 
-                if (actorRepository.TryGetEnemyAt(targetCell, out enemy))
+                // 적이 있는지 확인 및 이미 공격중인 적인지 중복검사
+                if (actorRepository.TryGetEnemyAt(targetCell, out ActorEntity enemy) &&
+                    !ContainsDefender(attackContexts, enemy))
                 {
-                    attackContext = BuildWeaponAttackContext(enemy, weapon, facing, weaponOffset);
+                    // 성공시 attackContext 생성
+                    attackContexts.Add(BuildWeaponAttackContext(enemy, weapon, facing, weaponOffset));
+                }
+            }
+
+            return attackContexts.Count > 0;
+        }
+
+        private static bool ContainsDefender(IReadOnlyList<WeaponAttackContext> attackContexts, ActorEntity defender)
+        {
+            if (attackContexts == null || defender == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < attackContexts.Count; i++)
+            {
+                if (attackContexts[i]?.Defender == defender)
+                {
                     return true;
                 }
             }
@@ -225,7 +285,7 @@ namespace Arkeum.Production.Gameplay.Run
                 Weapon = weapon,
                 FacingDirection = facing,
                 WeaponOffset = weaponOffset,
-                AttackPower = CurrentRun.Player.Stats.AttackPower,
+                AttackPower = RunStatCalculator.CalculatePlayerAttack(CurrentRun),
                 TimingResult = TimingAttackResult.None,
             };
         }
@@ -348,7 +408,6 @@ namespace Arkeum.Production.Gameplay.Run
             activeProfile.SetGold(currentGold - price);
             CurrentRun.HasEquippedWeapon = true;
             CurrentRun.EquippedWeapon = purchasedOffer.Weapon;
-            CurrentRun.Player.Stats.AttackPower = CurrentRun.EffectiveAttack;
 
             if (hadEquippedWeapon)
             {
@@ -499,8 +558,7 @@ namespace Arkeum.Production.Gameplay.Run
             {
                 CurrentRun.HasEquippedWeapon = true;
                 CurrentRun.EquippedWeapon = weaponSpawn.Weapon;
-                CurrentRun.Player.Stats.AttackPower = CurrentRun.EffectiveAttack;
-                
+                    
                 WeaponPickedUp?.Invoke();
                 
                 SetMessage(BuildWeaponPickupMessage(weaponSpawn.Weapon, hadEquippedWeapon, droppedWeapon));

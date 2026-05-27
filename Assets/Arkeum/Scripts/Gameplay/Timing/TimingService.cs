@@ -1,4 +1,5 @@
 using Arkeum.Production.Gameplay.Run;
+using System.Collections.Generic;
 
 namespace Arkeum.Production.Gameplay.Timing
 {
@@ -9,7 +10,18 @@ namespace Arkeum.Production.Gameplay.Timing
 
         public bool TryBegin(RunState runState, WeaponAttackContext attackContext, out TimingSession session)
         {
+            return TryBegin(
+                runState,
+                attackContext != null ? new[] { attackContext } : null,
+                out session);
+        }
+
+        public bool TryBegin(RunState runState, IReadOnlyList<WeaponAttackContext> attackContexts, out TimingSession session)
+        {
             session = null;
+            WeaponAttackContext attackContext = attackContexts != null && attackContexts.Count > 0
+                ? attackContexts[0]
+                : null;
             if (runState == null || !runState.IsTimingModeEnabled || attackContext?.Weapon == null)
             {
                 return false;
@@ -27,7 +39,7 @@ namespace Arkeum.Production.Gameplay.Timing
                 return false;
             }
 
-            session = new TimingSession(attackContext, definition, runtime);
+            session = new TimingSession(attackContexts, definition, runtime);
             CurrentSession = session;
             return true;
         }

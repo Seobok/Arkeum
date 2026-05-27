@@ -597,3 +597,42 @@
 
 ### 확인하지 못한 사항 또는 후속 점검 사항
 - Unity Play Mode에서 실제 공격 입력별 좌우 flip 변화와 타이밍 챌린지 팝업 직전 표시 상태는 직접 확인하지 못했다.
+## 2026-05-27 플레이어 범위 공격 다중 대상 적용
+
+### 사용자의 요청 개요
+- 플레이어 공격 범위 안에 여러 공격 대상이 있을 때 모든 적이 공격을 받도록 수정 요청.
+
+### 핵심 요구사항
+- 무기 공격 범위에 포함된 살아있는 적을 하나만 선택하지 않고 모두 피해 처리한다.
+- 기존 무기 오프셋, 방향 회전, 벽에 의한 공격 차단 규칙은 유지한다.
+- 타이밍 공격 사용 시에도 같은 타이밍 결과가 범위 내 모든 공격 대상에게 적용되도록 한다.
+
+### 이번 작업 범위
+- 플레이어 공격 대상 탐색과 피해 적용 흐름을 단일 대상에서 다중 대상 목록 기반으로 변경.
+- 타이밍 공격 세션이 여러 공격 컨텍스트를 보관하고 완료 시 모두 처리하도록 변경.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs`
+  - `TryGetPlayerAttackTargets()`가 공격 범위 내 모든 적의 `WeaponAttackContext`를 수집하도록 변경.
+  - `ResolvePlayerAttacks()`가 수집된 모든 대상에게 피해, 사망 처리, 골드 획득, 턴 소비를 한 번에 처리하도록 추가.
+  - 타이밍 공격 완료 시 모든 대상 컨텍스트에 동일한 `TimingAttackResult`를 적용하도록 수정.
+- `Assets/Arkeum/Scripts/Gameplay/Timing/TimingService.cs`
+  - 단일 공격 컨텍스트뿐 아니라 다중 공격 컨텍스트 목록으로 타이밍 세션을 시작할 수 있도록 확장.
+- `Assets/Arkeum/Scripts/Gameplay/Timing/TimingSession.cs`
+  - 타이밍 세션이 `AttackContexts` 목록을 보관하도록 확장.
+- `Docs/input.md`
+  - 이번 작업 요청, 변경 범위, 빌드 결과, 후속 점검 사항 기록.
+
+### 실제 수행한 작업 요약
+- 무기 공격 오프셋을 끝까지 순회하면서 막히지 않은 각 칸의 적을 모두 공격 대상으로 수집하도록 변경.
+- 동일 적이 중복 오프셋에 걸릴 가능성에 대비해 같은 적은 한 번만 추가하도록 방어 로직을 추가.
+- 각 대상별로 별도 `WeaponAttackContext`를 사용해 창 같은 오프셋 기반 무기 효과가 기존 규칙대로 대상별 적용되도록 유지.
+- 범위 공격 결과 메시지는 다중 명중, 다중 처치, 단일 처치 상황을 구분해 표시하도록 정리.
+
+### 빌드/테스트 여부
+- `$env:DOTNET_CLI_HOME='D:\Unity\Private\.dotnet'; $env:HOME='D:\Unity\Private\.dotnet'; dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 무기별 범위 내 다중 적 피격, 타이밍 공격 다중 피격, 처치/골드 메시지 표시를 직접 확인하지 못했다.
+- `Assembly-CSharp-Editor.csproj` 빌드는 실행하지 않았다.
