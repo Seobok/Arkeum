@@ -66,10 +66,17 @@ namespace Arkeum.Production.Core
                 return;
             }
 
-            ServiceRegistry services = BuildServices();
+            //씬 오브젝트 초기화
             worldPresenter.Initialize();
+
+            //HUD UI 초기화
             hudPresenter.Initialize(gameDirector);
+
+            //타이밍 기능 팝업 관련 UI 초기화
             timingPopupPresenter.Initialize();
+
+            //게임 디렉터 초기화 (게임 진입)
+            ServiceRegistry services = BuildServices();
             SaveProfile profile = new SaveProfile();
             gameDirector.Initialize(services, profile);
         }

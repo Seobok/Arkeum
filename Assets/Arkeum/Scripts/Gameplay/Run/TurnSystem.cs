@@ -9,8 +9,6 @@
             {
                 return;
             }
-
-            runState.TurnCount += 1;
         }
     }
 }

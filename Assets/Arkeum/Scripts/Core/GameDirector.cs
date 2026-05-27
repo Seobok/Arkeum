@@ -217,17 +217,6 @@ namespace Arkeum.Production.Core
             {
                 actionResult = CurrentRunController.TryHandlePlayerAction(direction);
             }
-            else if (Services.InputReader.WasWaitPressed())
-            {
-                CurrentRunController.Wait();
-                actionResult = PlayerActionResultType.Handled;
-            }
-            else if (Services.InputReader.WasUseBandagePressed())
-            {
-                actionResult = CurrentRunController.UseBandage()
-                    ? PlayerActionResultType.Handled
-                    : PlayerActionResultType.NotHandled;
-            }
 
             if (actionResult == PlayerActionResultType.NotHandled)
             {
@@ -333,6 +322,8 @@ namespace Arkeum.Production.Core
             runState.CurrentFloor = nextFloor;
             runState.CurrentFloorDefinition = nextFloorDefinition;
             runState.FloorExitUsed = false;
+            runState.BossRoomEntered = false;
+            runState.BossRoomCleared = false;
             runState.EndReason = RunEndReason.None;
             runState.Player = player;
             player.SetMaxHp(PlayerMaxHP);

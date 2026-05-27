@@ -6,7 +6,7 @@ namespace Arkeum.Production.Gameplay.Run
     public sealed class OffsetDamageModifierWeaponEffect : WeaponEffectDefinition
     {
         [SerializeField] private Vector2Int offset = Vector2Int.right;
-        [SerializeField] private int attackPowerBonus = -1;
+        [SerializeField] private int attackPowerBonus;
 
         public Vector2Int Offset => offset;
         public int AttackPowerBonus => attackPowerBonus;

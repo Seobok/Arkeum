@@ -56,9 +56,6 @@ namespace Arkeum.Production.Gameplay.Run
             {
                 RunIndex = (profile?.TotalReturns ?? 0) + 1,
                 CurrentFloor = 1,
-                TurnCount = 0,
-                BandageCount = startingLoadout != null ? startingLoadout.BandageCount : 0,
-                AttackBonus = 0,
                 FloorExitUsed = false,
                 BossRoomEntered = false,
                 BossRoomCleared = false,
@@ -288,37 +285,6 @@ namespace Arkeum.Production.Gameplay.Run
                 AttackPower = RunStatCalculator.CalculatePlayerAttack(CurrentRun),
                 TimingResult = TimingAttackResult.None,
             };
-        }
-
-        public bool UseBandage()
-        {
-            if (CurrentRun == null)
-            {
-                return false;
-            }
-
-            if (CurrentRun.Player == null)
-            {
-                return false;
-            }
-
-            if (CurrentRun.BandageCount <= 0)
-            {
-                SetMessage("No bandages remain.");
-                return false;
-            }
-
-            if (CurrentRun.Player.CurrentHp >= CurrentRun.Player.Stats.MaxHp)
-            {
-                SetMessage("You are already at full health.");
-                return false;
-            }
-
-            CurrentRun.BandageCount -= 1;
-            CurrentRun.Player.SetCurrentHp(CurrentRun.Player.CurrentHp + 4);
-            SetMessage("You bind your wounds.");
-            ConsumeTurn();
-            return true;
         }
 
         public void Wait()

@@ -9,9 +9,6 @@ namespace Arkeum.Production.Gameplay.Run
         public int RunIndex;
         public int CurrentFloor;
         public RunFloorDefinition CurrentFloorDefinition;
-        public int TurnCount;
-        public int BandageCount;
-        public int AttackBonus;
         public bool FloorExitUsed;
         public bool BossRoomEntered;
         public bool BossRoomCleared;
@@ -20,7 +17,5 @@ namespace Arkeum.Production.Gameplay.Run
         public bool IsTimingModeEnabled;
         public RunEndReason EndReason;
         public ActorEntity Player;
-
-        public int EffectiveAttack => RunStatCalculator.CalculatePlayerAttack(this);
     }
 }

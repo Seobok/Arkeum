@@ -12,7 +12,7 @@ namespace Arkeum.Production.Gameplay.Actors
 
         public int MaxHp => maxHp;
         public int AttackPower = 1;
-        public int Defense;
+        public int Defense = 0;
         public int DetectionRange = 6;
         public int MovementRange = 1;
         public int AttackPreparationTurns;
