@@ -15,7 +15,7 @@ MonoBehaviour:
   id: Sword
   displayName: "\uB300\uAC80"
   sprite: {fileID: 21300000, guid: 9fea228192abf31418cacd4b940b30bd, type: 3}
-  tint: {r: 0.75, g: 0.43, b: 0.18, a: 1}
+  tint: {r: 1, g: 1, b: 1, a: 1}
   attackBonus: 1
   attackEditorMin: {x: -3, y: -3}
   attackEditorMax: {x: 3, y: 3}

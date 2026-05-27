@@ -165,13 +165,16 @@ namespace Arkeum.Production.Presentation.World
                     continue;
                 }
 
-                markerViews.Add(viewFactory.CreateCell(
+                var weaponMark = viewFactory.CreateCell(
                     markerRoot,
                     weaponSpawn.Position,
                     GetWeaponSprite(weaponSpawn.Weapon),
                     GetWeaponTint(weaponSpawn.Weapon),
                     $"Weapon_{i}",
-                    4));
+                    4);
+                // 무기 마크가 잘 안보여서 스케일 조절
+                weaponMark.transform.localScale = new Vector3(2, 2, 1);
+                markerViews.Add(weaponMark);
             }
 
             // 진열대 View

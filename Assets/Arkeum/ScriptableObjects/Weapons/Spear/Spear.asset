@@ -15,7 +15,7 @@ MonoBehaviour:
   id: Spear
   displayName: "\uCC3D"
   sprite: {fileID: 21300000, guid: ac6f57ca87f084d4e9beec43aee26b9f, type: 3}
-  tint: {r: 0.75, g: 0.43, b: 0.18, a: 1}
+  tint: {r: 1, g: 1, b: 1, a: 1}
   attackBonus: 1
   attackEditorMin: {x: -3, y: -3}
   attackEditorMax: {x: 3, y: 3}

@@ -15,15 +15,14 @@ MonoBehaviour:
   enemyId: Skeleton
   displayName: "\uC2A4\uCF08\uB808\uD1A4"
   stats:
-    MaxHp: 2
+    maxHp: 2
     AttackPower: 1
     Defense: 0
-    ActionInterval: 1
     DetectionRange: 6
     MovementRange: 1
     AttackPreparationTurns: 1
     MovePreparationTurns: 1
   bloodReward: 1
   attackPattern: {fileID: 11400000, guid: 5c561af495ad5284bad0ecd44fa28faf, type: 2}
-  sprite: {fileID: 0}
+  sprite: {fileID: 21300000, guid: 1aa37d9d2622c1648a302dc9b6eb5f62, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
