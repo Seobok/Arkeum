@@ -1,4 +1,4 @@
-using Arkeum.Production.Gameplay.Timing;
+﻿using Arkeum.Production.Gameplay.Timing;
 using UnityEngine;
 
 namespace Arkeum.Production.Presentation.UI
@@ -7,6 +7,7 @@ namespace Arkeum.Production.Presentation.UI
     {
         protected TimingSession Session { get; private set; }
 
+        // 타이밍 팝업 호출
         public void Show(TimingSession session)
         {
             Session = session;
@@ -18,6 +19,7 @@ namespace Arkeum.Production.Presentation.UI
             }
         }
 
+        // 타이밍 팝업 호출 중 프레임 단위로 호출 (LateUpdate)
         public void Refresh(TimingSession session)
         {
             if (session == null)

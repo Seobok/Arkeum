@@ -133,8 +133,10 @@ namespace Arkeum.Production.Core
             
             // 런 컨트롤러에 런 스테이트 주입
             runController.Begin(runState);
+            CurrentRunController = runController;
 
-            PrepareRun(runController);
+            //씬 오브젝트 및 HUD 초기화
+            CurrentState = GameState.RunPreparing;
             Services.WorldPresenter.SetActorRepository(Services.ActorRepository);
             Services.WorldPresenter.BindRun(runState, Services.MapService.CurrentMap);
             Services.WorldPresenter.Refresh();
@@ -144,12 +146,7 @@ namespace Arkeum.Production.Core
             CurrentState = GameState.InRun;
         }
 
-        public void PrepareRun(RunController runController)
-        {
-            CurrentRunController = runController;
-            CurrentState = GameState.RunPreparing;
-        }
-
+        // 런 결과 출력
         public void ShowRunResult()
         {
             if (CurrentRunController?.CurrentRun == null)
@@ -157,47 +154,60 @@ namespace Arkeum.Production.Core
                 return;
             }
 
+            // 클리어 데이터 처리
             Services.ProgressionService.ApplyRunEnd(ActiveProfile, CurrentRunController.CurrentRun);
+
+            // 클리어 UI 데이터 입력
             Services.ProgressionService.BuildResultLines(
                 ActiveProfile,
                 CurrentRunController.CurrentRun,
                 lostResultLines,
                 keptResultLines);
+
+            // 클리어 UI (TEXT) / 다른 방식으로 수정 예정
             Services.HudPresenter.SetRunResult(lostResultLines, keptResultLines);
             Services.HudPresenter.SetMessage(CurrentRunController.CurrentRun.EndReason == RunEndReason.Death
                 ? "Death is not the end, only the start of reckoning."
                 : "The recovered light returns to the altar.");
+
             Services.WorldPresenter.Refresh();
             CurrentState = GameState.RunResult;
         }
 
+        // HUB 인풋
         private void UpdateHubInput()
         {
+            // 방향키 입력 확인
             if (!Services.InputReader.TryGetMoveDirection(out Vector2Int direction))
             {
                 return;
             }
 
             Vector2Int target = hubPlayerPosition + direction;
-            if (Services.InteractionSystem.TryInteract(target, null))
+
+            // 인터렉션
+            if (Services.InteractionSystem.TryInteract(target, Services.ActorRepository.Player))
             {
                 Services.WorldPresenter.UpdateHubPlayerPosition(hubPlayerPosition);
                 Services.WorldPresenter.Refresh();
                 return;
             }
 
+            // 이동 가능한 위치인지
             if (!Services.MapService.IsWalkableCell(target))
             {
                 Services.HudPresenter.SetMessage("The path is blocked.");
                 return;
             }
 
+            // 이동
             hubPlayerPosition = target;
             Services.WorldPresenter.UpdateHubPlayerPosition(hubPlayerPosition);
             Services.WorldPresenter.Refresh();
             UpdateHubLocationMessage();
         }
 
+        // RUN 인풋
         private void UpdateRunInput()
         {
             if (CurrentRunController == null)
@@ -205,6 +215,7 @@ namespace Arkeum.Production.Core
                 return;
             }
 
+            // 타이밍 토글 ( 턴 소모 X )
             if (Services.InputReader.WasTimingTogglePressed())
             {
                 CurrentRunController.ToggleTimingMode();
@@ -213,6 +224,8 @@ namespace Arkeum.Production.Core
             }
 
             PlayerActionResultType actionResult = PlayerActionResultType.NotHandled;
+
+            // 방향키 입력 확인
             if (Services.InputReader.TryGetMoveDirection(out Vector2Int direction))
             {
                 actionResult = CurrentRunController.TryHandlePlayerAction(direction);
@@ -223,6 +236,7 @@ namespace Arkeum.Production.Core
                 return;
             }
 
+            // 타이밍 공격
             if (actionResult == PlayerActionResultType.TimingChallengeStarted)
             {
                 Services.WorldPresenter.Refresh();

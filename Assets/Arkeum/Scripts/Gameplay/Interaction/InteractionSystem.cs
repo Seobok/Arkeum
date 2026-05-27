@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Arkeum.Production.Gameplay.Actors;
 using Arkeum.Production.Gameplay.Map;
 using Arkeum.Production.Gameplay.Run;
@@ -27,6 +27,7 @@ namespace Arkeum.Production.Gameplay.Interaction
             interactables.AddRange(sources);
         }
 
+        //HUB 인터렉션
         public bool TryInteract(Vector2Int targetCell, ActorEntity actor)
         {
             if (TryGetInteractableAt(targetCell, out IInteractable interactable))
@@ -37,6 +38,7 @@ namespace Arkeum.Production.Gameplay.Interaction
             return false;
         }
 
+        //RUN 인터렉션
         public InteractionResolution ResolveRunInteractionAt(
             Vector2Int targetCell,
             ActorEntity actor,
@@ -47,6 +49,7 @@ namespace Arkeum.Production.Gameplay.Interaction
             return interactionResolver.ResolveRunInteractionAt(targetCell, interactable, actor, runState, mapDefinition);
         }
 
+        // 해당 위치에 있는 인터렉션을 가져오는 함수
         public bool TryGetInteractableAt(Vector2Int targetCell, out IInteractable interactableAtCell)
         {
             for (int i = 0; i < interactables.Count; i++)

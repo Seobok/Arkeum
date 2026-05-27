@@ -305,21 +305,6 @@ namespace Arkeum.Production.Presentation.UI
             return hasReferences;
         }
 
-        private string BuildControlsText()
-        {
-            if (gameDirector.CurrentState == GameState.InRun || gameDirector.CurrentState == GameState.TimingChallenge)
-            {
-                return "Move keys: attack, interact, or move\nWait: Q\nItems: 1 bandage\nTiming: Next";
-            }
-
-            if (gameDirector.CurrentState == GameState.RunResult)
-            {
-                return "Close result: Enter";
-            }
-
-            return "Move: arrow keys / WASD\nInteract: bump the target in front of you";
-        }
-
         #region HP UI
         private bool TryInitializeHpList()
         {
@@ -488,18 +473,6 @@ namespace Arkeum.Production.Presentation.UI
         }
 
         #region PreparedTarget UI
-        private void RefreshPreparedTargetToggle(bool inRun)
-        {
-            bool canShow = inRun && gameDirector.Services?.WorldPresenter != null;
-            preparedTargetToggle.gameObject.SetActive(canShow);
-            if (!canShow)
-            {
-                return;
-            }
-
-            preparedTargetToggle.SetIsOnWithoutNotify(gameDirector.Services.WorldPresenter.ShowEnemyPreparedTargetMarkers);
-        }
-
         private void OnPreparedTargetToggleChanged(bool show)
         {
             if (gameDirector?.Services?.WorldPresenter == null)
@@ -511,56 +484,5 @@ namespace Arkeum.Production.Presentation.UI
             gameDirector.Services.WorldPresenter.Refresh();
         }
         #endregion
-
-        private static string BuildResultText(string title, List<string> lines)
-        {
-            StringBuilder resultBuilder = new StringBuilder(title);
-            if (lines.Count == 0)
-            {
-                resultBuilder.Append("\nNone");
-                return resultBuilder.ToString();
-            }
-
-            for (int i = 0; i < lines.Count; i++)
-            {
-                resultBuilder.Append('\n');
-                resultBuilder.Append(lines[i]);
-            }
-
-            return resultBuilder.ToString();
-        }
-
-        private static string FormatWeaponLine(RunState runState)
-        {
-            if (runState == null || !runState.HasEquippedWeapon)
-            {
-                return "Default blade";
-            }
-
-            WeaponDefinition weapon = runState.EquippedWeapon;
-            if (weapon == null)
-            {
-                return "Weapon (+1 attack)";
-            }
-
-            return $"{weapon.DisplayName} (+{weapon.AttackBonus} attack)";
-        }
-
-        private static string FormatTimingLine(RunState runState)
-        {
-            if (runState == null)
-            {
-                return "Timing: Off";
-            }
-
-            string state = runState.IsTimingModeEnabled ? "On" : "Off";
-            WeaponDefinition weapon = runState.EquippedWeapon;
-            if (!runState.IsTimingModeEnabled || weapon == null)
-            {
-                return $"Timing: {state}";
-            }
-
-            return weapon.HasTimingChallenge ? $"Timing: {state}" : $"Timing: {state} (weapon has no challenge)";
-        }
     }
 }

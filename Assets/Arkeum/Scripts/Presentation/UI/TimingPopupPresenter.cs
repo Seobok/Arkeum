@@ -1,4 +1,4 @@
-using Arkeum.Production.Gameplay.Timing;
+﻿using Arkeum.Production.Gameplay.Timing;
 using UnityEngine;
 
 namespace Arkeum.Production.Presentation.UI
@@ -18,6 +18,7 @@ namespace Arkeum.Production.Presentation.UI
             Hide();
         }
 
+        // 타이밍 공격 호출
         public void Show(TimingSession timingSession)
         {
             session = timingSession;
@@ -42,7 +43,10 @@ namespace Arkeum.Production.Presentation.UI
                 return;
             }
 
+            // 타이밍 팝업 생성
             CreatePresenter(presenterPrefab);
+
+            // 타이밍 팝업 호출
             activePresenter.Show(session);
         }
 
@@ -69,9 +73,10 @@ namespace Arkeum.Production.Presentation.UI
 
         private void CreatePresenter(TimingChallengePresenterBase presenterPrefab)
         {
+            // 기존 삭제되지 않은 타이밍 팝업이 있다면 제거
             DestroyActivePresenter();
 
-            // The host only chooses the prefab; each prefab owns its own layout and widgets.
+            // 타이밍 팝업 생성
             Transform root = presenterRoot != null ? presenterRoot : transform;
             activePresenter = Instantiate(presenterPrefab, root);
         }

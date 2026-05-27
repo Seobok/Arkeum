@@ -1,4 +1,4 @@
-using Arkeum.Production.Gameplay.Run;
+﻿using Arkeum.Production.Gameplay.Run;
 using System.Collections.Generic;
 
 namespace Arkeum.Production.Gameplay.Progression
@@ -12,6 +12,7 @@ namespace Arkeum.Production.Gameplay.Progression
             this.questService = questService;
         }
 
+        // 클리어시 호출 / 클리어 데이터 관련 처리
         public void ApplyRunEnd(SaveProfile profile, RunState runState)
         {
             if (profile == null || runState == null)
@@ -23,11 +24,6 @@ namespace Arkeum.Production.Gameplay.Progression
             if (profile.HighestFloor < runState.CurrentFloor)
             {
                 profile.HighestFloor = runState.CurrentFloor;
-            }
-
-            if (runState.EndReason == RunEndReason.FloorClear)
-            {
-                questService.MarkPrototypeClear(profile);
             }
         }
 

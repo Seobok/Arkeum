@@ -38,11 +38,13 @@ namespace Arkeum.Production.Presentation.World
             BuildWorldRoots();
         }
 
+        // 액터 등록
         public void SetActorRepository(ActorRepository repository)
         {
             actorRepository = repository;
         }
 
+        // HUB 맵 등록
         public void BindHub(MapDefinition mapDefinition, Vector2Int hubPlayerPosition)
         {
             CurrentMap = mapDefinition;
@@ -51,6 +53,7 @@ namespace Arkeum.Production.Presentation.World
             MarkFloorDirtyIfMapChanged(mapDefinition);
         }
 
+        // Run 맵 등록
         public void BindRun(RunState runState, MapDefinition mapDefinition)
         {
             CurrentRun = runState;
@@ -58,6 +61,8 @@ namespace Arkeum.Production.Presentation.World
             MarkFloorDirtyIfMapChanged(mapDefinition);
         }
 
+        // 새로 그리기
+        // 호출 시점 :: 허브 진입 시 / 런 시작 시 / 런 결과 출력 시 / 인터렉션 시 / 플레이어 이동 시 / 타이밍 능력 사용 시 / 타이밍 능력 종료 시 / 다음 층 이동 시 / 예측 온오프 시
         public void Refresh()
         {
             EnsureCamera();
@@ -72,17 +77,24 @@ namespace Arkeum.Production.Presentation.World
                 return;
             }
 
+            // 바닥 타일 View
             RefreshFloor(CurrentMap);
             ClearMarkerViews();
+
+            // 런 사용 View 새로고침
             if (CurrentRun != null && actorRepository != null)
             {
+                // 마커 View
                 DrawMapMarkers(CurrentMap);
                 DrawEnemyPreparedTargetMarkers();
+
+                // 액터 View
                 RefreshRunActors();
                 FollowRunPlayer();
                 return;
             }
 
+            // 허브 사용 View 새로고침
             DrawMapMarkers(CurrentMap);
             DrawHubMarkers();
             RefreshHubPlayer();
@@ -101,6 +113,7 @@ namespace Arkeum.Production.Presentation.World
 
         private void RefreshFloor(MapDefinition map)
         {
+            //같은 MapDefinition이면 바닥 재생성 X
             if (renderedFloorMap == map)
             {
                 return;
@@ -127,6 +140,10 @@ namespace Arkeum.Production.Presentation.World
 
         private void DrawMapMarkers(MapDefinition map)
         {
+            // 마커 View는 항상 재생성
+            // 벽, 바닥 무기, 상점 진열품, 층 출구, 적 예고 공격/이동, 허브 던전 입구
+
+            // 벽 View
             for (int i = 0; i < map.WallCells.Count; i++)
             {
                 Vector2Int wallCell = map.WallCells[i];
@@ -139,6 +156,7 @@ namespace Arkeum.Production.Presentation.World
                     1));
             }
 
+            // 무기 View
             for (int i = 0; i < map.WeaponSpawns.Count; i++)
             {
                 WeaponSpawnDefinition weaponSpawn = map.WeaponSpawns[i];
@@ -156,6 +174,7 @@ namespace Arkeum.Production.Presentation.World
                     4));
             }
 
+            // 진열대 View
             for (int i = 0; i < map.ShopOffers.Count; i++)
             {
                 ShopOfferDefinition shopOffer = map.ShopOffers[i];
@@ -173,6 +192,7 @@ namespace Arkeum.Production.Presentation.World
                     5));
             }
 
+            // 출구 View
             if (map.FloorExitPosition != Vector2Int.zero)
             {
                 markerViews.Add(viewFactory.CreateCell(
@@ -217,10 +237,13 @@ namespace Arkeum.Production.Presentation.World
 
         private void RefreshRunActors()
         {
+            // 액터 View는 매번 전부 지우지 않고 ID 기준으로 재사용
+
             activeActorIds.Clear();
             IReadOnlyList<ActorEntity> actors = actorRepository.Actors;
             for (int i = 0; i < actors.Count; i++)
             {
+                // 살아있는 액터 순회
                 ActorEntity actor = actors[i];
                 if (actor == null || !actor.IsAlive)
                 {
@@ -243,6 +266,7 @@ namespace Arkeum.Production.Presentation.World
                     sortingOrder = 10;
                 }
 
+                // 액터 View 새로고침
                 RefreshActorView(
                     actor.Id,
                     actor.DisplayName,
@@ -254,6 +278,7 @@ namespace Arkeum.Production.Presentation.World
                     sortingOrder);
             }
 
+            // 비활성화 액터 제거
             RemoveInactiveActorViews();
         }
 
@@ -275,6 +300,7 @@ namespace Arkeum.Production.Presentation.World
             activeActorIds.Add(actorId);
             if (!actorViews.TryGetValue(actorId, out ActorView actorView) || actorView == null)
             {
+                // 기존에 있는 액터는 재생성 X
                 actorView = viewFactory.CreateActor(actorRoot, displayName, position, sprite, tint, sortingOrder);
                 actorView.SetFacing(facingDirection);
                 actorViews[actorId] = actorView;
@@ -294,6 +320,7 @@ namespace Arkeum.Production.Presentation.World
                 return;
             }
 
+            // 적 예고 View
             IReadOnlyList<ActorEntity> actors = actorRepository.Actors;
             for (int i = 0; i < actors.Count; i++)
             {
