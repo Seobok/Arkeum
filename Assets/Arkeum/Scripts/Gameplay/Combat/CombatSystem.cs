@@ -1,4 +1,4 @@
-using Arkeum.Production.Gameplay.Actors;
+﻿using Arkeum.Production.Gameplay.Actors;
 using Arkeum.Production.Gameplay.Run;
 using Arkeum.Production.Gameplay.Timing;
 using UnityEngine;
@@ -16,16 +16,24 @@ namespace Arkeum.Production.Gameplay.Combat
 
         public int ResolvePlayerAttack(RunState runState, ActorEntity attacker, ActorEntity defender, WeaponAttackContext attackContext)
         {
-            int attackPower = attackContext != null ? attackContext.AttackPower : attacker.Stats.AttackPower;
+            int attackPower = attackContext != null
+                ? attackContext.AttackPower
+                : RunStatCalculator.CalculatePlayerAttack(runState);
+
+            // 무기의 특수효과 적용
             ApplyWeaponEffects(attackContext);
             if (attackContext != null)
             {
                 attackPower = attackContext.AttackPower;
             }
 
+            // 타이밍 효과 적용
             attackPower = ApplyTimingResult(attackContext, attackPower);
+
+            // 데미지 적용
             int damage = damageResolver.ResolveDamage(attackPower, defender.Stats.Defense);
             ApplyDamage(defender, damage);
+
             return damage;
         }
 
@@ -36,6 +44,7 @@ namespace Arkeum.Production.Gameplay.Combat
             return damage;
         }
 
+        // 최종 데미지 적용
         private void ApplyDamage(ActorEntity target, int damage)
         {
             target.SetCurrentHp(target.CurrentHp - damage);

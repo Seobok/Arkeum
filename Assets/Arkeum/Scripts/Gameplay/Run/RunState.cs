@@ -21,8 +21,6 @@ namespace Arkeum.Production.Gameplay.Run
         public RunEndReason EndReason;
         public ActorEntity Player;
 
-        public int EffectiveAttack => 3 + AttackBonus + (HasEquippedWeapon ? EquippedWeaponAttackBonus : 0);
-
-        private int EquippedWeaponAttackBonus => EquippedWeapon != null ? EquippedWeapon.AttackBonus : 1;
+        public int EffectiveAttack => RunStatCalculator.CalculatePlayerAttack(this);
     }
 }

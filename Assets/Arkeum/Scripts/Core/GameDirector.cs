@@ -33,6 +33,7 @@ namespace Arkeum.Production.Core
                 return;
             }
 
+            // 현재 게임의 상태에 따라 인풋을 변경
             switch (CurrentState)
             {
                 case GameState.Hub:
@@ -69,33 +70,38 @@ namespace Arkeum.Production.Core
             }
         }
 
+        // 허브 진입시 호출 (초기화)
         public void EnterHub(string message = null)
         {
+            //맵 생성 및 인터렉션 연결
             Services.MapService.LoadHubMap();
             ApplySceneInteractablePositions();
             hubPlayerPosition = Services.MapService.CurrentMap.PlayerSpawn;
             BuildHubInteractables();
+
+            //씬 배치
             Services.WorldPresenter.BindHub(Services.MapService.CurrentMap, hubPlayerPosition);
             Services.WorldPresenter.SetActorRepository(null);
             Services.WorldPresenter.Refresh();
-            Services.HudPresenter.BindRun(null);
+
+            //타이밍 팝업 제거
             Services.TimingPopupPresenter.Hide();
             Services.TimingService.CancelCurrent();
+
+            //HUD 허브에 맞게 재설정
+            Services.HudPresenter.BindRun(null);
             Services.HudPresenter.ClearRunResult();
             Services.HudPresenter.SetDialogue(string.Empty);
             Services.HudPresenter.SetMessage(message ?? "The embers of the return altar flicker quietly.");
+
             CurrentRunController = null;
             CurrentState = GameState.Hub;
         }
 
-        public void PrepareRun(RunController runController)
-        {
-            CurrentRunController = runController;
-            CurrentState = GameState.RunPreparing;
-        }
-
+        // 런 시작시 호출 (초기화)
         public void StartRun()
         {
+            // 맵 생성, 액터 생성 및 인터렉션 연결
             int runFloor = StartingRunFloor;
             RunFloorDefinition floorDefinition = Services.MapService.GetRunFloor(runFloor);
             Services.MapService.LoadRunFloor(floorDefinition, runFloor);
@@ -103,6 +109,7 @@ namespace Arkeum.Production.Core
             BuildRunActors();
             BuildRunInteractables();
 
+            // 런 컨트롤러 생성
             RunController runController = new RunController(
                 Services.TurnSystem,
                 Services.CombatSystem,
@@ -113,15 +120,18 @@ namespace Arkeum.Production.Core
                 Services.TimingService,
                 ActiveProfile);
 
+            // 런 스테이트 생성
             RunState runState = runController.CreateRunState(ActiveProfile, Services.RunDefinition?.StartingLoadout);
             runState.CurrentFloor = runFloor;
             runState.CurrentFloorDefinition = floorDefinition;
+            // 플레이어 설정
             ActorEntity player = Services.ActorRepository.Player;
-            runState.Player = player;
             //TODO :: 추후에는 다른 파일에서 값을 읽어올 수 있도록, 데이터를 관리하는 파일을 생성해야 함.
             player.SetMaxHp(PlayerMaxHP);
             player.SetCurrentHp(PlayerMaxHP);
-            player.Stats.AttackPower = runState.EffectiveAttack;
+            runState.Player = player;
+            
+            // 런 컨트롤러에 런 스테이트 주입
             runController.Begin(runState);
 
             PrepareRun(runController);
@@ -132,6 +142,12 @@ namespace Arkeum.Production.Core
             Services.HudPresenter.SetDialogue(string.Empty);
             Services.HudPresenter.SetMessage("You descend into the ash corridor. Enemies react after every action.");
             CurrentState = GameState.InRun;
+        }
+
+        public void PrepareRun(RunController runController)
+        {
+            CurrentRunController = runController;
+            CurrentState = GameState.RunPreparing;
         }
 
         public void ShowRunResult()
@@ -279,6 +295,7 @@ namespace Arkeum.Production.Core
             }
         }
 
+        // 다음 층으로 이동
         private bool TryAdvanceToNextFloor()
         {
             RunState runState = CurrentRunController?.CurrentRun;
@@ -318,9 +335,8 @@ namespace Arkeum.Production.Core
             runState.FloorExitUsed = false;
             runState.EndReason = RunEndReason.None;
             runState.Player = player;
-            player.SetCurrentHp(currentHp);
             player.SetMaxHp(PlayerMaxHP);
-            player.Stats.AttackPower = runState.EffectiveAttack;
+            player.SetCurrentHp(currentHp);
 
             Services.WorldPresenter.SetActorRepository(Services.ActorRepository);
             Services.WorldPresenter.BindRun(runState, Services.MapService.CurrentMap);
@@ -339,17 +355,18 @@ namespace Arkeum.Production.Core
             }
         }
 
+        //액터 생성
         private void BuildRunActors()
         {
+            List<ActorEntity> actors = new List<ActorEntity>();
+
             MapDefinition map = Services.MapService.CurrentMap;
             RunFloorDefinition floorDefinition = Services.MapService.CurrentRunFloor;
-            ActorStats playerStats = new ActorStats
-            {
-                AttackPower = 3,
-                Defense = 1,
-            };
-            playerStats.SetMaxHp(12);
 
+            // 플레이어 Stat 생성
+            ActorStats playerStats = RunStatCalculator.CreatePlayerStats();
+
+            // 플레이어 Entity 생성
             ActorEntity player = new ActorEntity
             {
                 Id = "player",
@@ -358,19 +375,15 @@ namespace Arkeum.Production.Core
                 IsEnemy = false,
                 Stats = playerStats,
             };
-            player.SetCurrentHp(12);
+            actors.Add(player);
 
-            List<ActorEntity> actors = new List<ActorEntity>
-            {
-                player,
-            };
-
+            // 맵 전체 적 순회
             IReadOnlyList<EnemySpawnDefinition> enemySpawns = map.EnemySpawns;
-
             if (enemySpawns != null && enemySpawns.Count > 0)
             {
                 for (int i = 0; i < enemySpawns.Count; i++)
                 {
+                    // 적 Entity 생성
                     ActorEntity enemy = CreateEnemy(enemySpawns[i], i);
                     if (enemy != null)
                     {
@@ -383,6 +396,7 @@ namespace Arkeum.Production.Core
                 Debug.Log("[GameDirector] No run enemy spawns configured. Only the player will be spawned.");
             }
 
+            // 서비스에 등록
             Services.ActorRepository.SetActors(actors);
         }
 
@@ -494,6 +508,7 @@ namespace Arkeum.Production.Core
             }
         }
 
+        // Enemy Entity 생성
         private static ActorEntity CreateEnemy(EnemySpawnDefinition spawnDefinition, int index)
         {
             if (spawnDefinition == null || spawnDefinition.EnemyDefinition == null)
@@ -516,7 +531,9 @@ namespace Arkeum.Production.Core
                 Stats = stats,
             };
 
+            enemy.SetMaxHp(stats.MaxHp);
             enemy.SetCurrentHp(stats.MaxHp);
+
             return enemy;
         }
     }

@@ -597,6 +597,7 @@
 
 ### 확인하지 못한 사항 또는 후속 점검 사항
 - Unity Play Mode에서 실제 공격 입력별 좌우 flip 변화와 타이밍 챌린지 팝업 직전 표시 상태는 직접 확인하지 못했다.
+
 ## 2026-05-27 플레이어 범위 공격 다중 대상 적용
 
 ### 사용자의 요청 개요
@@ -635,4 +636,53 @@
 
 ### 확인하지 못한 사항 또는 후속 점검 사항
 - Unity Play Mode에서 실제 무기별 범위 내 다중 적 피격, 타이밍 공격 다중 피격, 처치/골드 메시지 표시를 직접 확인하지 못했다.
+- `Assembly-CSharp-Editor.csproj` 빌드는 실행하지 않았다.
+## 2026-05-27 플레이어 공격력 계산 구조 정리
+
+### 사용자의 요청 개요
+- 플레이어 공격력 변동을 `Stats.AttackPower`에 직접 덮어쓰는 현재 방식이 추후 배수 아이템, 조건부 보정, 버프 확장에 문제가 될 수 있어 구조 정리 요청.
+
+### 핵심 요구사항
+- 플레이어의 최종 공격력을 `ActorStats.AttackPower`에 직접 갱신하는 흐름을 줄인다.
+- 공격 시점에 현재 런 상태, 무기, 보정값을 기준으로 공격력을 계산하도록 정리한다.
+- 기존 공격력 계산 결과는 유지한다.
+
+### 이번 작업 범위
+- 플레이어 런 공격력 계산 전용 `RunStatCalculator` 추가.
+- 런 시작, 층 이동, 무기 구매, 무기 획득 시 `Player.Stats.AttackPower`를 직접 덮어쓰던 코드 제거.
+- 공격 컨텍스트 생성 시 계산기를 통해 공격력을 산출하도록 변경.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunStatCalculator.cs`
+  - 플레이어 기본 공격력/방어력과 런 공격력 계산을 모으는 계산기 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunStatCalculator.cs.meta`
+  - 신규 Unity 스크립트 메타 파일 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunState.cs`
+  - `EffectiveAttack`이 하드코딩 합산 대신 `RunStatCalculator.CalculatePlayerAttack()`을 사용하도록 변경.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs`
+  - 공격 컨텍스트의 `AttackPower`를 `RunStatCalculator`에서 계산하도록 변경.
+  - 무기 구매/획득 시 `Player.Stats.AttackPower` 직접 갱신 제거.
+- `Assets/Arkeum/Scripts/Gameplay/Combat/CombatSystem.cs`
+  - 플레이어 공격 컨텍스트가 없는 경우에도 `RunStatCalculator`를 fallback 공격력 계산 경로로 사용하도록 변경.
+- `Assets/Arkeum/Scripts/Core/GameDirector.cs`
+  - 런 시작/층 이동 시 `Player.Stats.AttackPower` 직접 갱신 제거.
+  - 플레이어 기본 스탯 생성 시 `RunStatCalculator.CreatePlayerStats()`를 사용하도록 변경.
+- `Assembly-CSharp.csproj`
+  - 신규 `RunStatCalculator.cs` 컴파일 항목 추가.
+- `Docs/input.md`
+  - 이번 작업 요청, 변경 범위, 빌드 결과, 후속 점검 사항 기록.
+
+### 실제 수행한 작업 요약
+- 플레이어 최종 공격력은 더 이상 런 시작, 층 이동, 무기 변경 시점에 `Stats.AttackPower`에 캐싱하지 않는다.
+- 공격 대상별 `WeaponAttackContext`를 만들 때 현재 `RunState` 기준으로 공격력을 계산한다.
+- 기존 계산식인 기본 공격력 3 + 런 공격 보너스 + 장착 무기 공격 보너스는 유지했다.
+- 플레이어 방어력 기본값은 `RunStatCalculator.CreatePlayerStats()`에서 1로 초기화하도록 보존했다.
+
+### 빌드/테스트 여부
+- `$env:DOTNET_CLI_HOME='D:\Unity\Private\.dotnet'; $env:HOME='D:\Unity\Private\.dotnet'; dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 런 시작, 층 이동, 무기 구매/획득 후 HUD 표시와 실제 피해량이 기존과 동일한지 직접 확인하지 못했다.
+- 배수/퍼센트/조건부 스탯 보정 시스템은 아직 구현하지 않았고, 이번 작업은 계산 진입점을 분리하는 1차 정리다.
 - `Assembly-CSharp-Editor.csproj` 빌드는 실행하지 않았다.
