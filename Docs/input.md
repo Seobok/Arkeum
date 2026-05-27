@@ -686,3 +686,39 @@
 - Unity Play Mode에서 런 시작, 층 이동, 무기 구매/획득 후 HUD 표시와 실제 피해량이 기존과 동일한지 직접 확인하지 못했다.
 - 배수/퍼센트/조건부 스탯 보정 시스템은 아직 구현하지 않았고, 이번 작업은 계산 진입점을 분리하는 1차 정리다.
 - `Assembly-CSharp-Editor.csproj` 빌드는 실행하지 않았다.
+## 2026-05-27 층 이동 시 플레이어 엔티티 재사용
+
+### 사용자의 요청 개요
+- 다음 층으로 이동할 때 플레이어 엔티티를 새로 만들지 않고 기존 플레이어 엔티티를 재사용하는 방식으로 수정 요청.
+
+### 핵심 요구사항
+- 새 런 시작 시에는 플레이어 엔티티를 생성한다.
+- 층 이동 시에는 기존 `runState.Player`를 새 층 액터 목록에 다시 넣고 위치만 새 층 스폰 지점으로 이동한다.
+- 현재 HP 등 플레이어 엔티티가 가진 상태를 층 이동 중 유지한다.
+
+### 이번 작업 범위
+- `GameDirector.BuildRunActors()`가 기존 플레이어 엔티티를 선택적으로 받을 수 있도록 변경.
+- `TryAdvanceToNextFloor()`에서 기존 `runState.Player`를 `BuildRunActors()`에 전달하도록 변경.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Core/GameDirector.cs`
+  - `BuildRunActors(ActorEntity existingPlayer = null)` 시그니처로 변경.
+  - 기존 플레이어가 전달되면 새 플레이어를 만들지 않고 `GridPosition`만 현재 맵의 `PlayerSpawn`으로 갱신한 뒤 액터 목록에 다시 등록.
+  - 기존 플레이어가 없을 때만 새 플레이어 엔티티와 기본 스탯을 생성.
+  - 층 이동 시 `BuildRunActors(runState.Player)`를 호출하도록 변경.
+- `Docs/input.md`
+  - 이번 작업 요청, 변경 범위, 빌드 결과, 후속 점검 사항 기록.
+
+### 실제 수행한 작업 요약
+- 새 런 시작 흐름은 기존처럼 `BuildRunActors()`를 호출해 새 플레이어를 만든다.
+- 다음 층 이동 흐름은 기존 플레이어 엔티티를 재사용하며, 새 층의 스폰 위치로 이동시킨다.
+- 기존 `ActorRepository.SetActors()` 구조는 유지해 현재 층의 적 목록은 새로 만들고, 플레이어만 기존 객체를 다시 등록한다.
+- 층 이동 후 HP 복원 흐름은 기존처럼 유지했다.
+
+### 빌드/테스트 여부
+- `$env:DOTNET_CLI_HOME='D:\Unity\Private\.dotnet'; $env:HOME='D:\Unity\Private\.dotnet'; dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 층 이동 후 플레이어 HP, 위치, 카메라 추적, HUD 바인딩, 액터 뷰 재사용 상태를 직접 확인하지 못했다.
+- `Assembly-CSharp-Editor.csproj` 빌드는 실행하지 않았다.

@@ -1,4 +1,4 @@
-using Arkeum.Production.Gameplay.Actors;
+﻿using Arkeum.Production.Gameplay.Actors;
 
 namespace Arkeum.Production.Gameplay.Run
 {
@@ -16,14 +16,17 @@ namespace Arkeum.Production.Gameplay.Run
             };
         }
 
+        // 플레이어 공격력을 계산하는 함수
         public static int CalculatePlayerAttack(RunState runState)
         {
-            int attackPower = BasePlayerAttackPower;
+            // 기본 공격력
+            int attackPower = runState.Player.Stats.AttackPower;
             if (runState == null)
             {
                 return attackPower;
             }
 
+            // 무기 공격력
             if (runState.HasEquippedWeapon)
             {
                 attackPower += runState.EquippedWeapon != null ? runState.EquippedWeapon.AttackBonus : 1;

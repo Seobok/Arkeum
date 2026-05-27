@@ -309,7 +309,7 @@ namespace Arkeum.Production.Core
             }
 
             ApplySceneInteractablePositions();
-            BuildRunActors();
+            BuildRunActors(runState.Player);
             BuildRunInteractables();
 
             ActorEntity player = Services.ActorRepository.Player;
@@ -347,25 +347,34 @@ namespace Arkeum.Production.Core
         }
 
         //액터 생성
-        private void BuildRunActors()
+        private void BuildRunActors(ActorEntity existingPlayer = null)
         {
             List<ActorEntity> actors = new List<ActorEntity>();
 
             MapDefinition map = Services.MapService.CurrentMap;
             RunFloorDefinition floorDefinition = Services.MapService.CurrentRunFloor;
 
-            // 플레이어 Stat 생성
-            ActorStats playerStats = RunStatCalculator.CreatePlayerStats();
-
-            // 플레이어 Entity 생성
-            ActorEntity player = new ActorEntity
+            // 이미 런 중인 플레이어가 있다면 해당 플레이어를 사용하고 없다면 생성
+            ActorEntity player = existingPlayer;
+            if (player == null)
             {
-                Id = "player",
-                DisplayName = "Ash Knight",
-                GridPosition = map.PlayerSpawn,
-                IsEnemy = false,
-                Stats = playerStats,
-            };
+                // 플레이어 Entity 생성
+                player = new ActorEntity
+                {
+                    Id = "player",
+                    DisplayName = "Ash Knight",
+                    IsEnemy = false,
+                    Stats = RunStatCalculator.CreatePlayerStats(),
+                };
+            }
+
+            player.GridPosition = map.PlayerSpawn;
+            player.IsEnemy = false;
+            if (player.Stats == null)
+            {
+                player.Stats = RunStatCalculator.CreatePlayerStats();
+            }
+
             actors.Add(player);
 
             // 맵 전체 적 순회
