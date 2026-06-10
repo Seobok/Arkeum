@@ -9,13 +9,20 @@ namespace Arkeum.Production.Presentation.World
     public sealed class WorldPresenter : MonoBehaviour
     {
         private const float CameraZ = -10f;
+        private const int RunVisionRange = 5;
+        private const int UnexploredFogSortingOrder = 100;
+        private const int ExploredFogSortingOrder = 99;
 
         [SerializeField] private WorldVisualSet visualSet;
 
         private readonly List<GameObject> floorViews = new List<GameObject>();
         private readonly List<GameObject> markerViews = new List<GameObject>();
+        private readonly List<GameObject> fogViews = new List<GameObject>();
+        private readonly Dictionary<Vector2Int, SpriteRenderer> fogRenderers = new Dictionary<Vector2Int, SpriteRenderer>();
         private readonly Dictionary<string, ActorView> actorViews = new Dictionary<string, ActorView>();
         private readonly HashSet<string> activeActorIds = new HashSet<string>();
+        private readonly HashSet<Vector2Int> exploredCells = new HashSet<Vector2Int>();
+        private readonly HashSet<Vector2Int> visibleCells = new HashSet<Vector2Int>();
         private readonly ProductionViewFactory viewFactory = new ProductionViewFactory();
 
         private Camera mainCamera;
@@ -23,9 +30,11 @@ namespace Arkeum.Production.Presentation.World
         private Transform floorRoot;
         private Transform actorRoot;
         private Transform markerRoot;
+        private Transform fogRoot;
         private Transform cameraFollowTarget;
         private ActorRepository actorRepository;
         private MapDefinition renderedFloorMap;
+        private MapDefinition renderedFogMap;
 
         public MapDefinition CurrentMap { get; private set; }
         public RunState CurrentRun { get; private set; }
@@ -47,6 +56,12 @@ namespace Arkeum.Production.Presentation.World
         // HUB 맵 등록
         public void BindHub(MapDefinition mapDefinition, Vector2Int hubPlayerPosition)
         {
+            if (CurrentMap != mapDefinition)
+            {
+                ClearRunFogState();
+                ClearFogViews();
+            }
+
             CurrentMap = mapDefinition;
             CurrentRun = null;
             HubPlayerPosition = hubPlayerPosition;
@@ -56,6 +71,12 @@ namespace Arkeum.Production.Presentation.World
         // Run 맵 등록
         public void BindRun(RunState runState, MapDefinition mapDefinition)
         {
+            if (CurrentMap != mapDefinition)
+            {
+                ClearRunFogState();
+                ClearFogViews();
+            }
+
             CurrentRun = runState;
             CurrentMap = mapDefinition;
             MarkFloorDirtyIfMapChanged(mapDefinition);
@@ -84,9 +105,12 @@ namespace Arkeum.Production.Presentation.World
             // 런 사용 View 새로고침
             if (CurrentRun != null && actorRepository != null)
             {
+                UpdateRunFog();
+
                 // 마커 View
                 DrawMapMarkers(CurrentMap);
                 DrawEnemyPreparedTargetMarkers();
+                DrawRunFog(CurrentMap);
 
                 // 액터 View
                 RefreshRunActors();
@@ -160,7 +184,7 @@ namespace Arkeum.Production.Presentation.World
             for (int i = 0; i < map.WeaponSpawns.Count; i++)
             {
                 WeaponSpawnDefinition weaponSpawn = map.WeaponSpawns[i];
-                if (weaponSpawn == null)
+                if (weaponSpawn == null || !IsRunCellVisible(weaponSpawn.Position))
                 {
                     continue;
                 }
@@ -181,7 +205,7 @@ namespace Arkeum.Production.Presentation.World
             for (int i = 0; i < map.ShopOffers.Count; i++)
             {
                 ShopOfferDefinition shopOffer = map.ShopOffers[i];
-                if (shopOffer == null)
+                if (shopOffer == null || !IsRunCellVisible(shopOffer.Position))
                 {
                     continue;
                 }
@@ -196,7 +220,7 @@ namespace Arkeum.Production.Presentation.World
             }
 
             // 출구 View
-            if (map.FloorExitPosition != Vector2Int.zero)
+            if (map.FloorExitPosition != Vector2Int.zero && IsRunCellVisible(map.FloorExitPosition))
             {
                 markerViews.Add(viewFactory.CreateCell(
                     markerRoot,
@@ -249,6 +273,11 @@ namespace Arkeum.Production.Presentation.World
                 // 살아있는 액터 순회
                 ActorEntity actor = actors[i];
                 if (actor == null || !actor.IsAlive)
+                {
+                    continue;
+                }
+
+                if (actor.IsEnemy && !IsRunCellVisible(actor.GridPosition))
                 {
                     continue;
                 }
@@ -331,7 +360,8 @@ namespace Arkeum.Production.Presentation.World
                 if (actor == null ||
                     !actor.IsEnemy ||
                     !actor.IsAlive ||
-                    !actor.HasPendingEnemyTargetCell)
+                    !actor.HasPendingEnemyTargetCell ||
+                    !IsRunCellVisible(actor.GridPosition))
                 {
                     continue;
                 }
@@ -359,6 +389,11 @@ namespace Arkeum.Production.Presentation.World
 
             if (attackPattern == null)
             {
+                if (!IsRunCellVisible(actor.PendingEnemyTargetCell))
+                {
+                    return;
+                }
+
                 string fallbackMarkerName = $"Pending_{actor.PendingEnemyAction}_{actor.Id}";
                 markerViews.Add(viewFactory.CreateCell(
                     markerRoot,
@@ -377,7 +412,7 @@ namespace Arkeum.Production.Presentation.World
                     attackPattern.Offsets[i],
                     actor.PendingEnemyFacingDirection);
                 Vector2Int markerCell = actor.GridPosition + offset;
-                if (!markedCells.Add(markerCell))
+                if (!markedCells.Add(markerCell) || !IsRunCellVisible(markerCell))
                 {
                     continue;
                 }
@@ -395,6 +430,11 @@ namespace Arkeum.Production.Presentation.World
 
         private void DrawEnemyPreparedMoveMarker(ActorEntity actor)
         {
+            if (!IsRunCellVisible(actor.PendingEnemyTargetCell))
+            {
+                return;
+            }
+
             string markerName = $"Pending_{actor.PendingEnemyAction}_{actor.Id}";
             markerViews.Add(viewFactory.CreateCell(
                 markerRoot,
@@ -403,6 +443,94 @@ namespace Arkeum.Production.Presentation.World
                 GetEnemyMoveMarkerTint(),
                 markerName,
                 6));
+        }
+
+        private void UpdateRunFog()
+        {
+            visibleCells.Clear();
+            if (CurrentRun?.Player == null || CurrentMap == null)
+            {
+                return;
+            }
+
+            Vector2Int playerCell = CurrentRun.Player.GridPosition;
+            for (int i = 0; i < CurrentMap.WalkableCells.Count; i++)
+            {
+                Vector2Int cell = CurrentMap.WalkableCells[i];
+                int distance = Mathf.Abs(cell.x - playerCell.x) + Mathf.Abs(cell.y - playerCell.y);
+                if (distance > RunVisionRange)
+                {
+                    continue;
+                }
+
+                visibleCells.Add(cell);
+                exploredCells.Add(cell);
+            }
+        }
+
+        private void DrawRunFog(MapDefinition map)
+        {
+            if (CurrentRun == null || map == null)
+            {
+                return;
+            }
+
+            EnsureFogViews(map);
+            for (int i = 0; i < map.WalkableCells.Count; i++)
+            {
+                Vector2Int cell = map.WalkableCells[i];
+                if (!fogRenderers.TryGetValue(cell, out SpriteRenderer fogRenderer) || fogRenderer == null)
+                {
+                    continue;
+                }
+
+                if (visibleCells.Contains(cell))
+                {
+                    fogRenderer.gameObject.SetActive(false);
+                    continue;
+                }
+
+                bool explored = exploredCells.Contains(cell);
+                fogRenderer.gameObject.SetActive(true);
+                fogRenderer.color = explored ? GetExploredFogTint() : GetUnexploredFogTint();
+                fogRenderer.sortingOrder = explored ? ExploredFogSortingOrder : UnexploredFogSortingOrder;
+            }
+        }
+
+        private void EnsureFogViews(MapDefinition map)
+        {
+            if (renderedFogMap == map)
+            {
+                return;
+            }
+
+            ClearFogViews();
+            if (fogRoot == null)
+            {
+                BuildWorldRoots();
+            }
+
+            for (int i = 0; i < map.WalkableCells.Count; i++)
+            {
+                Vector2Int cell = map.WalkableCells[i];
+                GameObject fog = viewFactory.CreateCell(
+                    fogRoot,
+                    cell,
+                    null,
+                    GetUnexploredFogTint(),
+                    $"Fog_{cell.x}_{cell.y}",
+                    UnexploredFogSortingOrder);
+                fog.transform.localScale = new Vector3(1f, 1f, 1f);
+                fogViews.Add(fog);
+
+                SpriteRenderer renderer = fog.GetComponent<SpriteRenderer>();
+                if (renderer != null)
+                {
+                    fogRenderers[cell] = renderer;
+                }
+            }
+
+            renderedFogMap = map;
         }
 
         private void EnsureCamera()
@@ -442,6 +570,8 @@ namespace Arkeum.Production.Presentation.World
             actorRoot.SetParent(worldRoot, false);
             markerRoot = new GameObject("Markers").transform;
             markerRoot.SetParent(worldRoot, false);
+            fogRoot = new GameObject("Fog").transform;
+            fogRoot.SetParent(worldRoot, false);
         }
 
         private void FollowRunPlayer()
@@ -518,7 +648,9 @@ namespace Arkeum.Production.Presentation.World
         {
             ClearFloorViews();
             ClearMarkerViews();
+            ClearFogViews();
             ClearActorViews();
+            ClearRunFogState();
             renderedFloorMap = null;
         }
 
@@ -530,6 +662,13 @@ namespace Arkeum.Production.Presentation.World
         private void ClearMarkerViews()
         {
             DestroyViews(markerViews);
+        }
+
+        private void ClearFogViews()
+        {
+            DestroyViews(fogViews);
+            fogRenderers.Clear();
+            renderedFogMap = null;
         }
 
         private void ClearActorViews()
@@ -596,6 +735,17 @@ namespace Arkeum.Production.Presentation.World
         private static bool IsMarkerEnabled(Vector2Int position)
         {
             return position != Vector2Int.zero;
+        }
+
+        private void ClearRunFogState()
+        {
+            exploredCells.Clear();
+            visibleCells.Clear();
+        }
+
+        private bool IsRunCellVisible(Vector2Int cell)
+        {
+            return CurrentRun == null || visibleCells.Contains(cell);
         }
 
         private Sprite GetFloorSprite()
@@ -712,6 +862,16 @@ namespace Arkeum.Production.Presentation.World
         private Color GetEnemyMoveMarkerTint()
         {
             return visualSet != null ? visualSet.EnemyMoveMarkerTint : new Color(0.18f, 0.68f, 0.26f);
+        }
+
+        private Color GetUnexploredFogTint()
+        {
+            return visualSet != null ? visualSet.UnexploredFogTint : Color.black;
+        }
+
+        private Color GetExploredFogTint()
+        {
+            return visualSet != null ? visualSet.ExploredFogTint : new Color(0.45f, 0.45f, 0.45f, 0.65f);
         }
     }
 }

@@ -14,6 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Presentation.World.WorldVisualSet
   floorSprite: {fileID: 343247394, guid: cbfa85894397c144a9a0fb1ba6a53d9e, type: 3}
   floorTint: {r: 1, g: 1, b: 1, a: 1}
+  wallSprite: {fileID: 0}
+  wallTint: {r: 0.08, g: 0.08, b: 0.09, a: 1}
   playerSprite: {fileID: -7978735674136817684, guid: 510fb8782b4339344bde7862dbfbfa81, type: 3}
   playerTint: {r: 1, g: 1, b: 1, a: 1}
   defaultEnemySprite: {fileID: 0}
@@ -28,3 +30,5 @@ MonoBehaviour:
   enemyAttackMarkerTint: {r: 0.82, g: 0.16, b: 0.13, a: 1}
   enemyMoveMarkerSprite: {fileID: 0}
   enemyMoveMarkerTint: {r: 0.18, g: 0.68, b: 0.26, a: 1}
+  unexploredFogTint: {r: 0, g: 0, b: 0, a: 1}
+  exploredFogTint: {r: 0.122641504, g: 0.122641504, b: 0.122641504, a: 0.70980394}

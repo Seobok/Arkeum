@@ -31,6 +31,10 @@ namespace Arkeum.Production.Presentation.World
         [SerializeField] private Sprite enemyMoveMarkerSprite;
         [SerializeField] private Color enemyMoveMarkerTint = new Color(0.18f, 0.68f, 0.26f);
 
+        [Header("Fog of War")]
+        [SerializeField] private Color unexploredFogTint = Color.black;
+        [SerializeField] private Color exploredFogTint = new Color(0.45f, 0.45f, 0.45f, 0.65f);
+
         public Sprite FloorSprite => floorSprite;
         public Color FloorTint => floorTint;
         public Sprite WallSprite => wallSprite;
@@ -49,5 +53,7 @@ namespace Arkeum.Production.Presentation.World
         public Color EnemyAttackMarkerTint => enemyAttackMarkerTint;
         public Sprite EnemyMoveMarkerSprite => enemyMoveMarkerSprite;
         public Color EnemyMoveMarkerTint => enemyMoveMarkerTint;
+        public Color UnexploredFogTint => unexploredFogTint;
+        public Color ExploredFogTint => exploredFogTint;
     }
 }
