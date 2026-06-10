@@ -44,6 +44,13 @@ namespace Arkeum.Production.Gameplay.Combat
             return damage;
         }
 
+        public int ApplyFixedDamage(ActorEntity target, int damage)
+        {
+            int fixedDamage = Mathf.Max(0, damage);
+            ApplyDamage(target, fixedDamage);
+            return fixedDamage;
+        }
+
         // 최종 데미지 적용
         private void ApplyDamage(ActorEntity target, int damage)
         {

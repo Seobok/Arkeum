@@ -7,6 +7,8 @@ namespace Arkeum.Production.Gameplay.Actors
 {
     public sealed class EnemyBehaviorActions
     {
+        private const int EnemyMoveCollisionDamage = 1;
+
         private static readonly Vector2Int[] CardinalDirections =
         {
             Vector2Int.up,
@@ -216,14 +218,22 @@ namespace Arkeum.Production.Gameplay.Actors
             return current;
         }
 
-        private static void ExecutePreparedMove(EnemyBehaviorContext context)
+        private void ExecutePreparedMove(EnemyBehaviorContext context)
         {
             ActorEntity enemy = context.Enemy;
             Vector2Int targetCell = enemy.PendingEnemyTargetCell;
+            ActorEntity player = context.Player;
             if (enemy.HasPendingEnemyTargetCell &&
                 CanMoveTo(targetCell, context.Player.GridPosition, context.MapService, context.ActorRepository))
             {
                 enemy.FacingDirection = GetFacingToward(enemy.GridPosition, targetCell, enemy.FacingDirection);
+                if (targetCell == player.GridPosition)
+                {
+                    combatSystem.ApplyFixedDamage(player, EnemyMoveCollisionDamage);
+                    ClearPreparation(enemy);
+                    return;
+                }
+
                 enemy.GridPosition = targetCell;
             }
 
@@ -265,8 +275,7 @@ namespace Arkeum.Production.Gameplay.Actors
 
         private static bool CanMoveTo(Vector2Int targetCell, Vector2Int playerPosition, MapService mapService, ActorRepository actorRepository)
         {
-            return targetCell != playerPosition &&
-                   mapService.IsEnemyWalkable(targetCell) &&
+            return mapService.IsEnemyWalkable(targetCell) &&
                    !actorRepository.IsEnemyOccupied(targetCell);
         }
 
