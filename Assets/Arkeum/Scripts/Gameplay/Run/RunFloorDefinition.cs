@@ -8,12 +8,35 @@ namespace Arkeum.Production.Gameplay.Run
     public sealed class RunFloorDefinition
     {
         public int FloorIndex = 1;
+        public RunMapGenerationMode GenerationMode = RunMapGenerationMode.CellularAutomata;
         public MapAsset MapAsset;
         public List<MapAsset> RoomAssets = new List<MapAsset>();
         public List<RunSpecialRoomDefinition> SpecialRooms = new List<RunSpecialRoomDefinition>();
         public int MinimumRoomCount = 6;
         public int RoomGap = 5;
         public int PlacementAttempts = 300;
+        public CellularAutomataMapSettings CellularAutomataSettings = new CellularAutomataMapSettings();
+    }
+
+    public enum RunMapGenerationMode
+    {
+        RoomGraph,
+        CellularAutomata,
+        FixedMapAsset,
+    }
+
+    [Serializable]
+    public sealed class CellularAutomataMapSettings
+    {
+        public int Width = 48;
+        public int Height = 30;
+        public int FillPercent = 45;
+        public int SmoothIterations = 5;
+        public int BirthLimit = 4;
+        public int DeathLimit = 3;
+        public int BorderThickness = 1;
+        public int EnemySpawnZoneSize = 5;
+        public int EnemySpawnSafeDistanceFromPlayer = 6;
     }
 
     public enum RunSpecialRoomType

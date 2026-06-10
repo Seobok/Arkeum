@@ -42,9 +42,7 @@ namespace Arkeum.Production.Gameplay.Map
 
             RoomTemplateSet roomTemplates = CreateRoomTemplates(floorDefinition, floorMapAsset);
             DungeonGenerationSettings settings = DungeonGenerationSettings.From(floorDefinition, floor, roomTemplates.SpecialRoomSlots.Count);
-            MapDefinition map = roomTemplates.BossRoom != null
-                ? CreateBossDungeonMap(roomTemplates, settings)
-                : CreateDungeonMap(roomTemplates, settings);
+            MapDefinition map = CreateRunMapByMode(floorDefinition, roomTemplates, settings);
             map.RunFloor = floor;
             return map;
         }
@@ -68,6 +66,447 @@ namespace Arkeum.Production.Gameplay.Map
 
             AddRoom(map, -3, -2, 3, 2);
             return map;
+        }
+
+        private static MapDefinition CreateRunMapByMode(
+            RunFloorDefinition floorDefinition,
+            RoomTemplateSet roomTemplates,
+            DungeonGenerationSettings settings)
+        {
+            if (floorDefinition.GenerationMode == RunMapGenerationMode.FixedMapAsset)
+            {
+                if (TryCreateFromAsset(floorDefinition.MapAsset, out MapDefinition assetMap))
+                {
+                    assetMap.RunFloor = settings.Floor;
+                    Debug.Log($"[MapGenerator] Fixed map loaded floor={settings.Floor}, cells={assetMap.WalkableCells.Count}");
+                    return assetMap;
+                }
+
+                Debug.LogWarning("[MapGenerator] Fixed map generation failed. Falling back to room graph generation.");
+            }
+
+            if (floorDefinition.GenerationMode == RunMapGenerationMode.RoomGraph ||
+                floorDefinition.GenerationMode == RunMapGenerationMode.FixedMapAsset ||
+                roomTemplates.BossRoom != null)
+            {
+                return roomTemplates.BossRoom != null
+                    ? CreateBossDungeonMap(roomTemplates, settings)
+                    : CreateDungeonMap(roomTemplates, settings);
+            }
+
+            return CreateCellularAutomataDungeonMap(floorDefinition, roomTemplates, settings);
+        }
+
+        private static MapDefinition CreateCellularAutomataDungeonMap(
+            RunFloorDefinition floorDefinition,
+            RoomTemplateSet roomTemplates,
+            DungeonGenerationSettings settings)
+        {
+            CellularAutomataMapSettings cellularSettings = floorDefinition.CellularAutomataSettings ?? new CellularAutomataMapSettings();
+            int width = Mathf.Max(12, cellularSettings.Width);
+            int height = Mathf.Max(12, cellularSettings.Height);
+            int borderThickness = Mathf.Clamp(cellularSettings.BorderThickness, 1, Mathf.Min(width, height) / 2);
+            System.Random random = new System.Random();
+
+            bool[,] walls = CreateInitialCellularWalls(width, height, borderThickness, cellularSettings.FillPercent, random);
+            int smoothIterations = Mathf.Max(0, cellularSettings.SmoothIterations);
+            for (int i = 0; i < smoothIterations; i++)
+            {
+                walls = SmoothCellularWalls(walls, width, height, cellularSettings.BirthLimit, cellularSettings.DeathLimit);
+            }
+
+            HashSet<Vector2Int> openRegion = FindLargestOpenRegion(walls, width, height);
+            int minimumOpenCells = Mathf.Max(16, width * height / 8);
+            if (openRegion.Count < minimumOpenCells)
+            {
+                Debug.LogWarning(
+                    $"[MapGenerator] Cellular map has too few connected open cells. " +
+                    $"Falling back to room graph generation. openCells={openRegion.Count}, minimum={minimumOpenCells}");
+                return CreateDungeonMap(roomTemplates, settings);
+            }
+
+            MapDefinition map = new MapDefinition
+            {
+                RunFloor = settings.Floor,
+            };
+
+            Vector2Int offset = new Vector2Int(-width / 2, -height / 2);
+            AddCellularMapCells(map, walls, openRegion, width, height, offset);
+            Vector2Int localSpawn = PickCellClosestToCenter(openRegion, width, height);
+            Vector2Int localExit = PickFarthestReachableCell(openRegion, localSpawn);
+            map.PlayerSpawn = localSpawn + offset;
+            map.FloorExitPosition = localExit + offset;
+            AddCellularEnemySpawns(
+                map,
+                roomTemplates,
+                openRegion,
+                offset,
+                localSpawn,
+                localExit,
+                width,
+                height,
+                cellularSettings,
+                random);
+
+            DungeonRoomDefinition generatedArea = new DungeonRoomDefinition
+            {
+                Id = 0,
+                Origin = Vector2Int.zero,
+                Min = offset,
+                Max = new Vector2Int(width - 1, height - 1) + offset,
+            };
+
+            foreach (Vector2Int cell in openRegion)
+            {
+                generatedArea.Cells.Add(cell + offset);
+            }
+
+            map.Rooms.Add(generatedArea);
+
+            Debug.Log(
+                $"[MapGenerator] Cellular dungeon generated floor={settings.Floor}, size={width}x{height}, " +
+                $"openCells={openRegion.Count}, wallCells={map.WallCells.Count}, enemies={map.EnemySpawns.Count}, " +
+                $"spawn={map.PlayerSpawn}, exit={map.FloorExitPosition}");
+            return map;
+        }
+
+        private static bool[,] CreateInitialCellularWalls(
+            int width,
+            int height,
+            int borderThickness,
+            int fillPercent,
+            System.Random random)
+        {
+            bool[,] walls = new bool[width, height];
+            int clampedFillPercent = Mathf.Clamp(fillPercent, 0, 100);
+            for (int x = 0; x < width; x++)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    bool isBorder =
+                        x < borderThickness ||
+                        y < borderThickness ||
+                        x >= width - borderThickness ||
+                        y >= height - borderThickness;
+                    walls[x, y] = isBorder || random.Next(100) < clampedFillPercent;
+                }
+            }
+
+            return walls;
+        }
+
+        private static bool[,] SmoothCellularWalls(bool[,] current, int width, int height, int birthLimit, int deathLimit)
+        {
+            bool[,] next = new bool[width, height];
+            for (int x = 0; x < width; x++)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    int wallNeighbors = CountWallNeighbors(current, width, height, x, y);
+                    if (current[x, y])
+                    {
+                        next[x, y] = wallNeighbors >= deathLimit;
+                    }
+                    else
+                    {
+                        next[x, y] = wallNeighbors > birthLimit;
+                    }
+                }
+            }
+
+            return next;
+        }
+
+        private static int CountWallNeighbors(bool[,] walls, int width, int height, int cellX, int cellY)
+        {
+            int count = 0;
+            for (int x = cellX - 1; x <= cellX + 1; x++)
+            {
+                for (int y = cellY - 1; y <= cellY + 1; y++)
+                {
+                    if (x == cellX && y == cellY)
+                    {
+                        continue;
+                    }
+
+                    if (x < 0 || y < 0 || x >= width || y >= height || walls[x, y])
+                    {
+                        count++;
+                    }
+                }
+            }
+
+            return count;
+        }
+
+        private static HashSet<Vector2Int> FindLargestOpenRegion(bool[,] walls, int width, int height)
+        {
+            HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
+            HashSet<Vector2Int> largestRegion = new HashSet<Vector2Int>();
+            for (int x = 0; x < width; x++)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    Vector2Int start = new Vector2Int(x, y);
+                    if (walls[x, y] || visited.Contains(start))
+                    {
+                        continue;
+                    }
+
+                    HashSet<Vector2Int> region = FloodFillOpenRegion(walls, width, height, start, visited);
+                    if (region.Count > largestRegion.Count)
+                    {
+                        largestRegion = region;
+                    }
+                }
+            }
+
+            return largestRegion;
+        }
+
+        private static HashSet<Vector2Int> FloodFillOpenRegion(
+            bool[,] walls,
+            int width,
+            int height,
+            Vector2Int start,
+            HashSet<Vector2Int> visited)
+        {
+            HashSet<Vector2Int> region = new HashSet<Vector2Int>();
+            Queue<Vector2Int> queue = new Queue<Vector2Int>();
+            visited.Add(start);
+            queue.Enqueue(start);
+
+            while (queue.Count > 0)
+            {
+                Vector2Int cell = queue.Dequeue();
+                region.Add(cell);
+
+                for (int i = 0; i < CardinalOffsets.Length; i++)
+                {
+                    Vector2Int neighbor = cell + CardinalOffsets[i];
+                    if (neighbor.x < 0 || neighbor.y < 0 || neighbor.x >= width || neighbor.y >= height)
+                    {
+                        continue;
+                    }
+
+                    if (walls[neighbor.x, neighbor.y] || visited.Contains(neighbor))
+                    {
+                        continue;
+                    }
+
+                    visited.Add(neighbor);
+                    queue.Enqueue(neighbor);
+                }
+            }
+
+            return region;
+        }
+
+        private static void AddCellularMapCells(
+            MapDefinition map,
+            bool[,] walls,
+            HashSet<Vector2Int> openRegion,
+            int width,
+            int height,
+            Vector2Int offset)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    Vector2Int localCell = new Vector2Int(x, y);
+                    Vector2Int worldCell = localCell + offset;
+                    AddWalkableCell(map, worldCell);
+                    if (walls[x, y] || !openRegion.Contains(localCell))
+                    {
+                        AddWallCell(map, worldCell);
+                    }
+                }
+            }
+        }
+
+        private static Vector2Int PickCellClosestToCenter(HashSet<Vector2Int> cells, int width, int height)
+        {
+            Vector2Int center = new Vector2Int(width / 2, height / 2);
+            Vector2Int bestCell = Vector2Int.zero;
+            int bestDistance = int.MaxValue;
+            foreach (Vector2Int cell in cells)
+            {
+                int distance = Mathf.Abs(cell.x - center.x) + Mathf.Abs(cell.y - center.y);
+                if (distance >= bestDistance)
+                {
+                    continue;
+                }
+
+                bestCell = cell;
+                bestDistance = distance;
+            }
+
+            return bestCell;
+        }
+
+        private static Vector2Int PickFarthestReachableCell(HashSet<Vector2Int> cells, Vector2Int start)
+        {
+            Queue<Vector2Int> queue = new Queue<Vector2Int>();
+            Dictionary<Vector2Int, int> distances = new Dictionary<Vector2Int, int>();
+            Vector2Int farthest = start;
+            int farthestDistance = 0;
+            queue.Enqueue(start);
+            distances[start] = 0;
+
+            while (queue.Count > 0)
+            {
+                Vector2Int cell = queue.Dequeue();
+                int distance = distances[cell];
+                if (distance > farthestDistance)
+                {
+                    farthest = cell;
+                    farthestDistance = distance;
+                }
+
+                for (int i = 0; i < CardinalOffsets.Length; i++)
+                {
+                    Vector2Int neighbor = cell + CardinalOffsets[i];
+                    if (!cells.Contains(neighbor) || distances.ContainsKey(neighbor))
+                    {
+                        continue;
+                    }
+
+                    distances[neighbor] = distance + 1;
+                    queue.Enqueue(neighbor);
+                }
+            }
+
+            return farthest;
+        }
+
+        private static void AddCellularEnemySpawns(
+            MapDefinition map,
+            RoomTemplateSet roomTemplates,
+            HashSet<Vector2Int> openRegion,
+            Vector2Int offset,
+            Vector2Int localSpawn,
+            Vector2Int localExit,
+            int width,
+            int height,
+            CellularAutomataMapSettings settings,
+            System.Random random)
+        {
+            List<EnemyDefinition> enemyDefinitions = CollectEnemyDefinitions(roomTemplates);
+            if (enemyDefinitions.Count == 0)
+            {
+                Debug.LogWarning("[MapGenerator] Cellular enemy spawn skipped. No EnemyDefinition found in floor room assets.");
+                return;
+            }
+
+            int zoneSize = Mathf.Max(1, settings.EnemySpawnZoneSize);
+            int safeDistance = Mathf.Max(0, settings.EnemySpawnSafeDistanceFromPlayer);
+            int skippedZones = 0;
+            for (int zoneMinX = 0; zoneMinX < width; zoneMinX += zoneSize)
+            {
+                for (int zoneMinY = 0; zoneMinY < height; zoneMinY += zoneSize)
+                {
+                    List<Vector2Int> candidates = CollectCellularEnemySpawnCandidates(
+                        openRegion,
+                        localSpawn,
+                        localExit,
+                        zoneMinX,
+                        zoneMinY,
+                        Mathf.Min(zoneMinX + zoneSize, width),
+                        Mathf.Min(zoneMinY + zoneSize, height),
+                        safeDistance);
+
+                    if (candidates.Count == 0)
+                    {
+                        skippedZones++;
+                        continue;
+                    }
+
+                    Vector2Int localPosition = candidates[random.Next(candidates.Count)];
+                    map.EnemySpawns.Add(new EnemySpawnDefinition
+                    {
+                        EnemyDefinition = enemyDefinitions[random.Next(enemyDefinitions.Count)],
+                        Position = localPosition + offset,
+                    });
+                }
+            }
+
+            Debug.Log(
+                $"[MapGenerator] Cellular enemy spawns placed. enemies={map.EnemySpawns.Count}, " +
+                $"zoneSize={zoneSize}, skippedZones={skippedZones}");
+        }
+
+        private static List<Vector2Int> CollectCellularEnemySpawnCandidates(
+            HashSet<Vector2Int> openRegion,
+            Vector2Int localSpawn,
+            Vector2Int localExit,
+            int minX,
+            int minY,
+            int maxXExclusive,
+            int maxYExclusive,
+            int safeDistance)
+        {
+            List<Vector2Int> candidates = new List<Vector2Int>();
+            for (int x = minX; x < maxXExclusive; x++)
+            {
+                for (int y = minY; y < maxYExclusive; y++)
+                {
+                    Vector2Int cell = new Vector2Int(x, y);
+                    if (!openRegion.Contains(cell) || cell == localSpawn || cell == localExit)
+                    {
+                        continue;
+                    }
+
+                    int spawnDistance = Mathf.Abs(cell.x - localSpawn.x) + Mathf.Abs(cell.y - localSpawn.y);
+                    if (spawnDistance < safeDistance)
+                    {
+                        continue;
+                    }
+
+                    candidates.Add(cell);
+                }
+            }
+
+            return candidates;
+        }
+
+        private static List<EnemyDefinition> CollectEnemyDefinitions(RoomTemplateSet roomTemplates)
+        {
+            List<EnemyDefinition> enemyDefinitions = new List<EnemyDefinition>();
+            AddEnemyDefinitionsFromTemplate(enemyDefinitions, roomTemplates.StartRoom);
+            for (int i = 0; i < roomTemplates.Rooms.Count; i++)
+            {
+                AddEnemyDefinitionsFromTemplate(enemyDefinitions, roomTemplates.Rooms[i]);
+            }
+
+            for (int i = 0; i < roomTemplates.SpecialRoomSlots.Count; i++)
+            {
+                if (roomTemplates.SpecialRoomSlots[i].SpecialRoomType == RunSpecialRoomType.Shop)
+                {
+                    continue;
+                }
+
+                AddEnemyDefinitionsFromTemplate(enemyDefinitions, roomTemplates.SpecialRoomSlots[i]);
+            }
+
+            return enemyDefinitions;
+        }
+
+        private static void AddEnemyDefinitionsFromTemplate(List<EnemyDefinition> enemyDefinitions, RoomTemplate template)
+        {
+            if (template == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < template.EnemySpawns.Count; i++)
+            {
+                EnemyDefinition enemyDefinition = template.EnemySpawns[i].EnemyDefinition;
+                if (enemyDefinition != null && !enemyDefinitions.Contains(enemyDefinition))
+                {
+                    enemyDefinitions.Add(enemyDefinition);
+                }
+            }
         }
 
         private static MapDefinition CreateDungeonMap(RoomTemplateSet roomTemplates, DungeonGenerationSettings settings)

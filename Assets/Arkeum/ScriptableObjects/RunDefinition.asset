@@ -15,6 +15,7 @@ MonoBehaviour:
   startingLoadout: {fileID: 11400000, guid: cda73b7ccfdd4cb9b2c7596c9ced96fa, type: 2}
   floors:
   - FloorIndex: 1
+    GenerationMode: 1
     MapAsset: {fileID: 11400000, guid: 5454b70dab147d04aa66c5421932c83a, type: 2}
     RoomAssets:
     - {fileID: 11400000, guid: 104e5945f003e114cb4592bae96646eb, type: 2}
@@ -33,7 +34,18 @@ MonoBehaviour:
     MinimumRoomCount: 6
     RoomGap: 5
     PlacementAttempts: 300
+    CellularAutomataSettings:
+      Width: 50
+      Height: 50
+      FillPercent: 43
+      SmoothIterations: 5
+      BirthLimit: 10
+      DeathLimit: 3
+      BorderThickness: 2
+      EnemySpawnZoneSize: 5
+      EnemySpawnSafeDistanceFromPlayer: 6
   - FloorIndex: 2
+    GenerationMode: 0
     MapAsset: {fileID: 11400000, guid: 836ccaf5697137347af45c686329152f, type: 2}
     RoomAssets: []
     SpecialRooms:
@@ -46,3 +58,13 @@ MonoBehaviour:
     MinimumRoomCount: 6
     RoomGap: 5
     PlacementAttempts: 300
+    CellularAutomataSettings:
+      Width: 48
+      Height: 30
+      FillPercent: 45
+      SmoothIterations: 5
+      BirthLimit: 4
+      DeathLimit: 3
+      BorderThickness: 1
+      EnemySpawnZoneSize: 5
+      EnemySpawnSafeDistanceFromPlayer: 6

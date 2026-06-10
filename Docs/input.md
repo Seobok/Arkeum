@@ -759,3 +759,84 @@
 ### 확인하지 못한 사항 또는 후속 점검 사항
 - Unity Play Mode에서 몬스터가 플레이어 칸을 이동 목적지로 잡는 실제 상황과 HP 감소 표시를 직접 확인하지 못했다.
 - `Assembly-CSharp-Editor.csproj` 빌드는 실행하지 않았다.
+
+## 2026-06-09 맵 생성 방식 선택 및 셀룰러 오토마타 생성 경로 추가
+
+### 사용자의 요청 개요
+- 기본 맵 생성 기믹을 셀룰러 오토마타 알고리즘 기반으로 바꾸되, 튜토리얼이나 보스방처럼 직접 모양을 정해야 하는 맵을 위해 기존 맵 생성 로직도 남겨달라는 요청.
+
+### 핵심 요구사항
+- 일반 층은 셀룰러 오토마타 기반 동굴형 맵 생성 방식을 사용할 수 있어야 한다.
+- 기존 `MapAsset` 방 템플릿 기반 방 그래프 생성 로직은 삭제하지 않고 선택 가능한 방식으로 유지한다.
+- 튜토리얼 등 완전 수동 맵은 `MapAsset`을 그대로 런타임 맵으로 읽는 경로를 사용할 수 있어야 한다.
+- 보스방이 있는 층은 기존 보스층 고정 배치 로직을 계속 사용할 수 있어야 한다.
+
+### 이번 작업 범위
+- 층 정의 데이터에 맵 생성 모드와 셀룰러 오토마타 파라미터를 추가했다.
+- 런 맵 생성 진입점에서 생성 모드별 분기 경로를 추가했다.
+- 셀룰러 오토마타 기반 맵 생성, smoothing, 가장 큰 연결 영역 추출, 플레이어 스폰/출구 위치 선택을 구현했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunFloorDefinition.cs`
+  - `RunMapGenerationMode` enum 추가.
+  - `RunFloorDefinition.GenerationMode` 추가.
+  - `CellularAutomataMapSettings` 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Map/MapGenerator.cs`
+  - `CreateRunMap()`에서 생성 모드별로 `FixedMapAsset`, 기존 `RoomGraph`, 신규 `CellularAutomata` 경로를 선택하도록 변경.
+  - 보스방 템플릿이 있는 층은 기존 `CreateBossDungeonMap()` 경로를 우선 사용하도록 유지.
+  - 셀룰러 오토마타 초기 랜덤 벽 배치, 반복 smoothing, 가장 큰 열린 영역 flood fill, BFS 기반 원거리 출구 선택 로직 추가.
+
+### 실제 수행한 작업 요약
+- 기존 `CreateDungeonMap()`, `CreateBossDungeonMap()`, `CreateFallbackDungeonMap()` 로직은 삭제하지 않고 그대로 유지했다.
+- `FixedMapAsset` 모드에서는 `RunFloorDefinition.MapAsset`을 직접 `MapDefinition`으로 변환한다.
+- `CellularAutomata` 모드에서는 설정 크기 안에서 벽/바닥을 생성하고, 연결된 가장 큰 바닥 영역을 플레이 가능한 공간으로 삼는다.
+- 셀룰러 맵은 `MapDefinition.WalkableCells`, `WallCells`, `PlayerSpawn`, `FloorExitPosition`, 단일 `Rooms` 항목을 채워 기존 런타임 조회 구조와 맞췄다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 두 빌드 모두 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 셀룰러 오토마타 맵의 실제 바닥/벽 표시, 이동 가능 영역, 출구 상호작용은 아직 직접 확인하지 못했다.
+- 신규 `GenerationMode`와 `CellularAutomataSettings`가 기존 `RunDefinition.asset` 인스펙터에서 원하는 값으로 보이는지 확인이 필요하다.
+- 셀룰러 오토마타 맵에는 아직 적/무기/상점 배치 후처리를 넣지 않았다. 일반 층에서 해당 배치를 원하면 별도 스폰 규칙이 필요하다.
+
+## 2026-06-09 셀룰러 오토마타 맵 5x5 구역별 몬스터 랜덤 스폰 추가
+
+### 사용자의 요청 개요
+- 셀룰러 방식으로 던전을 생성했을 때 지형을 5x5칸 단위 구역으로 나누고, 구역당 몬스터 1마리를 랜덤 스폰하는 방식으로 변경 요청.
+
+### 핵심 요구사항
+- 셀룰러 오토마타 생성 맵에만 구역 단위 몬스터 스폰을 적용한다.
+- 5x5 구역마다 유효한 바닥 칸을 찾아 몬스터 1마리를 랜덤 배치한다.
+- 기존 방 그래프 기반 맵의 수동/방 템플릿 적 스폰 로직은 유지한다.
+
+### 이번 작업 범위
+- 셀룰러 오토마타 설정에 몬스터 스폰 구역 크기와 플레이어 시작점 안전거리 설정을 추가했다.
+- 셀룰러 맵 생성 후 가장 큰 연결 영역 기준으로 5x5 구역을 순회하며 적 스폰을 생성하도록 구현했다.
+- 적 종류는 기존 층의 `MapAsset` 방 템플릿에 등록된 `EnemySpawns`의 `EnemyDefinition` 목록을 풀로 재사용하도록 했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunFloorDefinition.cs`
+  - `CellularAutomataMapSettings.EnemySpawnZoneSize` 추가. 기본값은 5.
+  - `CellularAutomataMapSettings.EnemySpawnSafeDistanceFromPlayer` 추가. 기본값은 6.
+- `Assets/Arkeum/Scripts/Gameplay/Map/MapGenerator.cs`
+  - 셀룰러 맵 생성 후 `AddCellularEnemySpawns()`를 호출하도록 추가.
+  - 5x5 구역별 유효 바닥 후보 수집, 적 정의 풀 수집, 랜덤 스폰 생성 로직 추가.
+
+### 실제 수행한 작업 요약
+- 각 구역은 `EnemySpawnZoneSize` 기준으로 나누며, 기본값은 요청대로 5x5다.
+- 구역 안에서 가장 큰 연결 바닥 영역에 속하고, 플레이어 스폰/출구가 아니며, 플레이어 시작점 안전거리 밖인 칸만 후보로 사용한다.
+- 후보가 없는 구역은 스폰하지 않고 건너뛴다.
+- 적 정의가 하나도 없으면 셀룰러 적 스폰을 건너뛰고 경고 로그를 남긴다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 두 빌드 모두 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 5x5 구역별 실제 몬스터 배치 밀도와 성능은 아직 직접 확인하지 못했다.
+- 200x200 맵에서 5x5 구역마다 1마리를 배치하면 이론상 최대 1600마리까지 생성될 수 있어 실제 플레이 밀도 조정이 필요할 수 있다.
+- 현재 적 종류 풀은 방 템플릿에 배치된 기존 적 스폰에서 가져오므로, 해당 층의 `RoomAssets` 또는 시작 `MapAsset`에 적 스폰 샘플이 필요하다.
