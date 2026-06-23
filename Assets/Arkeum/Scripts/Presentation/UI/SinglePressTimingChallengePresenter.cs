@@ -1,16 +1,14 @@
 using Arkeum.Production.Gameplay.Timing;
+using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace Arkeum.Production.Presentation.UI
 {
     public sealed class SinglePressTimingChallengePresenter : TimingChallengePresenterBase
     {
         [SerializeField] private GameObject popupPanel;
-        [SerializeField] private Text titleText;
         [SerializeField] private RectTransform trackRect;
         [SerializeField] private RectTransform goodZoneRect;
-        [SerializeField] private RectTransform perfectZoneRect;
         [SerializeField] private RectTransform markerRect;
 
         private bool missingReferencesLogged;
@@ -38,9 +36,8 @@ namespace Arkeum.Production.Presentation.UI
             }
 
             // This presenter is intentionally tied to the one-button, moving-marker rule.
-            titleText.text = session.Definition != null ? session.Definition.DisplayName : "Timing";
-            SetZone(goodZoneRect, runtime.GoodZoneMin, runtime.GoodZoneMax);
-            SetZone(perfectZoneRect, runtime.PerfectZoneMin, runtime.PerfectZoneMax);
+            SetZone(goodZoneRect, runtime.SuccessZoneMin, runtime.SuccessZoneMax);
+
             SetMarker(runtime.NormalizedPosition);
         }
 
@@ -56,10 +53,8 @@ namespace Arkeum.Production.Presentation.UI
         {
             bool hasReferences =
                 popupPanel != null &&
-                titleText != null &&
                 trackRect != null &&
                 goodZoneRect != null &&
-                perfectZoneRect != null &&
                 markerRect != null;
 
             if (!hasReferences && !missingReferencesLogged)

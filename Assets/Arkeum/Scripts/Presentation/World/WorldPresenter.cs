@@ -219,6 +219,9 @@ namespace Arkeum.Production.Presentation.World
                     5));
             }
 
+            DrawShopTeleportMarker(map.ShopEntrancePosition, "ShopEntranceMarker");
+            DrawShopTeleportMarker(map.ShopExitPosition, "ShopExitMarker");
+
             // 출구 View
             if (map.FloorExitPosition != Vector2Int.zero && IsRunCellVisible(map.FloorExitPosition))
             {
@@ -230,6 +233,24 @@ namespace Arkeum.Production.Presentation.World
                     "FloorExitMarker",
                     2));
             }
+        }
+
+        private void DrawShopTeleportMarker(Vector2Int position, string markerName)
+        {
+            if (!IsMarkerEnabled(position) || !IsRunCellVisible(position))
+            {
+                return;
+            }
+
+            GameObject marker = viewFactory.CreateCell(
+                markerRoot,
+                position,
+                GetFloorExitSprite(),
+                GetShopTeleportMarkerTint(),
+                markerName,
+                3);
+            marker.transform.localScale = new Vector3(1.2f, 1.2f, 1f);
+            markerViews.Add(marker);
         }
 
         private void DrawHubMarkers()
@@ -832,6 +853,11 @@ namespace Arkeum.Production.Presentation.World
         private Color GetFloorExitTint()
         {
             return visualSet != null ? visualSet.FloorExitTint : new Color(0.76f, 0.65f, 0.17f);
+        }
+
+        private Color GetShopTeleportMarkerTint()
+        {
+            return new Color(0.25f, 0.82f, 0.85f);
         }
 
         private Sprite GetDungeonEntranceSprite()

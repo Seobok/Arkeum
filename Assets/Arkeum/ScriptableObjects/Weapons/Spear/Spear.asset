@@ -25,4 +25,4 @@ MonoBehaviour:
   - {x: 2, y: 0}
   effects:
   - {fileID: 11400000, guid: ff1931addf490ee4bbc0e916000e7dd6, type: 2}
-  timingChallenge: {fileID: 0}
+  timingChallenge: {fileID: 11400000, guid: 2d9d2d14942ee1f4c8c986165874a161, type: 2}

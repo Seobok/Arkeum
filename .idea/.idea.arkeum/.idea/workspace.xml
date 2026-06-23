@@ -5,10 +5,23 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="21854d10-4486-4f0b-a0de-1ffa86a46fbb" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/MapAssets/StartPoint.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/MapAssets/StartPoint.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.arkeum/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.arkeum/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scenes/GameScene.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scenes/GameScene.unity" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/Weapons/Dagger/Dagger.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/Weapons/Dagger/Dagger.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/Weapons/Spear/Spear.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/Weapons/Spear/Spear.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/Weapons/Sword/Sword.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/Weapons/Sword/Sword.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Combat/CombatSystem.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Combat/CombatSystem.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Map/MapDefinition.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Map/MapDefinition.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Map/MapGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Map/MapGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Timing/ITimingChallengeRuntime.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Timing/ITimingChallengeRuntime.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Timing/SinglePressTimingChallengeDefinition.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Timing/SinglePressTimingChallengeDefinition.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Timing/TimingChallengeDefinition.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Timing/TimingChallengeDefinition.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Timing/TimingResultGrade.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Timing/TimingResultGrade.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Infrastructure/Input/InputReader.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Infrastructure/Input/InputReader.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/UI/SinglePressTimingChallengePresenter.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/UI/SinglePressTimingChallengePresenter.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Docs/input.md" beforeDir="false" afterPath="$PROJECT_DIR$/Docs/input.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -99,6 +112,11 @@
       <workItem from="1778501722202" duration="1608000" />
       <workItem from="1778588298637" duration="5088000" />
       <workItem from="1778675065381" duration="4197000" />
+      <workItem from="1779803788359" duration="916000" />
+      <workItem from="1779891581415" duration="823000" />
+      <workItem from="1780975832075" duration="749000" />
+      <workItem from="1781070150691" duration="3322000" />
+      <workItem from="1781164658698" duration="3080000" />
     </task>
     <servers />
   </component>

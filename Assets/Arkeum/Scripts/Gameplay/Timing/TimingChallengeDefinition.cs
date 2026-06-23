@@ -1,5 +1,6 @@
 using Arkeum.Production.Presentation.UI;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Arkeum.Production.Gameplay.Timing
 {
@@ -8,20 +9,18 @@ namespace Arkeum.Production.Gameplay.Timing
         [SerializeField] private string displayName = "Timing";
         [SerializeField] private TimingChallengePresenterBase presenterPrefab;
         [SerializeField] private float durationSeconds = 1.2f;
-        [SerializeField] private float goodDamageMultiplier = 1.35f;
-        [SerializeField] private float perfectDamageMultiplier = 1.75f;
+        [FormerlySerializedAs("goodDamageMultiplier")]
+        [SerializeField] private float successDamageMultiplier = 2f;
         [SerializeField] private int failedFlatDamageBonus;
-        [SerializeField] private int goodFlatDamageBonus;
-        [SerializeField] private int perfectFlatDamageBonus;
+        [FormerlySerializedAs("goodFlatDamageBonus")]
+        [SerializeField] private int successFlatDamageBonus;
 
         public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? name : displayName;
         public TimingChallengePresenterBase PresenterPrefab => presenterPrefab;
         public float DurationSeconds => Mathf.Max(0.1f, durationSeconds);
-        public float GoodDamageMultiplier => Mathf.Max(0f, goodDamageMultiplier);
-        public float PerfectDamageMultiplier => Mathf.Max(0f, perfectDamageMultiplier);
+        public float SuccessDamageMultiplier => Mathf.Max(0f, successDamageMultiplier);
         public int FailedFlatDamageBonus => failedFlatDamageBonus;
-        public int GoodFlatDamageBonus => goodFlatDamageBonus;
-        public int PerfectFlatDamageBonus => perfectFlatDamageBonus;
+        public int SuccessFlatDamageBonus => successFlatDamageBonus;
 
         public abstract ITimingChallengeRuntime CreateRuntime();
 
@@ -29,12 +28,10 @@ namespace Arkeum.Production.Gameplay.Timing
         {
             switch (grade)
             {
-                case TimingResultGrade.Perfect:
-                    return new TimingAttackResult(true, grade, PerfectDamageMultiplier, PerfectFlatDamageBonus);
-                case TimingResultGrade.Good:
-                    return new TimingAttackResult(true, grade, GoodDamageMultiplier, GoodFlatDamageBonus);
+                case TimingResultGrade.Success:
+                    return new TimingAttackResult(true, grade, SuccessDamageMultiplier, SuccessFlatDamageBonus);
                 case TimingResultGrade.Failed:
-                    return new TimingAttackResult(true, grade, 1f, FailedFlatDamageBonus);
+                    return new TimingAttackResult(true, grade, 0f, FailedFlatDamageBonus);
                 default:
                     return TimingAttackResult.None;
             }

@@ -12,6 +12,9 @@ namespace Arkeum.Production.Gameplay.Map
         public Vector2Int PlayerSpawn;
         public Vector2Int FloorExitPosition;
         public Vector2Int DungeonEntrancePosition;
+        public Vector2Int ShopEntrancePosition;
+        public Vector2Int ShopInteriorSpawnPosition;
+        public Vector2Int ShopExitPosition;
         public int BossRoomId = -1;
         public List<Vector2Int> BossEntranceBlockCells = new List<Vector2Int>();
         public List<Vector2Int> WalkableCells = new List<Vector2Int>();

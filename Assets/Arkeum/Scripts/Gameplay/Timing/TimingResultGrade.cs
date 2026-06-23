@@ -4,7 +4,6 @@ namespace Arkeum.Production.Gameplay.Timing
     {
         None,
         Failed,
-        Good,
-        Perfect,
+        Success,
     }
 }

@@ -882,3 +882,381 @@
 - Unity Play Mode에서 실제 이동에 따라 검은/회색/현재 시야 표시가 자연스럽게 갱신되는지는 아직 직접 확인하지 못했다.
 - 현재 시야는 벽에 의한 시야 차단 없이 거리 5칸 기준으로 계산한다. 벽 뒤를 가려야 한다면 별도 line-of-sight 처리가 필요하다.
 - 탐사 상태는 현재 런 화면 세션용이며 저장/로드까지 지속되지는 않는다.
+
+## 2026-06-10 타이밍 챌린지 2단계 판정 및 아무 키 입력 처리
+
+### 사용자의 요청 개요
+- 타이밍 챌린지 판정을 기존 실패/Good/Perfect 3단계에서 실패/성공 2단계로 단순화하고, 입력 방식을 엔터 전용에서 아무 키 입력으로 변경 요청.
+
+### 핵심 요구사항
+- 타이밍 챌린지는 실패와 성공 2가지 결과만 가진다.
+- 실패 시 데미지는 0, 성공 시 데미지는 2배로 처리한다.
+- 타이밍 판정 중에는 엔터키뿐 아니라 키보드의 아무 키를 눌러도 판정이 완료되어야 한다.
+
+### 이번 작업 범위
+- 타이밍 결과 enum, 챌린지 정의, 단일 입력 런타임, UI Presenter, 입력 판정, 타이밍 에셋 값을 수정했다.
+- 기존 단검에 연결된 `SinglePressTimingChallenge` 에셋의 데미지 배율과 판정 구간 필드명을 새 구조에 맞게 정리했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Timing/TimingResultGrade.cs`
+  - `Good`, `Perfect` 결과를 제거하고 `Success` 결과를 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Timing/TimingChallengeDefinition.cs`
+  - 성공 배율을 2배로 처리하고, 실패 배율을 0으로 처리하도록 변경.
+  - 기존 serialized 필드 호환을 위해 `FormerlySerializedAs`를 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Timing/ITimingChallengeRuntime.cs`
+  - Good/Perfect 구간 대신 Success 구간만 노출하도록 변경.
+- `Assets/Arkeum/Scripts/Gameplay/Timing/SinglePressTimingChallengeDefinition.cs`
+  - 단일 성공 구간 안에서 입력하면 `Success`, 그 외에는 `Failed`를 반환하도록 변경.
+- `Assets/Arkeum/Scripts/Presentation/UI/SinglePressTimingChallengePresenter.cs`
+  - 성공 구간만 표시하고 기존 Perfect 구간 UI는 숨기도록 변경.
+- `Assets/Arkeum/Scripts/Infrastructure/Input/InputReader.cs`
+  - 타이밍 판정 중 `Keyboard.current.anyKey.wasPressedThisFrame`도 완료 입력으로 인정하도록 변경.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs`
+  - 타이밍 결과 메시지 분기를 `Success` 기준으로 변경.
+- `Assets/Arkeum/ScriptableObjects/Timing/SinglePressTimingChallenge.asset`
+  - 성공 배율 2, 성공 구간 필드로 에셋 값을 갱신.
+
+### 실제 수행한 작업 요약
+- 타이밍 판정 모델을 `None / Failed / Success`로 정리했다.
+- 실패 결과는 공격력을 0배로 만들어 최종 데미지가 0이 되도록 했다.
+- 성공 결과는 공격력을 2배로 만들어 기존 공격 처리 흐름에 전달되도록 했다.
+- 기존 Good 구간을 Success 구간으로 사용하고 Perfect 구간은 제거했다.
+- 타이밍 판정 상태에서 키보드 아무 키 입력을 판정 완료 입력으로 처리하도록 했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 타이밍 UI 표시, 아무 키 입력 판정, 실패 시 0 데미지/성공 시 2배 데미지 체감은 직접 확인하지 못했다.
+- 기존 프리팹에는 Perfect 구간 RectTransform 참조가 남아 있을 수 있으나, 런타임에서 해당 오브젝트를 숨기도록 처리했다. 필요하면 프리팹 구조 자체도 추후 정리할 수 있다.
+
+## 2026-06-10 타이밍 실패 데미지 최소 1 적용 문제 수정
+
+### 사용자의 요청 개요
+- 타이밍 실패 시 데미지가 0이어야 하는데 실제로 데미지가 들어가는 것 같아, 실패 데미지 0 처리 위치와 원인 확인 요청.
+
+### 핵심 요구사항
+- 타이밍 실패 시 실제 최종 데미지가 0이어야 한다.
+- 실패 결과가 일반 데미지 계산기의 최소 피해 보정에 의해 1 이상으로 바뀌면 안 된다.
+
+### 이번 작업 범위
+- 타이밍 실패 결과가 전투 데미지 계산 흐름에서 어떻게 처리되는지 확인했다.
+- 타이밍 실패 공격에 한해 `DamageResolver`의 최소 1 데미지 보정을 우회하도록 수정했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Combat/CombatSystem.cs`
+  - `TimingResultGrade.Failed`인 타이밍 공격은 `DamageResolver.ResolveDamage()`로 넘기지 않고 즉시 0 데미지를 반환하도록 변경.
+
+### 실제 수행한 작업 요약
+- 실패 판정 자체는 `TimingChallengeDefinition.BuildResult()`에서 `DamageMultiplier = 0f`로 생성되고 있었다.
+- 하지만 `CombatSystem.ResolvePlayerAttack()`에서 이 공격력을 다시 `DamageResolver.ResolveDamage()`에 넘기고 있었다.
+- `DamageResolver.ResolveDamage()`는 `Mathf.Max(1, attackPower - defense)` 구조라 공격력이 0이어도 최종 피해가 1로 보정되는 상태였다.
+- 타이밍 실패 공격은 이 최소 피해 보정을 타지 않도록 별도 분기했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 타이밍 실패 입력 후 적 HP가 줄지 않는지는 직접 확인하지 못했다.
+
+## 2026-06-11 원형 수축 마커 타이밍 챌린지 추가
+
+### 사용자의 요청 개요
+- 원형 판과 중심이 같은 도넛 모양 성공 구간이 있고, 마커가 원 바깥에서 중심 방향으로 점점 줄어들 때 성공 구간 안에서 버튼을 누르면 성공하는 새 타이밍 챌린지 추가 요청.
+
+### 핵심 요구사항
+- 타이밍 UI는 원형 판을 기준으로 표시한다.
+- 성공 구간은 원형 판과 중심이 같은 도넛 모양 영역이다.
+- 마커는 원 바깥쪽에서 시작해 중심 방향으로 수축한다.
+- 마커 반지름이 성공 구간 안에 있을 때 입력하면 성공, 그 외에는 실패한다.
+
+### 이번 작업 범위
+- 원형 수축 마커용 `TimingChallengeDefinition`과 Runtime을 추가했다.
+- 원형 판, 도넛형 SuccessZone, 수축 마커를 표시하는 Presenter를 추가했다.
+- 바로 연결해 사용할 수 있도록 ScriptableObject 에셋과 Presenter 프리팹을 추가했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Timing/RadialShrinkTimingChallengeDefinition.cs`
+  - 마커 반지름이 바깥에서 안쪽으로 줄어드는 타이밍 규칙 추가.
+  - `IRadialShrinkTimingChallengeRuntime`을 통해 Presenter가 마커 반지름과 도넛 성공 구간을 읽을 수 있게 했다.
+- `Assets/Arkeum/Scripts/Presentation/UI/RadialShrinkTimingChallengePresenter.cs`
+  - 런타임에 원형 판, 도넛 성공 구간, 마커 UI를 생성하고 갱신하는 Presenter 추가.
+- `Assets/Arkeum/ScriptableObjects/Timing/RadialShrinkTimingChallenge.asset`
+  - 새 타이밍 챌린지 에셋 추가.
+- `Assets/Arkeum/Prefabs/Timing/RadialShrinkTiming.prefab`
+  - 새 Presenter 프리팹 추가.
+- `Assembly-CSharp.csproj`
+  - 새 스크립트 파일을 컴파일 목록에 추가.
+- 각 신규 파일의 `.meta`
+  - Unity 에셋 참조를 위한 메타 파일 추가.
+
+### 실제 수행한 작업 요약
+- 기본 설정은 `durationSeconds = 1.2`, 마커 시작 반지름 `1.2`, 종료 반지름 `0`, 성공 도넛 반지름 `0.48~0.62`로 구성했다.
+- 판정은 `MarkerRadiusNormalized`가 성공 도넛의 inner/outer 반지름 사이에 있으면 `Success`, 아니면 `Failed`를 반환한다.
+- Presenter는 별도 UI 참조를 요구하지 않고 프리팹 루트에 붙은 컴포넌트가 런타임에 필요한 UI 오브젝트를 생성한다.
+- 새 챌린지는 아직 특정 무기에 연결하지 않았다. 사용하려면 무기 에셋의 `timingChallenge` 필드에 `RadialShrinkTimingChallenge.asset`을 연결해야 한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 원형 UI 표시, 마커 수축 위치, 입력 성공/실패 판정은 직접 확인하지 못했다.
+- Unity Editor에서 새 프리팹과 ScriptableObject 참조가 정상 로드되는지 확인이 필요하다.
+
+## 2026-06-11 원형 타이밍 UI 미표시 가능 원인 보완
+
+### 사용자의 요청 개요
+- 새 원형 수축 마커 타이밍 챌린지 UI가 보이지 않는다고 문의.
+
+### 핵심 요구사항
+- 별도 추가 작업이 필요한지 확인한다.
+- UI가 보이지 않을 수 있는 구현상 원인을 보완한다.
+
+### 이번 작업 범위
+- 현재 `Dagger.asset`이 `RadialShrinkTimingChallenge.asset`을 바라보고 있어 무기 연결 자체는 되어 있음을 확인했다.
+- 원형 UI를 그리는 Graphic 컴포넌트를 private nested 클래스에서 Unity가 안정적으로 인식할 수 있는 독립 컴포넌트 파일로 분리했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/UI/RadialRingGraphic.cs`
+  - 도넛/원형 UI 메시를 그리는 독립 `MaskableGraphic` 컴포넌트 추가.
+- `Assets/Arkeum/Scripts/Presentation/UI/RadialShrinkTimingChallengePresenter.cs`
+  - nested `RingGraphic` 대신 독립 `RadialRingGraphic`을 사용하도록 변경.
+- `Assembly-CSharp.csproj`
+  - 새 `RadialRingGraphic.cs`를 컴파일 목록에 추가.
+- `Assets/Arkeum/Scripts/Presentation/UI/RadialRingGraphic.cs.meta`
+  - Unity 에셋 참조를 위한 메타 파일 추가.
+
+### 실제 수행한 작업 요약
+- UI 미표시는 별도 무기 연결 누락보다는 런타임에 private nested `MonoBehaviour` 그래픽을 추가하는 구조가 Unity에서 안정적으로 표시되지 않을 가능성이 컸다.
+- `RadialRingGraphic`을 별도 파일의 public 컴포넌트로 분리해 Unity 컴포넌트 생성/렌더링 경로를 명확하게 만들었다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 UI 표시 여부는 직접 확인하지 못했다.
+- 그래도 보이지 않는다면 `TimingPopupPresenter.presenterRoot`가 활성 Canvas 아래인지, 플레이 중 Console에 Presenter 프리팹/스크립트 참조 누락 경고가 있는지 확인해야 한다.
+
+## 2026-06-11 원형 타이밍 Presenter 수동 UI 연결 방식 변경
+
+### 사용자의 요청 개요
+- 원형 타이밍 UI가 여전히 보이지 않아, 런타임 자동 생성 방식 대신 사용자가 직접 UI를 만들고 연결하는 방식으로 스크립트 변경 요청.
+
+### 핵심 요구사항
+- Presenter가 UI 오브젝트를 자동 생성하지 않아야 한다.
+- Unity에서 직접 만든 원형 판, 성공 도넛, 마커 UI를 Inspector로 연결할 수 있어야 한다.
+- 런타임에는 연결된 UI의 성공 구간과 마커 위치만 갱신해야 한다.
+
+### 이번 작업 범위
+- `RadialShrinkTimingChallengePresenter`를 수동 UI 참조 기반으로 변경했다.
+- 기존 `RadialShrinkTiming.prefab`의 Presenter serialized 필드를 새 구조에 맞게 정리했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/UI/RadialShrinkTimingChallengePresenter.cs`
+  - 런타임 UI 생성 코드를 제거.
+  - `popupPanel`, `boardRect`, `successZoneRing`, `markerRect`를 Inspector에서 직접 연결하는 방식으로 변경.
+  - 연결 누락 시 Console 경고를 출력하도록 변경.
+- `Assets/Arkeum/Prefabs/Timing/RadialShrinkTiming.prefab`
+  - Presenter 필드를 새 수동 연결 방식에 맞게 갱신.
+- `Docs/input.md`
+  - 이번 변경과 수동 UI 구성 방식 기록.
+
+### 실제 수행한 작업 요약
+- `successZoneRing.SetRadii()`로 도넛 성공 구간만 갱신한다.
+- `boardRect.rect`의 짧은 축을 기준으로 반지름을 계산하고, `markerRect`는 중심에 고정한 채 `sizeDelta`로 지름을 갱신한다.
+- 프리팹에는 `popupPanel`만 루트로 연결되어 있고, `boardRect`, `successZoneRing`, `markerRect`는 사용자가 UI를 만든 뒤 직접 연결해야 한다.
+
+### 수동 UI 구성 방법
+- `RadialShrinkTiming` 프리팹을 연다.
+- 루트 아래에 원형 판 역할의 UI 오브젝트를 만든다.
+  - 이 오브젝트의 `RectTransform`을 Presenter의 `boardRect`에 연결한다.
+- 같은 중심을 갖는 성공 구간 오브젝트를 만든다.
+  - 이 오브젝트에 `RadialRingGraphic` 컴포넌트를 붙인다.
+  - 해당 컴포넌트를 Presenter의 `successZoneRing`에 연결한다.
+- 마커 UI 오브젝트를 만든다.
+  - 이 오브젝트의 `RectTransform`을 Presenter의 `markerRect`에 연결한다.
+  - 마커는 Presenter가 `boardRect` 중심 기준 위쪽 축에서 반지름만큼 이동시킨다.
+- 루트 또는 전체 패널 오브젝트는 Presenter의 `popupPanel`에 연결한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 사용자가 직접 만든 UI 연결 후 실제 표시되는지는 직접 확인하지 못했다.
+- `boardRect`, `successZoneRing`, `markerRect` 중 하나라도 비어 있으면 UI는 갱신되지 않고 Console 경고가 출력된다.
+
+## 2026-06-11 원형 타이밍 마커 수축 방식 수정
+
+### 사용자의 요청 개요
+- `SuccessZoneRing`이 위에서 아래로 움직이는 것처럼 보이며, 실제 의도는 `MarkerRect`가 원의 중심을 향해 반지름이 줄어드는 방식이라고 피드백.
+
+### 핵심 요구사항
+- 성공 구간 도넛은 고정되어야 한다.
+- 마커는 위치가 이동하는 것이 아니라 원 중심을 기준으로 반지름이 줄어들어야 한다.
+
+### 이번 작업 범위
+- `RadialShrinkTimingChallengePresenter`의 마커 갱신 방식을 위치 이동에서 크기 축소 방식으로 변경했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/UI/RadialShrinkTimingChallengePresenter.cs`
+  - `markerRect.anchoredPosition`을 반지름 값으로 이동시키던 방식을 제거.
+  - `markerRect.anchoredPosition`은 `Vector2.zero`로 고정하고, `markerRect.sizeDelta`를 반지름에 맞는 지름 크기로 갱신하도록 변경.
+
+### 실제 수행한 작업 요약
+- `boardRect`의 짧은 축을 기준으로 최대 반지름을 계산한다.
+- 현재 normalized 반지름에 따라 `markerDiameter = normalizedRadius * boardRadius * 2`를 계산한다.
+- `markerRect`는 항상 중심에 고정하고, `sizeDelta`만 줄어들게 했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 마커가 중심 기준으로 수축하는지는 직접 확인하지 못했다.
+- 마커 UI는 중심 기준 크기 변경이 자연스럽게 보이도록 `RectTransform` pivot과 anchors를 중앙 `(0.5, 0.5)`로 두는 것이 좋다.
+
+## 2026-06-11 초침 회전형 부채꼴 타이밍 챌린지 추가
+
+### 사용자의 요청 개요
+- 기존 타이밍 기능을 참고해 원형 중심에서 시계 초침처럼 선이 회전하고, 초록 부채꼴 구간에 들어왔을 때 입력하면 성공하는 새 타이밍을 만들고 싶다는 요청.
+
+### 핵심 요구사항
+- 원형 중심을 기준으로 회전하는 선형 마커가 있어야 한다.
+- 성공 구간은 초록색 부채꼴 영역으로 표시되어야 한다.
+- 회전 선의 각도가 성공 부채꼴 구간 안에 있을 때 입력하면 `Success`, 그 외에는 `Failed`로 판정해야 한다.
+- 기존 타이밍 챌린지/Presenter/ScriptableObject 구조를 재사용해야 한다.
+
+### 이번 작업 범위
+- 각도 기반 타이밍 판정 Runtime과 `TimingChallengeDefinition`을 추가했다.
+- 부채꼴 UI를 그리는 전용 `MaskableGraphic`을 추가했다.
+- 초침 회전형 Presenter와 기본 프리팹, ScriptableObject 에셋을 추가했다.
+- 특정 무기 에셋에는 새 타이밍을 자동 연결하지 않았다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Timing/ClockHandTimingChallengeDefinition.cs`
+  - 초침 회전형 타이밍 규칙과 각도 기반 성공 판정 Runtime 추가.
+- `Assets/Arkeum/Scripts/Presentation/UI/ClockHandTimingChallengePresenter.cs`
+  - 초록 부채꼴 구간과 회전 선 UI 갱신 Presenter 추가.
+- `Assets/Arkeum/Scripts/Presentation/UI/RadialSectorGraphic.cs`
+  - 중심각/각도 폭/반지름 범위로 부채꼴 또는 원호형 UI 메시를 생성하는 그래픽 컴포넌트 추가.
+- `Assets/Arkeum/ScriptableObjects/Timing/ClockHandTimingChallenge.asset`
+  - 새 초침 회전형 타이밍 챌린지 기본 에셋 추가.
+- `Assets/Arkeum/Prefabs/Timing/ClockHandTiming.prefab`
+  - 원형 판, 성공 부채꼴, 회전 선이 연결된 기본 Presenter 프리팹 추가.
+- `Assembly-CSharp.csproj`
+  - 새 C# 스크립트 3개를 컴파일 항목에 추가.
+- 각 신규 파일의 `.meta`
+  - Unity 에셋 참조를 위한 GUID 메타 파일 추가.
+- `Docs/input.md`
+  - 이번 요청, 변경 범위, 빌드 결과, 후속 점검 사항 기록.
+
+### 실제 수행한 작업 요약
+- `ClockHandTimingChallengeDefinition`은 `startAngleDegrees`, `clockwise`, `rotations`, `successCenterAngleDegrees`, `successSweepAngleDegrees` 설정으로 회전 선의 현재 각도와 성공 구간을 계산한다.
+- 입력 시 `Mathf.DeltaAngle()`로 회전 선이 성공 중심각 기준 반각 안에 있는지 판정한다.
+- `RadialSectorGraphic`은 초록 부채꼴 성공 영역을 직접 UI 메시로 그린다.
+- `ClockHandTimingChallengePresenter`는 성공 부채꼴을 갱신하고, `handRect`를 원 중심에 고정한 채 각도만 회전시킨다.
+- 새 `ClockHandTimingChallenge.asset`은 새 `ClockHandTiming.prefab`을 Presenter로 참조한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 회전 방향, 부채꼴 표시 위치, 입력 성공/실패 체감은 직접 확인하지 못했다.
+- 새 타이밍을 실제 무기에 사용하려면 원하는 `WeaponDefinition` 에셋의 `timingChallenge` 필드에 `ClockHandTimingChallenge.asset`을 연결해야 한다.
+- Unity Editor에서 `ClockHandTiming.prefab`의 원형 판/부채꼴/초침 UI 레이어 순서와 색상은 필요에 따라 조정할 수 있다.
+
+## 2026-06-11 타이밍 성공 구간 랜덤화
+
+### 사용자의 요청 개요
+- `SinglePress`, `RadialShrink`, `ClockHand` 타이밍의 고정 성공 구간을 제거하고, 성공 구간 길이와 성공 구간이 등장할 수 있는 범위를 기준으로 매 타이밍마다 랜덤 성공 구간을 만들도록 변경 요청.
+
+### 핵심 요구사항
+- `SinglePress`는 기존 `SuccessZoneMin`, `SuccessZoneMax` 설정 대신 성공 구간 길이와 등장 가능 범위를 사용해야 한다.
+- `RadialShrink`도 성공 반지름 min/max 대신 성공 구간 길이와 등장 가능 반지름 범위를 사용해야 한다.
+- `ClockHand`도 성공 중심각/각도 폭 직접 지정 대신 성공 구간 길이와 등장 가능 각도 범위를 사용해야 한다.
+- 성공 구간 판정과 UI 표시는 런타임에 랜덤 결정된 최종 성공 구간을 기준으로 동작해야 한다.
+
+### 이번 작업 범위
+- 세 타이밍 `TimingChallengeDefinition`의 serialized 설정 필드를 새 구조로 변경했다.
+- 각 Runtime 생성 시 성공 구간 전체가 등장 가능 범위 안에 들어가도록 시작 위치를 랜덤 샘플링하도록 했다.
+- 기본 타이밍 ScriptableObject 에셋 3개를 새 필드명과 기본값으로 갱신했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Timing/SinglePressTimingChallengeDefinition.cs`
+  - `successZoneMin/Max` 필드를 제거하고 `successZoneLength`, `successZoneSpawnRangeMin/Max` 기반 랜덤 구간 계산 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Timing/RadialShrinkTimingChallengeDefinition.cs`
+  - `successInner/OuterRadiusNormalized` 필드를 제거하고 `successZoneLengthNormalized`, `successZoneSpawnRangeMin/MaxNormalized` 기반 랜덤 반지름 구간 계산 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Timing/ClockHandTimingChallengeDefinition.cs`
+  - `successCenterAngleDegrees`, `successSweepAngleDegrees` 직접 설정을 제거하고 `successZoneLengthDegrees`, `successZoneSpawnRangeMin/MaxDegrees` 기반 랜덤 각도 구간 계산 추가.
+- `Assets/Arkeum/ScriptableObjects/Timing/SinglePressTimingChallenge.asset`
+  - 새 SinglePress 성공 구간 길이/등장 범위 기본값 반영.
+- `Assets/Arkeum/ScriptableObjects/Timing/RadialShrinkTimingChallenge.asset`
+  - 새 RadialShrink 성공 구간 길이/등장 범위 기본값 반영.
+- `Assets/Arkeum/ScriptableObjects/Timing/ClockHandTimingChallenge.asset`
+  - 새 ClockHand 성공 구간 길이/등장 범위 기본값 반영.
+- `Docs/input.md`
+  - 이번 변경 내용, 빌드 결과, 후속 점검 사항 기록.
+
+### 실제 수행한 작업 요약
+- 성공 구간은 런타임 생성 시 한 번 결정되며, 해당 타이밍 세션 동안 고정된다.
+- 등장 가능 범위가 성공 구간 길이보다 좁으면 성공 구간 길이를 등장 가능 범위에 맞게 줄여 비정상 구간이 생기지 않도록 했다.
+- Presenter는 기존처럼 Runtime의 최종 `SuccessZoneMin/Max`, 반지름, 각도 값을 읽어 표시하므로 별도 UI 변경 없이 랜덤 구간을 표시한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 여러 번 타이밍을 실행했을 때 성공 구간 위치가 매번 달라지는지는 직접 확인하지 못했다.
+- ClockHand의 등장 가능 각도 범위는 현재 0~360 내부의 일반 구간으로 처리하며, 330~30처럼 0도를 가로지르는 wrap 범위는 별도 규칙으로 지원하지 않는다.
+## 2026-06-11 셀룰러 맵 상점 마커 텔레포트 기능 추가
+
+### 사용자의 요청 개요
+- 셀룰러 방식 맵으로 변경되면서 사라진 상점 기능을 다시 사용할 수 있도록 요청.
+- 던전 맵의 랜덤 위치에 상점 마커를 생성하고, 해당 마커를 밟으면 맵 밖에 미리 생성된 상점으로 텔레포트하는 구조를 요구.
+- 상점 내부에도 복귀 마커를 두고, 해당 마커를 밟으면 기존 던전 맵의 상점 마커 위치로 돌아오도록 요구.
+
+### 핵심 요구사항
+- 셀룰러 런 맵에 상점 입구 마커를 랜덤한 유효 위치에 배치한다.
+- 기존 `RunSpecialRoomType.Shop` 상점 에셋을 셀룰러 맵 바깥에 생성한다.
+- 던전 상점 마커와 상점 내부 복귀 마커를 서로 텔레포트로 연결한다.
+- 상점 내부 진열대 구매 기능은 기존 `ShopOfferDefinition` 기반 흐름을 유지한다.
+
+### 이번 작업 범위
+- 셀룰러 맵 생성 경로에만 상점방 배치 및 텔레포트 마커 생성을 추가.
+- 플레이어가 마커 칸을 밟은 뒤 텔레포트되도록 런 이동 처리에 연결.
+- 월드 표시에서 상점 입구/복귀 마커를 별도 색상으로 렌더링.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Map/MapDefinition.cs`
+  - 상점 입구, 상점 내부 입장 위치, 상점 복귀 마커 위치를 저장하는 필드 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Map/MapGenerator.cs`
+  - 셀룰러 맵 생성 후 `Shop` 특수방 템플릿을 맵 바깥에 배치.
+  - 셀룰러 맵의 열린 칸 중 플레이어 시작점, 층 출구, 적 스폰과 겹치지 않는 위치를 상점 입구로 랜덤 선택.
+  - 상점 에셋의 `FloorExitPosition`이 있으면 복귀 마커로 사용하고, 없으면 첫 번째 문 위치를 복귀 마커로 사용.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs`
+  - 플레이어 이동 후 상점 입구/복귀 마커 위에 있으면 각각 상점 내부 또는 던전 입구 마커로 텔레포트하도록 추가.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 상점 입구/복귀 마커를 청록색 마커로 표시하도록 추가.
+- `Docs/input.md`
+  - 이번 작업 요청, 변경 범위, 빌드 결과, 후속 점검 사항 기록.
+
+### 실제 수행한 작업 요약
+- 셀룰러 맵에 상점 입구 마커를 랜덤 배치하고, 상점방은 생성된 셀룰러 맵 오른쪽 바깥에 배치하도록 구현.
+- 상점 진열대와 상점 영역(`ShopCells`)은 기존 상점방 배치 흐름을 재사용하도록 연결.
+- 던전 상점 입구를 밟으면 상점 기준 위치로 이동하고, 상점 내부 복귀 마커를 밟으면 던전의 기존 상점 입구 마커 위치로 돌아오게 구현.
+- 상점 내부 복귀 마커는 상점 에셋에 `FloorExitPosition`이 지정되어 있으면 해당 위치, 없으면 첫 번째 문 위치를 기본값으로 사용.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 셀룰러 맵 생성 후 상점 입구 마커 표시, 상점 입장/퇴장 텔레포트, 상점 구매 UI/메시지 흐름은 직접 확인하지 못했다.
+- 현재 `Floor1/Shop.asset`은 `FloorExitPosition`이 `{x: 0, y: 0}`이라 복귀 마커 기본값으로 첫 번째 문 위치가 사용된다. 원하는 상점 내부 마커 위치가 있다면 에셋의 `FloorExitPosition`을 명시적으로 지정하는 것이 좋다.

@@ -813,7 +813,7 @@ MonoBehaviour:
   gameDirector: {fileID: 1366012100}
   worldPresenter: {fileID: 1366012099}
   hudPresenter: {fileID: 1366012098}
-  timingPopupPresenter: {fileID: 0}
+  timingPopupPresenter: {fileID: 1366012102}
   inputActions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
   hubMapAsset: {fileID: 11400000, guid: dc578972a8f16d24cb7fc098d0b7ab89, type: 2}
   runDefinition: {fileID: 11400000, guid: 8b536f969ad437c4c97ddbfd6d3e49c4, type: 2}
@@ -905,7 +905,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1881505ae9a3410419237d25a110ad0b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Presentation.UI.TimingPopupPresenter
-  presenterRoot: {fileID: 0}
+  presenterRoot: {fileID: 333593688}
 --- !u!1001 &1912830459
 PrefabInstance:
   m_ObjectHideFlags: 0

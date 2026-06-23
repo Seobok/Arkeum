@@ -116,8 +116,10 @@ namespace Arkeum.Production.Gameplay.Run
             // 해당 셀으로 이동
             CurrentRun.Player.GridPosition = targetCell;
 
-            bool sealedBossRoom = TrySealBossRoomIfNeeded(); // 보스룸 입장인지 확인
+            bool teleportedByShopMarker = TryTeleportByShopMarker();
+            bool sealedBossRoom = !teleportedByShopMarker && TrySealBossRoomIfNeeded(); // 보스룸 입장인지 확인
             if (!sealedBossRoom &&
+                !teleportedByShopMarker &&
                 !TryAutoPickupAtPlayerPosition() && // 자리에 있는 아이템 픽업
                 !TryDescribeAdjacentShopOffer()) // 근처에 있는 진열대 정보 표시
             {
@@ -126,6 +128,37 @@ namespace Arkeum.Production.Gameplay.Run
 
             ConsumeTurn();
             return PlayerActionResultType.Handled;
+        }
+
+        private bool TryTeleportByShopMarker()
+        {
+            MapDefinition map = mapService.CurrentMap;
+            if (map == null || CurrentRun?.Player == null)
+            {
+                return false;
+            }
+
+            if (IsMarkerEnabled(map.ShopEntrancePosition) &&
+                IsMarkerEnabled(map.ShopExitPosition) &&
+                CurrentRun.Player.GridPosition == map.ShopEntrancePosition)
+            {
+                CurrentRun.Player.GridPosition = IsMarkerEnabled(map.ShopInteriorSpawnPosition)
+                    ? map.ShopInteriorSpawnPosition
+                    : map.ShopExitPosition;
+                SetMessage("You step through the shop marker.");
+                return true;
+            }
+
+            if (IsMarkerEnabled(map.ShopEntrancePosition) &&
+                IsMarkerEnabled(map.ShopExitPosition) &&
+                CurrentRun.Player.GridPosition == map.ShopExitPosition)
+            {
+                CurrentRun.Player.GridPosition = map.ShopEntrancePosition;
+                SetMessage("You return to the dungeon.");
+                return true;
+            }
+
+            return false;
         }
 
         public bool ResolveTimedAttack(TimingAttackResult timingResult)
@@ -563,6 +596,11 @@ namespace Arkeum.Production.Gameplay.Run
             return weapon != null ? weapon.DisplayName : "a weapon";
         }
 
+        private static bool IsMarkerEnabled(Vector2Int position)
+        {
+            return position != Vector2Int.zero;
+        }
+
         private void SetMessage(string message)
         {
             LastMessage = message;
@@ -577,10 +615,8 @@ namespace Arkeum.Production.Gameplay.Run
 
             switch (attackContext.TimingResult.Grade)
             {
-                case TimingResultGrade.Perfect:
-                    return "Perfect timing. ";
-                case TimingResultGrade.Good:
-                    return "Good timing. ";
+                case TimingResultGrade.Success:
+                    return "Timing success. ";
                 case TimingResultGrade.Failed:
                     return "Mistimed. ";
                 default:

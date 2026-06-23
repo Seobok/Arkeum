@@ -68,7 +68,8 @@ namespace Arkeum.Production.Infrastructure.Input
 
         public bool WasTimingActionPressed()
         {
-            return WasConfirmPressed();
+            return WasConfirmPressed() ||
+                (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame);
         }
 
         public bool WasConfirmPressed()

@@ -147,7 +147,6 @@ namespace Arkeum.Production.Gameplay.Map
                 height,
                 cellularSettings,
                 random);
-
             DungeonRoomDefinition generatedArea = new DungeonRoomDefinition
             {
                 Id = 0,
@@ -162,11 +161,12 @@ namespace Arkeum.Production.Gameplay.Map
             }
 
             map.Rooms.Add(generatedArea);
+            AddCellularShopRoom(map, roomTemplates, openRegion, offset, localSpawn, localExit, width, random);
 
             Debug.Log(
                 $"[MapGenerator] Cellular dungeon generated floor={settings.Floor}, size={width}x{height}, " +
                 $"openCells={openRegion.Count}, wallCells={map.WallCells.Count}, enemies={map.EnemySpawns.Count}, " +
-                $"spawn={map.PlayerSpawn}, exit={map.FloorExitPosition}");
+                $"spawn={map.PlayerSpawn}, exit={map.FloorExitPosition}, shopEntrance={map.ShopEntrancePosition}, shopExit={map.ShopExitPosition}");
             return map;
         }
 
@@ -490,6 +490,117 @@ namespace Arkeum.Production.Gameplay.Map
             }
 
             return enemyDefinitions;
+        }
+
+        private static void AddCellularShopRoom(
+            MapDefinition map,
+            RoomTemplateSet roomTemplates,
+            HashSet<Vector2Int> openRegion,
+            Vector2Int offset,
+            Vector2Int localSpawn,
+            Vector2Int localExit,
+            int mapWidth,
+            System.Random random)
+        {
+            RoomTemplate shopTemplate = FindShopRoomTemplate(roomTemplates);
+            if (shopTemplate == null)
+            {
+                return;
+            }
+
+            List<Vector2Int> entranceCandidates = CollectCellularShopEntranceCandidates(
+                map,
+                openRegion,
+                offset,
+                localSpawn,
+                localExit);
+            if (entranceCandidates.Count == 0)
+            {
+                Debug.LogWarning("[MapGenerator] Cellular shop skipped. No valid shop entrance cell found.");
+                return;
+            }
+
+            map.ShopEntrancePosition = entranceCandidates[random.Next(entranceCandidates.Count)];
+
+            Vector2Int shopOrigin = new Vector2Int(
+                offset.x + mapWidth + 8 - shopTemplate.Min.x,
+                offset.y - shopTemplate.Min.y);
+            PlacedRoom shopRoom = CreatePlacedRoom(map.Rooms.Count, shopTemplate, shopOrigin, new Vector2Int(999, 0));
+            AddPlacedRoom(map, shopRoom, new HashSet<Vector2Int>());
+            map.ShopInteriorSpawnPosition = shopOrigin;
+            map.ShopExitPosition = shopTemplate.HasFloorExit
+                ? shopTemplate.FloorExitPosition + shopOrigin
+                : PickShopExitMarkerCell(shopTemplate, shopOrigin);
+
+            Debug.Log(
+                $"[MapGenerator] Cellular shop placed. entrance={map.ShopEntrancePosition}, " +
+                $"shopExit={map.ShopExitPosition}, offers={shopRoom.ShopOffers.Count}");
+        }
+
+        private static Vector2Int PickShopExitMarkerCell(RoomTemplate shopTemplate, Vector2Int shopOrigin)
+        {
+            if (shopTemplate.Doors.Count > 0)
+            {
+                return shopTemplate.Doors[0].Position + shopOrigin;
+            }
+
+            return shopOrigin;
+        }
+
+        private static RoomTemplate FindShopRoomTemplate(RoomTemplateSet roomTemplates)
+        {
+            if (roomTemplates == null || roomTemplates.SpecialRoomSlots == null)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < roomTemplates.SpecialRoomSlots.Count; i++)
+            {
+                RoomTemplate roomTemplate = roomTemplates.SpecialRoomSlots[i];
+                if (roomTemplate != null && roomTemplate.SpecialRoomType == RunSpecialRoomType.Shop)
+                {
+                    return roomTemplate;
+                }
+            }
+
+            return null;
+        }
+
+        private static List<Vector2Int> CollectCellularShopEntranceCandidates(
+            MapDefinition map,
+            HashSet<Vector2Int> openRegion,
+            Vector2Int offset,
+            Vector2Int localSpawn,
+            Vector2Int localExit)
+        {
+            HashSet<Vector2Int> enemyCells = new HashSet<Vector2Int>();
+            for (int i = 0; i < map.EnemySpawns.Count; i++)
+            {
+                EnemySpawnDefinition enemySpawn = map.EnemySpawns[i];
+                if (enemySpawn != null)
+                {
+                    enemyCells.Add(enemySpawn.Position);
+                }
+            }
+
+            List<Vector2Int> candidates = new List<Vector2Int>();
+            foreach (Vector2Int localCell in openRegion)
+            {
+                if (localCell == localSpawn || localCell == localExit)
+                {
+                    continue;
+                }
+
+                Vector2Int worldCell = localCell + offset;
+                if (enemyCells.Contains(worldCell))
+                {
+                    continue;
+                }
+
+                candidates.Add(worldCell);
+            }
+
+            return candidates;
         }
 
         private static void AddEnemyDefinitionsFromTemplate(List<EnemyDefinition> enemyDefinitions, RoomTemplate template)
@@ -1708,6 +1819,9 @@ namespace Arkeum.Production.Gameplay.Map
                 PlayerSpawn = asset.PlayerSpawn,
                 FloorExitPosition = asset.FloorExitPosition,
                 DungeonEntrancePosition = asset.DungeonEntrancePosition,
+                ShopEntrancePosition = Vector2Int.zero,
+                ShopInteriorSpawnPosition = Vector2Int.zero,
+                ShopExitPosition = Vector2Int.zero,
             };
 
             for (int i = 0; i < asset.WeaponSpawns.Count; i++)

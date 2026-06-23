@@ -23,4 +23,4 @@ MonoBehaviour:
   attackOffsets:
   - {x: 1, y: 0}
   effects: []
-  timingChallenge: {fileID: 0}
+  timingChallenge: {fileID: 11400000, guid: 6d73e71c9f1049be932401b376275b2d, type: 2}

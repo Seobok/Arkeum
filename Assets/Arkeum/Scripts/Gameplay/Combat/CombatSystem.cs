@@ -28,6 +28,11 @@ namespace Arkeum.Production.Gameplay.Combat
             }
 
             // 타이밍 효과 적용
+            if (IsFailedTimingAttack(attackContext))
+            {
+                return 0;
+            }
+
             attackPower = ApplyTimingResult(attackContext, attackPower);
 
             // 데미지 적용
@@ -74,6 +79,13 @@ namespace Arkeum.Production.Gameplay.Combat
 
                 effect.ModifyPlayerAttack(context);
             }
+        }
+
+        private static bool IsFailedTimingAttack(WeaponAttackContext context)
+        {
+            return context != null &&
+                context.TimingResult.Attempted &&
+                context.TimingResult.Grade == TimingResultGrade.Failed;
         }
 
         private static int ApplyTimingResult(WeaponAttackContext context, int attackPower)
