@@ -5,6 +5,7 @@ using Arkeum.Production.Gameplay.Map;
 using Arkeum.Production.Gameplay.Progression;
 using Arkeum.Production.Gameplay.Run;
 using Arkeum.Production.Gameplay.Timing;
+using Arkeum.Production.Presentation.Audio;
 using UnityEngine;
 
 namespace Arkeum.Production.Core
@@ -96,6 +97,8 @@ namespace Arkeum.Production.Core
 
             CurrentRunController = null;
             CurrentState = GameState.Hub;
+            
+            AudioManager.Instance.PlayBgm("Hub");
         }
 
         // 런 시작시 호출 (초기화)
@@ -144,6 +147,8 @@ namespace Arkeum.Production.Core
             Services.HudPresenter.SetDialogue(string.Empty);
             Services.HudPresenter.SetMessage("You descend into the ash corridor. Enemies react after every action.");
             CurrentState = GameState.InRun;
+            
+            AudioManager.Instance.PlayBgm("Run");
         }
 
         // 런 결과 출력

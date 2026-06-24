@@ -1260,3 +1260,45 @@
 ### 확인하지 못한 사항 또는 후속 점검 사항
 - Unity Play Mode에서 실제 셀룰러 맵 생성 후 상점 입구 마커 표시, 상점 입장/퇴장 텔레포트, 상점 구매 UI/메시지 흐름은 직접 확인하지 못했다.
 - 현재 `Floor1/Shop.asset`은 `FloorExitPosition`이 `{x: 0, y: 0}`이라 복귀 마커 기본값으로 첫 번째 문 위치가 사용된다. 원하는 상점 내부 마커 위치가 있다면 에셋의 `FloorExitPosition`을 명시적으로 지정하는 것이 좋다.
+
+## 2026-06-23 BGM/SFX 관리 스크립트 추가
+
+### 사용자의 요청 개요
+- BGM 및 SFX를 관리할 수 있는 Unity 스크립트 작성 요청.
+
+### 핵심 요구사항
+- BGM과 SFX를 구분해서 관리할 수 있어야 한다.
+- Inspector에서 오디오 클립을 등록하고 코드에서 재생할 수 있어야 한다.
+- BGM 전환, 정지, 일시정지/재개, SFX 재생, 볼륨/뮤트 제어를 제공해야 한다.
+
+### 이번 작업 범위
+- 런타임에서 사용할 독립형 오디오 매니저 컴포넌트를 추가했다.
+- Unity 스크립트 인식을 위한 `.meta` 파일을 추가했다.
+- 로컬 IDE/빌드 확인을 위해 생성형 `Assembly-CSharp.csproj`의 Compile 목록에도 새 스크립트를 포함했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/Audio/AudioManager.cs`
+  - BGM/SFX 클립 목록, BGM 페이드 전환, SFX 풀링 재생, 2D/3D SFX 재생, 볼륨/뮤트 제어 API를 제공하는 `AudioManager` 추가.
+- `Assets/Arkeum/Scripts/Presentation/Audio.meta`
+  - Unity 폴더 메타 파일 추가.
+- `Assets/Arkeum/Scripts/Presentation/Audio/AudioManager.cs.meta`
+  - Unity 스크립트 메타 파일 추가.
+- `Assembly-CSharp.csproj`
+  - `AudioManager.cs`를 로컬 `dotnet build` Compile 목록에 포함. 단, 이 파일은 `.gitignore`의 `*.csproj` 규칙에 의해 저장소 추적 대상이 아니다.
+- `Docs/input.md`
+  - 이번 작업 요청, 변경 범위, 빌드 결과, 후속 점검 사항 기록.
+
+### 실제 수행한 작업 요약
+- `AudioManager`를 `Arkeum.Production.Presentation.Audio` 네임스페이스에 추가했다.
+- BGM은 `PlayBgm(string id)`, `PlayBgm(AudioClip)`, `StopBgm()`, `PauseBgm()`, `ResumeBgm()`로 제어할 수 있게 했다.
+- SFX는 `PlaySfx(string id)`, `PlaySfxAt(string id, Vector3 position)`, `PlaySfx(AudioClip)`로 재생할 수 있게 했다.
+- `SetMasterVolume`, `SetBgmVolume`, `SetSfxVolume`, `SetMuted`, `StopAllSfx`를 제공했다.
+- SFX는 지정한 풀 크기만큼 `AudioSource`를 생성해 효과음이 겹쳐 재생될 수 있게 했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 오디오 클립 등록, BGM 페이드 체감, SFX 동시 재생, 3D 위치 기반 SFX 동작은 직접 확인하지 못했다.
+- 씬에 `AudioManager` GameObject를 배치하고 Inspector에서 BGM/SFX id와 clip을 등록해야 실제 재생에 사용할 수 있다.
