@@ -6,6 +6,7 @@ using Arkeum.Production.Gameplay.Progression;
 using Arkeum.Production.Gameplay.Run;
 using Arkeum.Production.Gameplay.Timing;
 using Arkeum.Production.Infrastructure.Input;
+using Arkeum.Production.Presentation.Audio;
 using Arkeum.Production.Presentation.UI;
 using Arkeum.Production.Presentation.World;
 
@@ -24,6 +25,7 @@ namespace Arkeum.Production.Core
         public RunResultBuilder RunResultBuilder { get; }
         public TimingService TimingService { get; }
         public RunDefinition RunDefinition { get; }
+        public AudioCueService AudioCueService { get; }
         public WorldPresenter WorldPresenter { get; }
         public HudPresenter HudPresenter { get; }
         public TimingPopupPresenter TimingPopupPresenter { get; }
@@ -40,6 +42,7 @@ namespace Arkeum.Production.Core
             RunResultBuilder runResultBuilder,
             TimingService timingService,
             RunDefinition runDefinition,
+            AudioCueService audioCueService,
             WorldPresenter worldPresenter,
             HudPresenter hudPresenter,
             TimingPopupPresenter timingPopupPresenter)
@@ -55,6 +58,7 @@ namespace Arkeum.Production.Core
             RunResultBuilder = runResultBuilder;
             TimingService = timingService;
             RunDefinition = runDefinition;
+            AudioCueService = audioCueService;
             WorldPresenter = worldPresenter;
             HudPresenter = hudPresenter;
             TimingPopupPresenter = timingPopupPresenter;

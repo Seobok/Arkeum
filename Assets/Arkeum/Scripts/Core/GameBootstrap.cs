@@ -6,6 +6,7 @@ using Arkeum.Production.Gameplay.Progression;
 using Arkeum.Production.Gameplay.Run;
 using Arkeum.Production.Gameplay.Timing;
 using Arkeum.Production.Infrastructure.Input;
+using Arkeum.Production.Presentation.Audio;
 using Arkeum.Production.Presentation.UI;
 using Arkeum.Production.Presentation.World;
 using UnityEngine;
@@ -99,6 +100,7 @@ namespace Arkeum.Production.Core
             ProgressionService progressionService = new ProgressionService(questService);
             RunResultBuilder runResultBuilder = new RunResultBuilder();
             TimingService timingService = new TimingService();
+            AudioCueService audioCueService = new AudioCueService();
 
             return new ServiceRegistry(
                 inputReader,
@@ -112,6 +114,7 @@ namespace Arkeum.Production.Core
                 runResultBuilder,
                 timingService,
                 runDefinition,
+                audioCueService,
                 worldPresenter,
                 hudPresenter,
                 timingPopupPresenter);

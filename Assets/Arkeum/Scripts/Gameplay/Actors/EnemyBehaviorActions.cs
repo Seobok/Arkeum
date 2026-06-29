@@ -229,6 +229,7 @@ namespace Arkeum.Production.Gameplay.Actors
                 enemy.FacingDirection = GetFacingToward(enemy.GridPosition, targetCell, enemy.FacingDirection);
                 if (targetCell == player.GridPosition)
                 {
+                    // 이동할 칸에 플레이어가 있으면 고정 데미지
                     combatSystem.ApplyFixedDamage(player, EnemyMoveCollisionDamage);
                     ClearPreparation(enemy);
                     return;

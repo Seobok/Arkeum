@@ -98,7 +98,7 @@ namespace Arkeum.Production.Core
             CurrentRunController = null;
             CurrentState = GameState.Hub;
             
-            AudioManager.Instance.PlayBgm("Hub");
+            Services.AudioCueService.PlayHubBgm();
         }
 
         // 런 시작시 호출 (초기화)
@@ -148,7 +148,7 @@ namespace Arkeum.Production.Core
             Services.HudPresenter.SetMessage("You descend into the ash corridor. Enemies react after every action.");
             CurrentState = GameState.InRun;
             
-            AudioManager.Instance.PlayBgm("Run");
+            Services.AudioCueService.PlayRunBgm();
         }
 
         // 런 결과 출력
@@ -209,6 +209,7 @@ namespace Arkeum.Production.Core
             hubPlayerPosition = target;
             Services.WorldPresenter.UpdateHubPlayerPosition(hubPlayerPosition);
             Services.WorldPresenter.Refresh();
+            Services.AudioCueService.PlayPlayerMove();
             UpdateHubLocationMessage();
         }
 
@@ -229,6 +230,7 @@ namespace Arkeum.Production.Core
             }
 
             PlayerActionResultType actionResult = PlayerActionResultType.NotHandled;
+            int playerHpBeforeAction = GetCurrentRunPlayerHp();
 
             // 방향키 입력 확인
             if (Services.InputReader.TryGetMoveDirection(out Vector2Int direction))
@@ -251,7 +253,7 @@ namespace Arkeum.Production.Core
                 return;
             }
 
-            CompleteHandledRunAction();
+            CompleteHandledRunAction(playerHpBeforeAction);
         }
 
         private void UpdateTimingChallengeInput()
@@ -281,14 +283,21 @@ namespace Arkeum.Production.Core
         private void CompleteTimingChallenge(TimingSession session, TimingResultGrade grade)
         {
             TimingAttackResult result = session.BuildResult(grade);
+            int playerHpBeforeAction = GetCurrentRunPlayerHp();
             CurrentRunController.ResolveTimedAttack(result);
             Services.TimingPopupPresenter.Hide();
             CurrentState = GameState.InRun;
-            CompleteHandledRunAction();
+            CompleteHandledRunAction(playerHpBeforeAction);
         }
 
-        private void CompleteHandledRunAction()
+        private void CompleteHandledRunAction(int playerHpBeforeAction)
         {
+            Services.AudioCueService.PlayRunActionFeedback(CurrentRunController.LastActionFeedback);
+            if (DidCurrentRunPlayerHpDecrease(playerHpBeforeAction))
+            {
+                Services.AudioCueService.PlayPlayerHit();
+            }
+
             Services.WorldPresenter.Refresh();
             Services.HudPresenter.SetMessage(CurrentRunController.LastMessage);
 
@@ -301,6 +310,19 @@ namespace Arkeum.Production.Core
 
                 ShowRunResult();
             }
+        }
+
+        private int GetCurrentRunPlayerHp()
+        {
+            return CurrentRunController?.CurrentRun?.Player != null
+                ? CurrentRunController.CurrentRun.Player.CurrentHp
+                : 0;
+        }
+
+        private bool DidCurrentRunPlayerHpDecrease(int previousHp)
+        {
+            return CurrentRunController?.CurrentRun?.Player != null &&
+                CurrentRunController.CurrentRun.Player.CurrentHp < previousHp;
         }
 
         // 다음 층으로 이동

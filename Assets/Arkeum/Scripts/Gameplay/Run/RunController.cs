@@ -24,6 +24,7 @@ namespace Arkeum.Production.Gameplay.Run
 
         public RunState CurrentRun { get; private set; }
         public string LastMessage { get; private set; } = string.Empty;
+        public RunActionFeedback LastActionFeedback { get; private set; }
 
         public RunController(
             TurnSystem turnSystem,
@@ -68,6 +69,7 @@ namespace Arkeum.Production.Gameplay.Run
 
         public PlayerActionResultType TryHandlePlayerAction(Vector2Int direction)
         {
+            LastActionFeedback = RunActionFeedback.None;
             if (CurrentRun?.Player == null)
             {
                 return PlayerActionResultType.NotHandled;
@@ -115,6 +117,7 @@ namespace Arkeum.Production.Gameplay.Run
 
             // 해당 셀으로 이동
             CurrentRun.Player.GridPosition = targetCell;
+            LastActionFeedback |= RunActionFeedback.PlayerMoved;
 
             bool teleportedByShopMarker = TryTeleportByShopMarker();
             bool sealedBossRoom = !teleportedByShopMarker && TrySealBossRoomIfNeeded(); // 보스룸 입장인지 확인
@@ -146,6 +149,7 @@ namespace Arkeum.Production.Gameplay.Run
                     ? map.ShopInteriorSpawnPosition
                     : map.ShopExitPosition;
                 SetMessage("You step through the shop marker.");
+                LastActionFeedback |= RunActionFeedback.PlayerTeleported;
                 return true;
             }
 
@@ -155,6 +159,7 @@ namespace Arkeum.Production.Gameplay.Run
             {
                 CurrentRun.Player.GridPosition = map.ShopEntrancePosition;
                 SetMessage("You return to the dungeon.");
+                LastActionFeedback |= RunActionFeedback.PlayerTeleported;
                 return true;
             }
 
@@ -163,6 +168,7 @@ namespace Arkeum.Production.Gameplay.Run
 
         public bool ResolveTimedAttack(TimingAttackResult timingResult)
         {
+            LastActionFeedback = RunActionFeedback.None;
             TimingSession session = timingService?.CurrentSession;
             IReadOnlyList<WeaponAttackContext> attackContexts = session?.AttackContexts;
             if (attackContexts == null || attackContexts.Count == 0 || CurrentRun?.Player == null)
@@ -203,6 +209,7 @@ namespace Arkeum.Production.Gameplay.Run
                 return;
             }
 
+            LastActionFeedback |= RunActionFeedback.PlayerAttacked;
             for (int i = 0; i < attackContexts.Count; i++)
             {
                 WeaponAttackContext attackContext = attackContexts[i];

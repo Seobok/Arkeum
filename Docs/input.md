@@ -1302,3 +1302,116 @@
 ### 확인하지 못한 사항 또는 후속 점검 사항
 - Unity Play Mode에서 실제 오디오 클립 등록, BGM 페이드 체감, SFX 동시 재생, 3D 위치 기반 SFX 동작은 직접 확인하지 못했다.
 - 씬에 `AudioManager` GameObject를 배치하고 Inspector에서 BGM/SFX id와 clip을 등록해야 실제 재생에 사용할 수 있다.
+
+## 2026-06-24 오디오 호출 위치 정리 및 액션 피드백 분리
+
+### 사용자의 요청 개요
+- 오디오 검토에서 제안했던 "다른 위치가 더 좋아 보이는 부분"에 맞춰 현재 적용된 오디오 호출 구조를 수정해 달라는 요청.
+
+### 핵심 요구사항
+- gameplay 계층(`RunController`, `CombatSystem`, `EnemyBehaviorActions`)에서 `AudioManager`를 직접 호출하지 않도록 정리한다.
+- 이동음은 실제 플레이어 위치 변경이 발생한 액션 피드백으로 일관되게 처리한다.
+- 버튼 사운드 수신기 네임스페이스를 기존 프로젝트 네임스페이스 규칙에 맞춘다.
+
+### 이번 작업 범위
+- 오디오 재생을 presentation/core 흐름으로 이동하기 위한 `AudioCueService` 추가.
+- 런 액션 결과를 오디오 ID가 아닌 gameplay 피드백 플래그로 전달하기 위한 `RunActionFeedback` 추가.
+- `GameDirector`가 액션 피드백과 플레이어 HP 변화를 보고 SFX를 재생하도록 변경.
+- 버튼 prefab의 직렬화된 `ButtonSoundReceiver` 타입명을 새 네임스페이스에 맞게 변경.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/Audio/AudioCueService.cs`
+  - BGM/SFX ID 매핑을 한 곳에 모아 `GameDirector`가 사용할 오디오 큐 서비스 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunActionFeedback.cs`
+  - 플레이어 이동, 공격, 텔레포트 같은 런 액션 피드백 플래그 추가.
+- `Assets/Arkeum/Scripts/Core/ServiceRegistry.cs`
+  - `AudioCueService`를 서비스로 보관하도록 추가.
+- `Assets/Arkeum/Scripts/Core/GameBootstrap.cs`
+  - `AudioCueService`를 생성해 `ServiceRegistry`에 주입.
+- `Assets/Arkeum/Scripts/Core/GameDirector.cs`
+  - BGM, 허브 이동음, 런 액션 SFX, 플레이어 피격음을 `AudioCueService`를 통해 재생하도록 변경.
+  - 런 액션 전후 플레이어 HP를 비교해 적 공격/충돌 피격음을 상위 흐름에서 재생하도록 변경.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs`
+  - `AudioManager` 직접 호출 제거.
+  - 일반 공격과 타이밍 공격 모두 `PlayerAttacked` 피드백을 남기도록 변경.
+  - 이동 성공 시 `PlayerMoved`, 상점 텔레포트 시 `PlayerTeleported` 피드백을 남기도록 변경.
+- `Assets/Arkeum/Scripts/Gameplay/Combat/CombatSystem.cs`
+  - 적 공격 시 `AudioManager` 직접 호출 제거.
+- `Assets/Arkeum/Scripts/Gameplay/Actors/EnemyBehaviorActions.cs`
+  - 적 이동 충돌 시 `AudioManager` 직접 호출 제거.
+- `Assets/Arkeum/Scripts/Presentation/Audio/ButtonSoundReceiver.cs`
+  - 네임스페이스를 `Arkeum.Production.Presentation.Audio`로 변경.
+- `Assets/Arkeum/Prefabs/UI/Button.prefab`
+  - `ButtonSoundReceiver` 직렬화 타입명을 변경된 네임스페이스로 갱신.
+- `Assembly-CSharp.csproj`
+  - 로컬 `dotnet build` 검증을 위해 새 C# 파일 2개를 Compile 목록에 추가. 이 파일은 Unity/Rider 생성 파일이며 저장소 추적 대상이 아닐 수 있다.
+
+### 실제 수행한 작업 요약
+- 오디오 ID와 실제 재생 호출은 `AudioCueService`에 모으고, gameplay 코드는 `RunActionFeedback`만 남기도록 분리했다.
+- 일반 공격에만 있던 공격 피드백을 `ResolvePlayerAttacks()` 내부로 옮겨 타이밍 공격 완료 시에도 같은 공격음이 나도록 했다.
+- 플레이어 이동 후 무기 줍기나 상점 정보 표시가 이어져도 이동 피드백은 남도록 위치 변경 직후 `PlayerMoved`를 기록하게 했다.
+- 적 공격과 적 이동 충돌 피격음은 `GameDirector`가 액션 전후 HP 감소를 감지해 재생하도록 변경했다.
+- 버튼 사운드 수신기 네임스페이스와 prefab 직렬화 참조를 정리했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp.csproj -nologo`는 병렬 실행 중 `obj/Debug/Assembly-CSharp.dll` 파일 잠금으로 1회 실패했으나, 단독 재실행 성공.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 청감, 이동+텔레포트 동시 재생 체감, 타이밍 공격 완료 사운드, 피격음 중복 여부는 직접 확인하지 못했다.
+- 현재 새로 추가한 액션 피드백은 기존에 씬에 등록된 `PlayerMove`, `PlayerAttack`, `PlayerHit`, `Teleport` SFX만 사용한다. 무기 줍기, 구매, 보스방 봉인/개방 같은 추가 SFX는 별도 클립 ID 등록 후 확장하면 된다.
+
+## 2026-06-29 StartScene 메인 메뉴 구현
+
+### 사용자의 요청 개요
+- `StartScene`을 사용하는 메인 메뉴의 추천 구조를 실제 프로젝트에 구현해 달라는 요청.
+
+### 핵심 요구사항
+- 메인 메뉴 UI 표시와 메뉴 동작 제어 책임을 분리한다.
+- 새 게임 선택 시 `GameScene`으로 전환한다.
+- 설정 화면에서 오디오 볼륨을 조절하고 설정값을 유지한다.
+- 실제 저장 기능이 없는 현재 상태에서는 이어하기를 사용할 수 없도록 명확히 표시한다.
+- `StartScene`이 빌드의 첫 진입 씬이 되도록 등록한다.
+
+### 이번 작업 범위
+- 기존 `StartScene`에 배치된 Start, Load, Setting, Quit 버튼을 재사용했다.
+- 메인 메뉴 Presenter와 Controller를 추가하고 Canvas에 연결했다.
+- 기존 네 버튼을 설정 화면에서 Master/BGM/SFX 볼륨 조절 및 뒤로 가기 버튼으로 전환하도록 구현했다.
+- 씬 전환 페이드와 오디오 설정의 `PlayerPrefs` 저장을 추가했다.
+- Build Settings에서 `StartScene`을 `GameScene`보다 앞에 등록했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/UI/MainMenuPresenter.cs`
+  - 버튼 검색·라벨·선택 상태, 메인/설정 화면 표시, 씬 전환 페이드를 담당하는 UI Presenter 추가.
+- `Assets/Arkeum/Scripts/Presentation/UI/MainMenuPresenter.cs.meta`
+  - Unity 스크립트 메타 파일 추가.
+- `Assets/Arkeum/Scripts/Core/MainMenuController.cs`
+  - 새 게임, 설정, 종료 흐름과 오디오 볼륨 설정 저장을 담당하는 메뉴 Controller 추가.
+- `Assets/Arkeum/Scripts/Core/MainMenuController.cs.meta`
+  - Unity 스크립트 메타 파일 추가.
+- `Assets/Arkeum/Scenes/StartScene.unity`
+  - Canvas에 Presenter와 Controller를 연결하고 해상도 대응을 위해 Canvas Scaler를 Scale With Screen Size 방식으로 변경.
+- `ProjectSettings/EditorBuildSettings.asset`
+  - `StartScene`을 첫 번째 빌드 씬으로 등록.
+- `Assembly-CSharp.csproj`
+  - 로컬 `dotnet build` 검증을 위해 새 스크립트 2개를 Compile 목록에 추가. 이 파일은 Unity/Rider 생성 파일이며 저장소 추적 대상이 아닐 수 있다.
+- `Docs/input.md`
+  - 이번 요청, 변경 범위, 빌드 결과와 후속 점검 사항 기록.
+
+### 실제 수행한 작업 요약
+- 메뉴 UI 책임을 `MainMenuPresenter`, 흐름 제어를 `MainMenuController`로 분리했다.
+- New Game 버튼은 짧은 페이드 후 `GameScene`을 비동기로 로드한다.
+- Continue 버튼은 저장 프로필 영속화 기능이 아직 없어 `Continue (No Save)`로 표시하고 비활성화했다.
+- Settings 버튼을 누르면 동일한 버튼 영역이 Master/BGM/SFX 볼륨 조절 화면으로 전환된다.
+- 볼륨은 클릭할 때마다 100%, 75%, 50%, 25%, 0% 순서로 변경되고 `PlayerPrefs`에 보관된다.
+- Quit 버튼은 플레이어 빌드에서 애플리케이션을 종료하고 Unity Editor Play Mode에서도 정지하도록 처리했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Editor가 실행 중이어서 별도 배치 모드 씬 로딩 검증은 수행하지 못했다.
+- Unity Play Mode에서 버튼 배치, 키보드/게임패드 UI 이동, 페이드, 실제 씬 전환 및 볼륨 청감은 직접 확인하지 못했다.
+- 이어하기를 활성화하려면 `SaveProfile` 파일 저장·불러오기 기능과 `GameBootstrap` 프로필 주입 구조를 추가해야 한다.
