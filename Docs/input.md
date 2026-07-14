@@ -1776,3 +1776,85 @@
 ### 확인하지 못한 사항 또는 후속 점검 사항
 - Unity Play Mode에서 실제 화면 진동 체감, 카메라 추적 중 흔들림 강도, 설정 Toggle 연동은 직접 확인하지 못했다.
 - `WorldVisualSet.asset`에서 `Enemy Damage Screen Shake Duration/Magnitude` 값을 플레이 감각에 맞게 조정해야 할 수 있다.
+
+## 2026-07-13 GameScene PauseMenu 및 Settings 연결
+
+### 사용자의 요청 개요
+- HUD의 `PauseMenu-Button`을 누르면 게임을 일시정지하고 `PauseMenu-Canvas`를 표시하며, PauseMenu의 `Settings-Button`을 누르면 Settings의 `OptionPanel`을 표시하도록 연결 요청.
+
+### 핵심 요구사항
+- Pause 버튼 입력 시 게임 진행을 정지하고 PauseMenu를 연다.
+- PauseMenu의 Settings 버튼 입력 시 OptionPanel을 연다.
+- 메뉴를 닫거나 Continue를 선택하면 일시정지를 정상적으로 해제한다.
+
+### 이번 작업 범위
+- PauseMenu와 Settings 화면 전환을 담당하는 런타임 컨트롤러 추가.
+- GameScene의 `GameRoot`에 컨트롤러를 연결하고 Pause/Settings Canvas 참조 지정.
+- 기존 `SettingsMenuBinder`의 OptionPanel 열기, 저장, Back 동작 재사용.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/UI/PauseMenuController.cs`
+  - Pause/Continue/Settings 버튼 연결, `Time.timeScale` 기반 일시정지, OptionPanel 전환, ESC 입력 처리 추가.
+- `Assets/Arkeum/Scripts/Presentation/UI/PauseMenuController.cs.meta`
+  - Unity 스크립트 메타데이터 추가.
+- `Assets/Arkeum/Scenes/GameScene.unity`
+  - `GameRoot`에 `PauseMenuController`를 추가하고 PauseMenu 및 Settings Canvas 참조 연결.
+- `Assembly-CSharp.csproj`
+  - 로컬 `dotnet build` 검증 대상에 새 스크립트 포함.
+- `Docs/input.md`
+  - 이번 작업 요청, 구현 내용, 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 게임 시작 시 PauseMenu와 Settings Canvas를 숨기도록 초기화했다.
+- `PauseMenu-Button` 클릭 시 기존 `Time.timeScale`을 보관하고 0으로 설정한 뒤 PauseMenu를 표시한다.
+- `Continue-Button` 또는 PauseMenu가 열린 상태의 ESC 입력 시 Canvas를 닫고 기존 `Time.timeScale`을 복원한다.
+- `Settings-Button` 클릭 시 PauseMenu를 숨기고 Settings Canvas 및 OptionPanel을 표시한다.
+- OptionPanel의 기존 Back 버튼 또는 ESC 입력 시 설정을 저장하고 PauseMenu로 돌아가도록 연결했다.
+- 씬 버튼은 기존 오브젝트 이름을 기준으로 탐색하며, 필수 참조가 누락되면 콘솔 오류를 출력하도록 했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 버튼 클릭, 일시정지 중 애니메이션 및 입력 정지, Canvas 표시 순서는 직접 확인하지 못했다.
+- PauseMenu의 `Exit-Button`과 `QuitGame-Button` 동작은 이번 요청 범위에 포함되지 않아 연결하지 않았다.
+
+## 2026-07-13 PauseMenu Exit 및 QuitGame 동작 연결
+
+### 사용자의 요청 개요
+- PauseMenu의 `Exit-Button`을 누르면 `StartScene`으로 이동하고, `QuitGame-Button`을 누르면 게임을 종료하도록 연결 요청.
+
+### 핵심 요구사항
+- Exit 입력 시 일시정지를 해제하고 StartScene을 로드한다.
+- QuitGame 입력 시 일시정지를 해제하고 애플리케이션을 종료한다.
+- Unity Editor Play Mode에서도 QuitGame 동작을 확인할 수 있어야 한다.
+
+### 이번 작업 범위
+- 기존 `PauseMenuController`에서 Exit 및 QuitGame 버튼을 이름으로 찾아 클릭 이벤트 연결.
+- 씬 전환 또는 종료 전에 메뉴를 닫고 기존 `Time.timeScale`을 복원하는 공통 처리 추가.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/UI/PauseMenuController.cs`
+  - `Exit-Button`, `QuitGame-Button` 참조와 이벤트 연결 추가.
+  - `StartScene` 로드 및 애플리케이션 종료 처리 추가.
+  - 메뉴 종료와 배속 복원 공통 로직 추가.
+- `Docs/input.md`
+  - 이번 작업 내용과 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- `Exit-Button` 클릭 시 설정을 저장하고 Pause/Settings Canvas를 닫은 다음 기존 배속을 복원하고 `StartScene`을 로드한다.
+- `QuitGame-Button` 클릭 시 같은 정리 작업 후 빌드에서는 `Application.Quit()`을 호출한다.
+- Unity Editor에서는 `QuitGame-Button` 클릭 시 Play Mode를 종료하도록 조건부 처리했다.
+- 필수 참조 누락 검사에 Exit 및 QuitGame 버튼을 포함했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 최종 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+- 두 빌드를 처음 병렬 실행했을 때 출력 DLL 파일 잠금으로 런타임 빌드 1회가 실패했으며, 에디터 빌드 완료 후 순차 재실행하여 성공을 확인했다.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 Exit 버튼의 실제 StartScene 전환과 QuitGame 버튼의 Play Mode 종료는 직접 클릭해 확인하지 못했다.
+- 플랫폼 빌드에서 `Application.Quit()`의 실제 종료 동작은 확인하지 못했다.
