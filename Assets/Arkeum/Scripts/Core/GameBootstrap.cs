@@ -6,6 +6,7 @@ using Arkeum.Production.Gameplay.Progression;
 using Arkeum.Production.Gameplay.Run;
 using Arkeum.Production.Gameplay.Timing;
 using Arkeum.Production.Infrastructure.Input;
+using Arkeum.Production.Infrastructure.Settings;
 using Arkeum.Production.Presentation.Audio;
 using Arkeum.Production.Presentation.UI;
 using Arkeum.Production.Presentation.World;
@@ -40,6 +41,8 @@ namespace Arkeum.Production.Core
 
         private void Awake()
         {
+            GameSettingsService.Initialize();
+
             if (gameDirector == null)
             {
                 gameDirector = GetComponent<GameDirector>();
@@ -80,6 +83,11 @@ namespace Arkeum.Production.Core
             ServiceRegistry services = BuildServices();
             SaveProfile profile = new SaveProfile();
             gameDirector.Initialize(services, profile);
+        }
+
+        private void Start()
+        {
+            GameSettingsService.ApplyAll();
         }
 
         private ServiceRegistry BuildServices()

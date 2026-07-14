@@ -11,22 +11,17 @@ namespace Arkeum.Production.Presentation.UI
     {
         [SerializeField, Min(0f)] private float fadeDuration = 0.25f;
 
-        private Button primaryButton;
-        private Button secondaryButton;
-        private Button tertiaryButton;
-        private Button quaternaryButton;
+        [SerializeField] private Button startButton;
+        [SerializeField] private Button loadButton;
+        [SerializeField] private Button settingButton;
+        [SerializeField] private Button quitButton;
         private CanvasGroup canvasGroup;
-        private bool showingSettings;
         private bool initialized;
 
         private Action newGameRequested;
         private Action continueRequested;
         private Action settingsRequested;
         private Action quitRequested;
-        private Action masterVolumeRequested;
-        private Action bgmVolumeRequested;
-        private Action sfxVolumeRequested;
-        private Action backRequested;
 
         public bool Initialize()
         {
@@ -35,12 +30,16 @@ namespace Arkeum.Production.Presentation.UI
                 return true;
             }
 
-            primaryButton = FindButton("StartButton");
-            secondaryButton = FindButton("LoadButton");
-            tertiaryButton = FindButton("SettingButton");
-            quaternaryButton = FindButton("QuitButton");
+            if(startButton == null)
+                startButton = FindButton("StartButton");
+            if (loadButton == null)
+                loadButton = FindButton("LoadButton");
+            if (settingButton == null)
+                settingButton = FindButton("SettingButton");
+            if (quitButton == null)
+                quitButton = FindButton("QuitButton");
 
-            if (primaryButton == null || secondaryButton == null || tertiaryButton == null || quaternaryButton == null)
+            if (startButton == null || loadButton == null || settingButton == null || quitButton == null)
             {
                 Debug.LogError("[MainMenuPresenter] StartScene must contain StartButton, LoadButton, SettingButton, and QuitButton.", this);
                 enabled = false;
@@ -53,10 +52,11 @@ namespace Arkeum.Production.Presentation.UI
                 canvasGroup = gameObject.AddComponent<CanvasGroup>();
             }
 
-            primaryButton.onClick.AddListener(HandlePrimaryButton);
-            secondaryButton.onClick.AddListener(HandleSecondaryButton);
-            tertiaryButton.onClick.AddListener(HandleTertiaryButton);
-            quaternaryButton.onClick.AddListener(HandleQuaternaryButton);
+            startButton.onClick.AddListener(HandleStartButton);
+            loadButton.onClick.AddListener(HandleLoadButton);
+            settingButton.onClick.AddListener(HandleSettingButton);
+            quitButton.onClick.AddListener(HandleQuitButton);
+            
             initialized = true;
             return true;
         }
@@ -65,40 +65,21 @@ namespace Arkeum.Production.Presentation.UI
             Action onNewGame,
             Action onContinue,
             Action onSettings,
-            Action onQuit,
-            Action onMasterVolume,
-            Action onBgmVolume,
-            Action onSfxVolume,
-            Action onBack)
+            Action onQuit)
         {
             newGameRequested = onNewGame;
             continueRequested = onContinue;
             settingsRequested = onSettings;
             quitRequested = onQuit;
-            masterVolumeRequested = onMasterVolume;
-            bgmVolumeRequested = onBgmVolume;
-            sfxVolumeRequested = onSfxVolume;
-            backRequested = onBack;
         }
 
         public void ShowMainMenu(bool canContinue)
         {
-            showingSettings = false;
-            SetButton(primaryButton, "New Game", true);
-            SetButton(secondaryButton, canContinue ? "Continue" : "Continue (No Save)", canContinue);
-            SetButton(tertiaryButton, "Settings", true);
-            SetButton(quaternaryButton, "Quit", true);
-            Select(primaryButton);
-        }
-
-        public void ShowSettings(float masterVolume, float bgmVolume, float sfxVolume)
-        {
-            showingSettings = true;
-            SetButton(primaryButton, $"Master  {ToPercent(masterVolume)}", true);
-            SetButton(secondaryButton, $"BGM  {ToPercent(bgmVolume)}", true);
-            SetButton(tertiaryButton, $"SFX  {ToPercent(sfxVolume)}", true);
-            SetButton(quaternaryButton, "Back", true);
-            Select(primaryButton);
+            SetButton(startButton, "New Game", true);
+            SetButton(loadButton, "Continue", canContinue);
+            SetButton(settingButton, "Settings", true);
+            SetButton(quitButton, "Quit", true);
+            Select(startButton);
         }
 
         public void PlayExitTransition(Action onComplete)
@@ -126,47 +107,23 @@ namespace Arkeum.Production.Presentation.UI
             onComplete?.Invoke();
         }
 
-        private void HandlePrimaryButton()
+        private void HandleStartButton()
         {
-            if (showingSettings)
-            {
-                masterVolumeRequested?.Invoke();
-                return;
-            }
-
             newGameRequested?.Invoke();
         }
 
-        private void HandleSecondaryButton()
+        private void HandleLoadButton()
         {
-            if (showingSettings)
-            {
-                bgmVolumeRequested?.Invoke();
-                return;
-            }
-
             continueRequested?.Invoke();
         }
 
-        private void HandleTertiaryButton()
+        private void HandleSettingButton()
         {
-            if (showingSettings)
-            {
-                sfxVolumeRequested?.Invoke();
-                return;
-            }
-
             settingsRequested?.Invoke();
         }
 
-        private void HandleQuaternaryButton()
+        private void HandleQuitButton()
         {
-            if (showingSettings)
-            {
-                backRequested?.Invoke();
-                return;
-            }
-
             quitRequested?.Invoke();
         }
 
@@ -200,11 +157,6 @@ namespace Arkeum.Production.Presentation.UI
             {
                 button.Select();
             }
-        }
-
-        private static string ToPercent(float value)
-        {
-            return $"{Mathf.RoundToInt(Mathf.Clamp01(value) * 100f)}%";
         }
     }
 }

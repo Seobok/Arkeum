@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Arkeum.Production.Presentation.Audio
 {
@@ -11,7 +12,8 @@ namespace Arkeum.Production.Presentation.Audio
 
         public void PlaySfx(string id)
         {
-            AudioManager.Instance.PlaySfx(id);
+            if(GetComponent<Button>().interactable)
+                AudioManager.Instance.PlaySfx(id);
         }
     }
 }

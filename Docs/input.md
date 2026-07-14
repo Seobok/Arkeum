@@ -1415,3 +1415,177 @@
 - Unity Editor가 실행 중이어서 별도 배치 모드 씬 로딩 검증은 수행하지 못했다.
 - Unity Play Mode에서 버튼 배치, 키보드/게임패드 UI 이동, 페이드, 실제 씬 전환 및 볼륨 청감은 직접 확인하지 못했다.
 - 이어하기를 활성화하려면 `SaveProfile` 파일 저장·불러오기 기능과 `GameBootstrap` 프로필 주입 구조를 추가해야 한다.
+
+## 2026-06-29 저장 데이터가 없을 때 Continue 버튼 표시 수정
+
+### 사용자의 요청 개요
+- 저장 데이터가 없을 때 Continue 버튼에 `(No Save)` 문구를 붙이지 않고 버튼만 비활성화하도록 요청.
+
+### 핵심 요구사항
+- 저장 여부와 관계없이 버튼 라벨은 `Continue`로 유지한다.
+- 저장 데이터가 없으면 기존처럼 버튼 입력은 비활성화한다.
+
+### 이번 작업 범위
+- 메인 메뉴 Presenter의 Continue 버튼 라벨 결정 로직만 수정했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/UI/MainMenuPresenter.cs`
+  - 저장 데이터가 없어도 Continue 버튼 라벨을 변경하지 않도록 수정.
+- `Docs/input.md`
+  - 이번 변경 내용과 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- `ShowMainMenu(false)` 호출 시 Continue 버튼의 텍스트는 `Continue`로 표시되고 `interactable`만 `false`가 되도록 변경했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 비활성화 색상과 버튼 입력 차단 상태는 직접 확인하지 못했다.
+
+## 2026-06-29 설정 시스템 및 UI 연결 스크립트 구현
+
+### 사용자의 요청 개요
+- 사용자가 제작할 설정 UI에 연결할 런타임 스크립트 구현 요청.
+- 사운드, 모바일 조작, 그래픽·프레임·화면 효과·배터리 절약·PC 해상도 설정을 요구.
+
+### 핵심 요구사항
+- Master/BGM/SFX 볼륨과 모바일 버튼 투명도를 Slider로 제어한다.
+- On/Off 및 라디오 버튼 UI는 Unity `Toggle`로 연결한다.
+- 모바일 전용 항목과 PC 전용 항목의 표시를 실행 플랫폼에 맞게 전환한다.
+- 설정값을 저장하고 다음 실행 및 씬 전환 뒤에도 적용한다.
+- UI 표현과 실제 설정 저장·적용 책임을 분리한다.
+
+### 이번 작업 범위
+- 전체 설정값을 보관·저장·적용하는 정적 설정 서비스를 추가했다.
+- 사용자가 만든 Slider/Toggle UI를 Inspector에서 연결할 설정 메뉴 Binder를 추가했다.
+- 모바일 이동 버튼 크기·투명도·좌우 위치를 실제 UI에 적용하는 선택형 Target 컴포넌트를 추가했다.
+- 메인 메뉴와 게임 직접 실행 경로에서 저장 설정을 초기화하도록 기존 Bootstrap을 연결했다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Infrastructure/Settings/GameSettingsService.cs`
+  - 모든 설정의 `PlayerPrefs` 저장, 조회, 변경 이벤트 및 런타임 적용 API 추가.
+- `Assets/Arkeum/Scripts/Infrastructure/Settings/GameSettingsService.cs.meta`
+  - Unity 스크립트 메타 파일 추가.
+- `Assets/Arkeum/Scripts/Infrastructure/Settings.meta`
+  - Unity 폴더 메타 파일 추가.
+- `Assets/Arkeum/Scripts/Presentation/UI/SettingsMenuBinder.cs`
+  - Slider, 버튼형 Toggle, 해상도 선택 항목과 설정 서비스를 연결하는 UI Binder 추가.
+- `Assets/Arkeum/Scripts/Presentation/UI/SettingsMenuBinder.cs.meta`
+  - Unity 스크립트 메타 파일 추가.
+- `Assets/Arkeum/Scripts/Presentation/UI/MobileControlSettingsTarget.cs`
+  - 모바일 이동 버튼의 크기, 투명도, 좌우 위치를 설정 변경에 맞춰 적용하는 컴포넌트 추가.
+- `Assets/Arkeum/Scripts/Presentation/UI/MobileControlSettingsTarget.cs.meta`
+  - Unity 스크립트 메타 파일 추가.
+- `Assets/Arkeum/Scripts/Core/MainMenuController.cs`
+  - 기존 오디오 설정 저장 코드를 공용 설정 서비스로 통합하고, 선택적으로 `SettingsMenuBinder` 패널을 열 수 있도록 연결.
+- `Assets/Arkeum/Scripts/Core/GameBootstrap.cs`
+  - GameScene 직접 실행 시에도 저장된 설정이 초기화·적용되도록 연결.
+- `Assembly-CSharp.csproj`
+  - 로컬 빌드 검증을 위해 새 C# 파일을 Compile 목록에 포함. Unity/Rider 생성 파일이므로 저장소 추적 대상이 아닐 수 있음.
+- `Docs/input.md`
+  - 이번 요청, 구현 범위, 검증 결과 및 후속 연결 사항 기록.
+
+### 실제 수행한 작업 요약
+- 오디오 볼륨, 진동, 모바일 버튼 크기·투명도·위치, 그래픽 품질, 프레임 제한, 화면 흔들림, 배터리 절약, 해상도를 저장하도록 구현했다.
+- 그래픽 품질은 프로젝트의 품질 단계 중 첫 단계/중간 단계/마지막 단계를 낮음/보통/높음으로 매핑한다.
+- 배터리 절약 모드 활성화 중에는 선택값을 덮어쓰지 않고 실제 적용 품질과 프레임만 낮음/30fps로 제한한다.
+- 프레임 제한 적용을 위해 VSync를 비활성화하고 `Application.targetFrameRate`를 설정한다.
+- 화면 흔들림은 현재 효과 구현체가 없어 설정값과 변경 이벤트만 제공하며, 흔들림 실행부에서 `GameSettingsService.ScreenShakeEnabled`를 확인하도록 확장할 수 있다.
+- 진동은 `GameSettingsService.TryVibrate()` 호출 시 모바일 플랫폼이고 설정이 활성화된 경우에만 실행된다.
+- 해상도는 Binder의 각 Resolution Option에 Toggle, width, height를 등록하는 방식으로 구성했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- 사용자가 제작할 설정 UI가 아직 없어 Inspector 참조 연결 및 Play Mode UI 상호작용은 확인하지 못했다.
+- Android/iOS 실기기에서 진동, 버튼 배치, 배터리 절약 모드 동작은 확인하지 못했다.
+- PC 해상도별 레이아웃과 전체 화면 모드 조합은 확인하지 못했다.
+- 실제 화면 흔들림 실행 코드는 현재 프로젝트에서 확인되지 않아 설정값 소비 연결은 후속 작업이 필요하다.
+
+## 2026-07-08 설정 시스템 모바일 우선 범위 축소
+
+### 사용자의 요청 개요
+- 설정 기능을 휴대폰 대응부터 구현하고 PC 설정은 추후 확장할 수 있도록 현재 범위를 축소해 달라는 요청.
+
+### 핵심 요구사항
+- 모바일에서 필요한 사운드, 진동, 조작 버튼, 그래픽·프레임·화면 효과·배터리 설정은 유지한다.
+- PC 전용 해상도 설정과 모바일/PC UI 분기 코드는 현재 구현에서 제거한다.
+- 이후 PC 대응 시 설정 서비스를 확장할 수 있는 구조는 유지한다.
+
+### 이번 작업 범위
+- 설정 서비스에서 해상도 저장 및 적용 기능 제거.
+- 설정 UI Binder에서 해상도 라디오 버튼과 플랫폼 전용 Root 참조 제거.
+- 모바일 조작 설정을 Unity Editor에서도 미리 볼 수 있도록 적용 조건 조정.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Infrastructure/Settings/GameSettingsService.cs`
+  - PC 해상도 키, 상태, 저장 API와 `Screen.SetResolution` 적용 로직 제거.
+- `Assets/Arkeum/Scripts/Presentation/UI/SettingsMenuBinder.cs`
+  - 해상도 옵션 직렬화 구조와 모바일/PC 표시 전환 필드 및 로직 제거.
+- `Assets/Arkeum/Scripts/Presentation/UI/MobileControlSettingsTarget.cs`
+  - 모바일 빌드 외에 Unity Editor에서도 버튼 크기·투명도·좌우 배치를 확인할 수 있도록 변경.
+- `Docs/input.md`
+  - 이번 범위 축소 내용과 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 현재 설정 UI에는 Master/BGM/SFX, 진동, 버튼 크기, 버튼 투명도, 이동 버튼 위치, 그래픽 품질, 프레임 제한, 화면 흔들림, 배터리 절약만 연결하면 된다.
+- PC 해상도 옵션과 `mobileOnlyRoot`, `pcOnlyRoot` Inspector 필드는 제거했다.
+- 기존 설정 저장·변경 이벤트 구조는 유지해 추후 PC 전용 옵션을 별도 확장할 수 있다.
+
+### 빌드/테스트 여부
+- 샌드박스 내부 첫 빌드는 로컬 Microsoft SDK 경로 접근 권한 부족으로 실패했다.
+- 승인된 `dotnet build Assembly-CSharp.csproj -nologo` 재실행은 성공했다.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- 설정 UI가 아직 연결되지 않아 Unity Play Mode에서 Slider/Toggle 상호작용은 확인하지 못했다.
+- Android/iOS 실기기에서 진동, 모바일 조작 버튼 배치, 배터리 절약 적용은 확인하지 못했다.
+- 화면 흔들림 실행부의 설정값 소비 연결은 기존과 동일하게 후속 작업이 필요하다.
+## 2026-07-11 MainMenuPresenter 설정 버튼 공유 레거시 제거 및 설정 Back 버튼 분리
+
+### 사용자 요청 개요
+- `StartScene`에서 별도 설정 패널을 사용하므로 `MainMenuPresenter`에 남아 있던 `showingSettings` 기반 레거시 설정 모드 코드를 제거해달라는 요청.
+- 기존 `backRequested` 기능은 메인 메뉴 버튼 재사용 방식이 아니라 설정 패널이 별도 Back 버튼을 받아 사용할 수 있도록 분리 요청.
+
+### 핵심 요구사항
+- 메인 메뉴 버튼은 New Game, Continue, Settings, Quit 역할만 담당한다.
+- 설정 UI는 별도 패널의 Slider/Toggle/Back Button으로 동작한다.
+- 설정 Back 동작은 `SettingsMenuBinder`가 자체 버튼을 받아 콜백으로 처리한다.
+
+### 이번 작업 범위
+- `MainMenuPresenter`의 설정 모드 상태와 설정용 버튼 재사용 콜백 제거.
+- `MainMenuController`의 메인 메뉴 액션 바인딩 단순화 및 설정 패널 Back 콜백 연결.
+- `SettingsMenuBinder`에 Back 버튼 참조와 `BindBack()` 기능 추가.
+- `StartScene`의 기존 `Back-Button`을 `SettingsMenuBinder.backButton`에 직렬화 연결.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/UI/MainMenuPresenter.cs`
+  - `showingSettings`, `ShowSettings()`, 볼륨 순환 콜백, `backRequested` 등 버튼 공유 레거시 제거.
+  - `Bind()`를 순수 메인 메뉴 액션 4개만 받도록 정리.
+- `Assets/Arkeum/Scripts/Core/MainMenuController.cs`
+  - `MainMenuPresenter.Bind()` 호출 인자 정리.
+  - `SettingsMenuBinder.BindBack(ShowMainMenu)` 연결 추가.
+  - 설정 패널이 없을 때 경고만 출력하도록 정리.
+- `Assets/Arkeum/Scripts/Presentation/UI/SettingsMenuBinder.cs`
+  - `backButton` 직렬화 필드, `BindBack(Action)`, Back 버튼 클릭 핸들러 추가.
+- `Assets/Arkeum/Scenes/StartScene.unity`
+  - 기존 `Back-Button` 프리팹 인스턴스의 `Button` 컴포넌트를 `SettingsMenuBinder.backButton`에 연결.
+- `Docs/input.md`
+  - 이번 요청, 변경 범위, 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 메인 메뉴 Presenter에서 설정 화면을 버튼 라벨 전환으로 표현하던 레거시 흐름을 제거했다.
+- 설정 패널 Back 동작을 `SettingsMenuBinder` 소유로 분리했다.
+- `StartScene`에 이미 존재하는 `Back-Button`을 새 필드에 연결해 Inspector 수동 연결 없이 동작하도록 했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 `StartScene` 설정 패널 열기/닫기와 Back 버튼 클릭 동작은 직접 확인하지 못했다.
