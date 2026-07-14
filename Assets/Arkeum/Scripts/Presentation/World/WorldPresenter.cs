@@ -1,7 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using Arkeum.Production.Gameplay.Actors;
 using Arkeum.Production.Gameplay.Map;
 using Arkeum.Production.Gameplay.Run;
+using Arkeum.Production.Infrastructure.Settings;
 using UnityEngine;
 
 namespace Arkeum.Production.Presentation.World
@@ -35,6 +37,9 @@ namespace Arkeum.Production.Presentation.World
         private ActorRepository actorRepository;
         private MapDefinition renderedFloorMap;
         private MapDefinition renderedFogMap;
+        private Coroutine screenShakeRoutine;
+        private Vector3 cameraShakeOffset;
+        private Vector3 lastCameraBasePosition;
 
         public MapDefinition CurrentMap { get; private set; }
         public RunState CurrentRun { get; private set; }
@@ -133,6 +138,45 @@ namespace Arkeum.Production.Presentation.World
         public void SetShowEnemyPreparedTargetMarkers(bool show)
         {
             ShowEnemyPreparedTargetMarkers = show;
+        }
+
+        public void PlayEnemyDamageEffects(IReadOnlyList<Vector2Int> damagedCells)
+        {
+            if (damagedCells == null || damagedCells.Count == 0)
+            {
+                return;
+            }
+
+            if (worldRoot == null)
+            {
+                BuildWorldRoots();
+            }
+
+            bool playedAnyEffect = false;
+            for (int i = 0; i < damagedCells.Count; i++)
+            {
+                Vector2Int cell = damagedCells[i];
+                if (!IsRunCellVisible(cell))
+                {
+                    continue;
+                }
+
+                viewFactory.CreateDamageEffect(
+                    markerRoot,
+                    cell,
+                    GetEnemyDamageEffectFrames(),
+                    GetEnemyDamageEffectTint(),
+                    $"EnemyDamageEffect_{cell.x}_{cell.y}_{Time.frameCount}_{i}",
+                    30,
+                    GetEnemyDamageEffectFrameRate(),
+                    GetEnemyDamageEffectScale());
+                playedAnyEffect = true;
+            }
+
+            if (playedAnyEffect)
+            {
+                PlayEnemyDamageScreenShake();
+            }
         }
 
         private void RefreshFloor(MapDefinition map)
@@ -568,7 +612,7 @@ namespace Arkeum.Production.Presentation.World
             }
 
             mainCamera.orthographic = true;
-            mainCamera.orthographicSize = 5.5f;
+            mainCamera.orthographicSize = 10f;
             mainCamera.backgroundColor = new Color(0.03f, 0.02f, 0.03f);
             if (createdCamera)
             {
@@ -651,10 +695,50 @@ namespace Arkeum.Production.Presentation.World
                 EnsureCamera();
             }
 
+            lastCameraBasePosition = position;
             if (mainCamera != null)
             {
-                mainCamera.transform.position = position;
+                mainCamera.transform.position = position + cameraShakeOffset;
             }
+        }
+
+        private void PlayEnemyDamageScreenShake()
+        {
+            if (!GameSettingsService.ScreenShakeEnabled ||
+                mainCamera == null ||
+                GetEnemyDamageScreenShakeDuration() <= 0f ||
+                GetEnemyDamageScreenShakeMagnitude() <= 0f)
+            {
+                return;
+            }
+
+            if (screenShakeRoutine != null)
+            {
+                StopCoroutine(screenShakeRoutine);
+            }
+
+            screenShakeRoutine = StartCoroutine(ShakeCamera(
+                GetEnemyDamageScreenShakeDuration(),
+                GetEnemyDamageScreenShakeMagnitude()));
+        }
+
+        private IEnumerator ShakeCamera(float duration, float magnitude)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                float strength = Mathf.Lerp(magnitude, 0f, t);
+                Vector2 offset = Random.insideUnitCircle * strength;
+                cameraShakeOffset = new Vector3(offset.x, offset.y, 0f);
+                MoveCameraTo(lastCameraBasePosition);
+                yield return null;
+            }
+
+            cameraShakeOffset = Vector3.zero;
+            MoveCameraTo(lastCameraBasePosition);
+            screenShakeRoutine = null;
         }
 
         private void MarkFloorDirtyIfMapChanged(MapDefinition mapDefinition)
@@ -888,6 +972,36 @@ namespace Arkeum.Production.Presentation.World
         private Color GetEnemyMoveMarkerTint()
         {
             return visualSet != null ? visualSet.EnemyMoveMarkerTint : new Color(0.18f, 0.68f, 0.26f);
+        }
+
+        private Sprite[] GetEnemyDamageEffectFrames()
+        {
+            return visualSet != null ? visualSet.EnemyDamageEffectFrames : null;
+        }
+
+        private Color GetEnemyDamageEffectTint()
+        {
+            return visualSet != null ? visualSet.EnemyDamageEffectTint : Color.white;
+        }
+
+        private float GetEnemyDamageEffectFrameRate()
+        {
+            return visualSet != null ? visualSet.EnemyDamageEffectFrameRate : 18f;
+        }
+
+        private float GetEnemyDamageEffectScale()
+        {
+            return visualSet != null ? visualSet.EnemyDamageEffectScale : 1f;
+        }
+
+        private float GetEnemyDamageScreenShakeDuration()
+        {
+            return visualSet != null ? visualSet.EnemyDamageScreenShakeDuration : 0.12f;
+        }
+
+        private float GetEnemyDamageScreenShakeMagnitude()
+        {
+            return visualSet != null ? visualSet.EnemyDamageScreenShakeMagnitude : 0.12f;
         }
 
         private Color GetUnexploredFogTint()

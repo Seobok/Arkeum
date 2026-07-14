@@ -19,12 +19,14 @@ namespace Arkeum.Production.Gameplay.Run
         private readonly ActorRepository actorRepository;
         private readonly TimingService timingService;
         private readonly SaveProfile activeProfile;
+        private readonly List<Vector2Int> damagedEnemyCells = new List<Vector2Int>();
         
         public event System.Action WeaponPickedUp;
 
         public RunState CurrentRun { get; private set; }
         public string LastMessage { get; private set; } = string.Empty;
         public RunActionFeedback LastActionFeedback { get; private set; }
+        public IReadOnlyList<Vector2Int> DamagedEnemyCells => damagedEnemyCells;
 
         public RunController(
             TurnSystem turnSystem,
@@ -70,6 +72,7 @@ namespace Arkeum.Production.Gameplay.Run
         public PlayerActionResultType TryHandlePlayerAction(Vector2Int direction)
         {
             LastActionFeedback = RunActionFeedback.None;
+            damagedEnemyCells.Clear();
             if (CurrentRun?.Player == null)
             {
                 return PlayerActionResultType.NotHandled;
@@ -169,6 +172,7 @@ namespace Arkeum.Production.Gameplay.Run
         public bool ResolveTimedAttack(TimingAttackResult timingResult)
         {
             LastActionFeedback = RunActionFeedback.None;
+            damagedEnemyCells.Clear();
             TimingSession session = timingService?.CurrentSession;
             IReadOnlyList<WeaponAttackContext> attackContexts = session?.AttackContexts;
             if (attackContexts == null || attackContexts.Count == 0 || CurrentRun?.Player == null)
@@ -221,6 +225,10 @@ namespace Arkeum.Production.Gameplay.Run
 
                 // 데미지 계산
                 int damage = combatSystem.ResolvePlayerAttack(CurrentRun, CurrentRun.Player, enemy, attackContext);
+                if (damage > 0)
+                {
+                    damagedEnemyCells.Add(enemy.GridPosition);
+                }
 
                 // 공격한 적이 죽었을 때
                 if (!enemy.IsAlive)

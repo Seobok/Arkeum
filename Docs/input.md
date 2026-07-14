@@ -1589,3 +1589,190 @@
 
 ### 확인하지 못한 사항 또는 후속 점검 사항
 - Unity Play Mode에서 실제 `StartScene` 설정 패널 열기/닫기와 Back 버튼 클릭 동작은 직접 확인하지 못했다.
+
+## 2026-07-11 몬스터 피격 이펙트 출력 시스템 구현
+
+### 사용자의 요청 개요
+- 몬스터가 데미지를 입었을 때 화면에 이펙트를 출력할 수 있도록 시스템 구현 요청.
+
+### 핵심 요구사항
+- 플레이어 공격으로 몬스터에게 실제 데미지가 들어간 경우에만 피격 이펙트를 출력한다.
+- 일반 공격과 타이밍 공격 모두 같은 방식으로 처리한다.
+- 이펙트 연출값은 월드 비주얼 설정에서 조정 가능해야 한다.
+
+### 이번 작업 범위
+- 런 컨트롤러에서 이번 액션 중 피해를 입은 몬스터 위치를 기록한다.
+- 액션 완료 후 월드 프레젠터가 해당 위치에 일회성 피격 이펙트를 생성한다.
+- 이펙트는 별도 뷰 컴포넌트가 크기 확대 및 페이드아웃 후 자동 제거한다.
+- 기본 스프라이트가 지정되지 않아도 fallback 스프라이트로 출력되도록 처리한다.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs`
+  - 플레이어 공격으로 실제 데미지가 발생한 몬스터 좌표를 `DamagedEnemyCells`로 기록.
+- `Assets/Arkeum/Scripts/Core/GameDirector.cs`
+  - 액션 처리 후 월드 갱신 다음 피격 이펙트를 출력하도록 연결.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 피격 좌표 목록을 받아 화면에 이펙트를 생성하는 API 추가.
+- `Assets/Arkeum/Scripts/Presentation/World/ProductionViewFactory.cs`
+  - 데미지 이펙트 GameObject 생성 기능 추가.
+- `Assets/Arkeum/Scripts/Presentation/World/DamageEffectView.cs`
+  - 이펙트 확대/페이드아웃/자동 제거 컴포넌트 추가.
+- `Assets/Arkeum/Scripts/Presentation/World/DamageEffectView.cs.meta`
+  - Unity 스크립트 메타 파일 추가.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldVisualSet.cs`
+  - 몬스터 피격 이펙트 스프라이트, 색상, 지속시간, 시작/종료 스케일 설정 추가.
+- `Assets/Arkeum/ScriptableObjects/WorldVisualSet.asset`
+  - 새 이펙트 설정값 기본값 명시.
+- `Assembly-CSharp.csproj`
+  - 로컬 `dotnet build` 검증을 위해 새 스크립트 compile 항목 반영.
+- `Docs/input.md`
+  - 이번 작업 내용 기록.
+
+### 실제 수행한 작업 요약
+- 일반 공격과 타이밍 공격이 공통으로 호출하는 `ResolvePlayerAttacks()`에서 데미지 결과가 0보다 큰 경우 몬스터 위치를 기록하도록 했다.
+- `CompleteHandledRunAction()`에서 월드 상태를 먼저 갱신한 뒤 기록된 몬스터 위치에 피격 이펙트를 출력하도록 했다.
+- 이펙트 오브젝트는 생성 후 설정된 시간 동안 확대 및 투명도 감소 애니메이션을 수행하고 자동 삭제된다.
+- `WorldVisualSet`에 새 설정 필드를 추가해 추후 인스펙터에서 전용 피격 스프라이트를 지정할 수 있도록 했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 공격 시 피격 이펙트의 위치, 크기, 지속시간, 시야 밖 몬스터 처리 체감은 직접 확인하지 못했다.
+- 현재 `WorldVisualSet.asset`의 `enemyDamageEffectSprite`는 비워 두었으므로, 원하는 전용 히트 스프라이트가 있으면 인스펙터에서 지정해야 한다.
+
+## 2026-07-11 몬스터 피격 이펙트 파티클 시스템 전환
+
+### 사용자의 요청 개요
+- 기존 스프라이트 직접 애니메이션 방식이 아니라 Unity `ParticleSystem`을 사용해 몬스터 피격 이펙트를 애니메이션으로 출력하도록 수정 요청.
+
+### 핵심 요구사항
+- 몬스터가 실제 데미지를 입었을 때 피격 위치에 파티클 이펙트를 출력한다.
+- 이펙트는 런타임에 `ParticleSystem`으로 생성되고 burst 방식으로 재생된다.
+- 파티클 수, 수명, 속도, 반경, 크기, 색상, 스프라이트를 `WorldVisualSet`에서 조정할 수 있어야 한다.
+
+### 이번 작업 범위
+- 기존 `SpriteRenderer` 확대/페이드아웃 방식의 `DamageEffectView`를 `ParticleSystem` 재생 및 자동 제거 방식으로 변경.
+- `ProductionViewFactory.CreateDamageEffect()`가 파티클 시스템을 구성하도록 수정.
+- `WorldVisualSet`의 피격 이펙트 설정을 파티클 전용 설정으로 교체.
+- `WorldPresenter`가 새 파티클 설정값을 전달하도록 수정.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/World/DamageEffectView.cs`
+  - 파티클 시스템을 재생하고 수명 종료 후 GameObject를 제거하도록 변경.
+- `Assets/Arkeum/Scripts/Presentation/World/ProductionViewFactory.cs`
+  - `ParticleSystem`, emission burst, circle shape, color over lifetime, size over lifetime, texture sheet sprite 설정을 런타임 구성.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldVisualSet.cs`
+  - `enemyDamageParticle*` 설정 필드와 프로퍼티 추가.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 파티클 이펙트 생성 시 count/lifetime/speed/radius/size 값을 전달하도록 변경.
+- `Assets/Arkeum/ScriptableObjects/WorldVisualSet.asset`
+  - 파티클 피격 이펙트 기본 설정값 반영.
+- `Docs/input.md`
+  - 이번 작업 내용 기록.
+
+### 실제 수행한 작업 요약
+- 피격 이펙트 오브젝트가 `SpriteRenderer` 대신 `ParticleSystem`을 가지도록 변경했다.
+- 파티클은 일회성 burst로 방출되고 색상 알파가 수명 동안 0으로 줄어든다.
+- 크기는 `enemyDamageParticleStartSize`에서 `enemyDamageParticleEndSize`로 변화한다.
+- `enemyDamageParticleSprite`가 지정되면 해당 스프라이트를 파티클 텍스처 시트로 사용한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 파티클 크기, 속도, 정렬 순서, 스프라이트 적용 결과는 직접 확인하지 못했다.
+- `WorldVisualSet.asset`의 `enemyDamageParticleSprite`는 현재 비워져 있으므로, 전용 파티클 스프라이트가 필요하면 Inspector에서 지정해야 한다.
+
+## 2026-07-11 몬스터 피격 이펙트 스프라이트 프레임 애니메이션 전환
+
+### 사용자의 요청 개요
+- 파티클 여러 개를 방출하는 방식이 아니라, 이펙트 오브젝트 1개가 여러 스프라이트 프레임을 순서대로 실행하는 방식으로 다시 제작 요청.
+
+### 핵심 요구사항
+- 기존 파티클 시스템 기반 피격 이펙트를 제거한다.
+- 피격 이펙트는 `SpriteRenderer` 1개로 표현한다.
+- 여러 개의 스프라이트 프레임을 순서대로 재생하고, 재생 완료 후 자동 제거한다.
+- 프레임 목록, 재생 속도, 색상, 스케일은 `WorldVisualSet`에서 설정할 수 있어야 한다.
+
+### 이번 작업 범위
+- `DamageEffectView`를 `ParticleSystem` 재생 방식에서 스프라이트 프레임 코루틴 재생 방식으로 변경.
+- `ProductionViewFactory.CreateDamageEffect()`에서 `ParticleSystem` 구성 코드를 제거하고 `SpriteRenderer` 기반 생성으로 변경.
+- `WorldVisualSet`의 `enemyDamageParticle*` 설정을 `enemyDamageEffectFrames`, `enemyDamageEffectFrameRate`, `enemyDamageEffectScale`, `enemyDamageEffectTint`로 교체.
+- `WorldPresenter`가 새 프레임 애니메이션 설정값을 전달하도록 변경.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/World/DamageEffectView.cs`
+  - 스프라이트 프레임 배열을 순서대로 재생하고 끝나면 GameObject를 제거하도록 변경.
+- `Assets/Arkeum/Scripts/Presentation/World/ProductionViewFactory.cs`
+  - 피격 이펙트를 `SpriteRenderer` 1개로 생성하도록 변경하고 파티클 구성 코드 제거.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldVisualSet.cs`
+  - 피격 이펙트 프레임 배열, 틴트, 프레임레이트, 스케일 설정 추가.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 피격 이펙트 생성 시 프레임 애니메이션 설정을 넘기도록 변경.
+- `Assets/Arkeum/ScriptableObjects/WorldVisualSet.asset`
+  - 파티클 설정값을 제거하고 프레임 애니메이션 기본 설정값 반영.
+- `Docs/input.md`
+  - 이번 작업 내용 기록.
+
+### 실제 수행한 작업 요약
+- 파티클 시스템 기반 burst, shape, color over lifetime, size over lifetime 설정 코드를 제거했다.
+- `DamageEffectView`가 `enemyDamageEffectFrames` 배열을 `enemyDamageEffectFrameRate` 간격으로 순차 표시하도록 했다.
+- 프레임 배열이 비어 있으면 fallback 스프라이트를 1프레임만 표시한 뒤 제거하도록 유지했다.
+- 기존 데미지 발생 좌표 기록 및 `WorldPresenter.PlayEnemyDamageEffects()` 호출 흐름은 그대로 유지했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 프레임 애니메이션 재생 속도, 위치, 스케일, 정렬 순서는 직접 확인하지 못했다.
+- `WorldVisualSet.asset`의 `enemyDamageEffectFrames`는 현재 비어 있으므로, 실제 사용하려면 Inspector에서 hit 애니메이션 스프라이트들을 순서대로 등록해야 한다.
+
+## 2026-07-12 몬스터 피격 이펙트 화면 진동 추가
+
+### 사용자의 요청 개요
+- 타격감을 위해 몬스터 피격 이펙트가 출력될 때 화면 진동도 함께 발생하도록 추가 요청.
+
+### 핵심 요구사항
+- 몬스터가 실제 데미지를 입어 피격 이펙트가 출력되는 시점에만 화면 진동을 실행한다.
+- 기존 설정 시스템의 화면 진동 On/Off 값을 존중한다.
+- 진동 시간과 세기는 월드 비주얼 설정에서 조정 가능해야 한다.
+
+### 이번 작업 범위
+- `WorldPresenter.PlayEnemyDamageEffects()`에서 실제 이펙트가 하나 이상 생성된 경우 화면 진동을 시작하도록 연결.
+- 카메라 추적 로직과 충돌하지 않도록 기본 카메라 위치와 shake offset을 분리.
+- `WorldVisualSet`에 피격 화면 진동 지속시간과 세기 설정을 추가.
+- `WorldVisualSet.asset`에 기본 화면 진동 값을 반영.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - `GameSettingsService.ScreenShakeEnabled`를 확인해 화면 진동 실행 여부를 결정.
+  - 카메라 기본 위치에 `cameraShakeOffset`을 합성하도록 `MoveCameraTo()`를 변경.
+  - 피격 화면 진동 코루틴 추가.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldVisualSet.cs`
+  - `enemyDamageScreenShakeDuration`, `enemyDamageScreenShakeMagnitude` 설정 추가.
+- `Assets/Arkeum/ScriptableObjects/WorldVisualSet.asset`
+  - 피격 화면 진동 기본값 `0.12`초, 세기 `0.12` 반영.
+- `Docs/input.md`
+  - 이번 작업 내용 기록.
+
+### 실제 수행한 작업 요약
+- 피격 이펙트가 시야 안에서 실제 생성된 경우에만 화면 진동을 실행하도록 했다.
+- 화면 진동 설정이 꺼져 있거나 지속시간/세기가 0 이하이면 실행하지 않도록 했다.
+- 카메라 Follow 갱신과 흔들림이 서로 덮어쓰지 않도록 `lastCameraBasePosition + cameraShakeOffset` 방식으로 처리했다.
+- 새 피격이 들어오면 기존 흔들림 코루틴을 중단하고 새 흔들림으로 갱신한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 화면 진동 체감, 카메라 추적 중 흔들림 강도, 설정 Toggle 연동은 직접 확인하지 못했다.
+- `WorldVisualSet.asset`에서 `Enemy Damage Screen Shake Duration/Magnitude` 값을 플레이 감각에 맞게 조정해야 할 수 있다.

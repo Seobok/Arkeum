@@ -56,6 +56,50 @@ namespace Arkeum.Production.Presentation.World
             return actorView;
         }
 
+        public DamageEffectView CreateDamageEffect(
+            Transform parent,
+            Vector2Int cell,
+            Sprite[] frames,
+            Color tint,
+            string name,
+            int sortingOrder,
+            float frameRate,
+            float scale)
+        {
+            GameObject effect = new GameObject(name);
+            effect.transform.SetParent(parent, false);
+            effect.transform.position = new Vector3(cell.x, cell.y, -0.2f);
+            effect.transform.localScale = Vector3.one * Mathf.Max(0.01f, scale);
+
+            Sprite fallbackSprite = GetSquareSprite();
+            SpriteRenderer renderer = effect.AddComponent<SpriteRenderer>();
+            renderer.sprite = GetFirstValidSprite(frames) ?? fallbackSprite;
+            renderer.color = tint;
+            renderer.sortingOrder = sortingOrder;
+
+            DamageEffectView effectView = effect.AddComponent<DamageEffectView>();
+            effectView.Initialize(renderer, frames, fallbackSprite, frameRate);
+            return effectView;
+        }
+
+        private static Sprite GetFirstValidSprite(Sprite[] frames)
+        {
+            if (frames == null)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < frames.Length; i++)
+            {
+                if (frames[i] != null)
+                {
+                    return frames[i];
+                }
+            }
+
+            return null;
+        }
+
         private Sprite GetSquareSprite()
         {
             if (squareSprite != null)

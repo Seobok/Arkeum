@@ -31,6 +31,14 @@ namespace Arkeum.Production.Presentation.World
         [SerializeField] private Sprite enemyMoveMarkerSprite;
         [SerializeField] private Color enemyMoveMarkerTint = new Color(0.18f, 0.68f, 0.26f);
 
+        [Header("Effects")]
+        [SerializeField] private Sprite[] enemyDamageEffectFrames;
+        [SerializeField] private Color enemyDamageEffectTint = new Color(1f, 1f, 1f, 1f);
+        [SerializeField] private float enemyDamageEffectFrameRate = 18f;
+        [SerializeField] private float enemyDamageEffectScale = 1f;
+        [SerializeField] private float enemyDamageScreenShakeDuration = 0.12f;
+        [SerializeField] private float enemyDamageScreenShakeMagnitude = 0.12f;
+
         [Header("Fog of War")]
         [SerializeField] private Color unexploredFogTint = Color.black;
         [SerializeField] private Color exploredFogTint = new Color(0.45f, 0.45f, 0.45f, 0.65f);
@@ -53,6 +61,12 @@ namespace Arkeum.Production.Presentation.World
         public Color EnemyAttackMarkerTint => enemyAttackMarkerTint;
         public Sprite EnemyMoveMarkerSprite => enemyMoveMarkerSprite;
         public Color EnemyMoveMarkerTint => enemyMoveMarkerTint;
+        public Sprite[] EnemyDamageEffectFrames => enemyDamageEffectFrames;
+        public Color EnemyDamageEffectTint => enemyDamageEffectTint;
+        public float EnemyDamageEffectFrameRate => Mathf.Max(1f, enemyDamageEffectFrameRate);
+        public float EnemyDamageEffectScale => Mathf.Max(0.01f, enemyDamageEffectScale);
+        public float EnemyDamageScreenShakeDuration => Mathf.Max(0f, enemyDamageScreenShakeDuration);
+        public float EnemyDamageScreenShakeMagnitude => Mathf.Max(0f, enemyDamageScreenShakeMagnitude);
         public Color UnexploredFogTint => unexploredFogTint;
         public Color ExploredFogTint => exploredFogTint;
     }

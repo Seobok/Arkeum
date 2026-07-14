@@ -299,6 +299,7 @@ namespace Arkeum.Production.Core
             }
 
             Services.WorldPresenter.Refresh();
+            Services.WorldPresenter.PlayEnemyDamageEffects(CurrentRunController.DamagedEnemyCells);
             Services.HudPresenter.SetMessage(CurrentRunController.LastMessage);
 
             if (CurrentRunController.CurrentRun.EndReason != RunEndReason.None)

@@ -30,5 +30,21 @@ MonoBehaviour:
   enemyAttackMarkerTint: {r: 0.82, g: 0.16, b: 0.13, a: 1}
   enemyMoveMarkerSprite: {fileID: 0}
   enemyMoveMarkerTint: {r: 0.18, g: 0.68, b: 0.26, a: 1}
+  enemyDamageEffectFrames:
+  - {fileID: -2645278852017342422, guid: e9770931a7554e143b1d28aff7f74cee, type: 3}
+  - {fileID: -2306084169695492615, guid: e9770931a7554e143b1d28aff7f74cee, type: 3}
+  - {fileID: -167769363876152365, guid: e9770931a7554e143b1d28aff7f74cee, type: 3}
+  - {fileID: 7101003253517350853, guid: e9770931a7554e143b1d28aff7f74cee, type: 3}
+  - {fileID: -3491160511682652639, guid: e9770931a7554e143b1d28aff7f74cee, type: 3}
+  - {fileID: 4623701302741035243, guid: e9770931a7554e143b1d28aff7f74cee, type: 3}
+  - {fileID: -8721427012756070751, guid: e9770931a7554e143b1d28aff7f74cee, type: 3}
+  - {fileID: 4315307204075091225, guid: e9770931a7554e143b1d28aff7f74cee, type: 3}
+  - {fileID: 8480273408666220222, guid: e9770931a7554e143b1d28aff7f74cee, type: 3}
+  - {fileID: -362959056997433037, guid: e9770931a7554e143b1d28aff7f74cee, type: 3}
+  enemyDamageEffectTint: {r: 1, g: 1, b: 1, a: 1}
+  enemyDamageEffectFrameRate: 200
+  enemyDamageEffectScale: 1
+  enemyDamageScreenShakeDuration: 0.12
+  enemyDamageScreenShakeMagnitude: 0.12
   unexploredFogTint: {r: 0, g: 0, b: 0, a: 1}
   exploredFogTint: {r: 0.122641504, g: 0.122641504, b: 0.122641504, a: 0.70980394}
