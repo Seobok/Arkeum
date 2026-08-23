@@ -31,6 +31,8 @@ MonoBehaviour:
     - RoomType: 3
       RoomAsset: {fileID: 11400000, guid: 9119d5ecf3f6b7846a9f77b13a862252, type: 2}
       Count: 1
+    ShopCatalog: {fileID: 11400000, guid: a88b8ebf7c10469d95aaf5b8331f8785, type: 2}
+    ShopOfferCount: 3
     MinimumRoomCount: 6
     RoomGap: 5
     PlacementAttempts: 300
@@ -55,6 +57,8 @@ MonoBehaviour:
     - RoomType: 2
       RoomAsset: {fileID: 11400000, guid: 785636b9b2c5c834aaecef3daa491a12, type: 2}
       Count: 1
+    ShopCatalog: {fileID: 0}
+    ShopOfferCount: 3
     MinimumRoomCount: 6
     RoomGap: 5
     PlacementAttempts: 300

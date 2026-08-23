@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 namespace Arkeum.Production.Infrastructure.Input
@@ -15,6 +16,10 @@ namespace Arkeum.Production.Infrastructure.Input
         private readonly InputAction moveAction;
         private readonly InputAction timingToggleAction;
         private readonly InputAction confirmAction;
+        private Vector2Int queuedMoveDirection;
+        private bool hasQueuedMove;
+        private bool timingToggleQueued;
+        private bool timingActionQueued;
 
         public InputReader(InputActionAsset inputActions)
         {
@@ -39,6 +44,14 @@ namespace Arkeum.Production.Infrastructure.Input
 
         public bool TryGetMoveDirection(out Vector2Int direction)
         {
+            if (hasQueuedMove)
+            {
+                direction = queuedMoveDirection;
+                queuedMoveDirection = Vector2Int.zero;
+                hasQueuedMove = false;
+                return direction != Vector2Int.zero;
+            }
+
             direction = Vector2Int.zero;
             if (moveAction == null || !moveAction.WasPressedThisFrame())
             {
@@ -63,13 +76,60 @@ namespace Arkeum.Production.Infrastructure.Input
 
         public bool WasTimingTogglePressed()
         {
+            if (timingToggleQueued)
+            {
+                timingToggleQueued = false;
+                return true;
+            }
+
             return timingToggleAction != null && timingToggleAction.WasPressedThisFrame();
         }
 
         public bool WasTimingActionPressed()
         {
-            return WasConfirmPressed() ||
+            if (timingActionQueued)
+            {
+                timingActionQueued = false;
+                return true;
+            }
+
+            bool confirmPressed = WasConfirmPressed();
+            if (confirmPressed && WasMousePressedOverUi())
+            {
+                confirmPressed = false;
+            }
+
+            return confirmPressed ||
                 (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame);
+        }
+
+        private static bool WasMousePressedOverUi()
+        {
+            return Mouse.current != null &&
+                Mouse.current.leftButton.wasPressedThisFrame &&
+                EventSystem.current != null &&
+                EventSystem.current.IsPointerOverGameObject();
+        }
+
+        public void QueueMove(Vector2Int direction)
+        {
+            if (direction == Vector2Int.zero)
+            {
+                return;
+            }
+
+            queuedMoveDirection = direction;
+            hasQueuedMove = true;
+        }
+
+        public void QueueTimingToggle()
+        {
+            timingToggleQueued = true;
+        }
+
+        public void QueueTimingAction()
+        {
+            timingActionQueued = true;
         }
 
         public bool WasConfirmPressed()

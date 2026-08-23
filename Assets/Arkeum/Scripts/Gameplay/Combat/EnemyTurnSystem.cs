@@ -9,11 +9,14 @@ namespace Arkeum.Production.Gameplay.Combat
     {
         private readonly EnemyBehaviorActions behaviorActions;
         private readonly IBehaviorTreeNode defaultBehaviorTree;
+        private readonly IBehaviorTreeNode bossBehaviorTree;
 
         public EnemyTurnSystem(CombatSystem combatSystem, TargetingService targetingService)
         {
             behaviorActions = new EnemyBehaviorActions(combatSystem, targetingService);
-            defaultBehaviorTree = new EnemyBehaviorTreeFactory().CreateDefaultTree();
+            EnemyBehaviorTreeFactory behaviorTreeFactory = new EnemyBehaviorTreeFactory();
+            defaultBehaviorTree = behaviorTreeFactory.CreateDefaultTree();
+            bossBehaviorTree = behaviorTreeFactory.CreateBossTree();
         }
 
         public void ResolveEnemyTurn(RunState runState, IReadOnlyList<ActorEntity> enemies, MapService mapService, ActorRepository actorRepository)
@@ -26,7 +29,25 @@ namespace Arkeum.Production.Gameplay.Combat
             for (int i = 0; i < enemies.Count; i++)
             {
                 ActorEntity enemy = enemies[i];
+                if (enemy == null)
+                {
+                    continue;
+                }
+
+                enemy.HasMoveCollisionFeedback = false;
+                enemy.MoveCollisionTargetCell = enemy.GridPosition;
+            }
+
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                ActorEntity enemy = enemies[i];
                 if (!enemy.IsAlive)
+                {
+                    continue;
+                }
+
+                bool isBoss = enemy.EnemyDefinition != null && enemy.EnemyDefinition.IsBoss;
+                if (isBoss && !runState.BossRoomEntered)
                 {
                     continue;
                 }
@@ -37,7 +58,10 @@ namespace Arkeum.Production.Gameplay.Combat
                     mapService,
                     actorRepository,
                     behaviorActions);
-                defaultBehaviorTree.Tick(context);
+                IBehaviorTreeNode behaviorTree = isBoss
+                    ? bossBehaviorTree
+                    : defaultBehaviorTree;
+                behaviorTree.Tick(context);
                 if (runState.Player.CurrentHp <= 0)
                 {
                     return;

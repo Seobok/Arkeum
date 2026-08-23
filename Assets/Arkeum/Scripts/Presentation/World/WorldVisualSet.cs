@@ -14,6 +14,8 @@ namespace Arkeum.Production.Presentation.World
         [Header("Actors")]
         [SerializeField] private Sprite playerSprite;
         [SerializeField] private Color playerTint = new Color(0.91f, 0.86f, 0.78f);
+        [SerializeField] private Sprite[] playerIdleFrames;
+        [SerializeField] private float playerIdleFrameRate = 8f;
         [SerializeField] private Sprite defaultEnemySprite;
         [SerializeField] private Color defaultEnemyTint = new Color(0.63f, 0.25f, 0.21f);
 
@@ -49,6 +51,8 @@ namespace Arkeum.Production.Presentation.World
         public Color WallTint => wallTint;
         public Sprite PlayerSprite => playerSprite;
         public Color PlayerTint => playerTint;
+        public Sprite[] PlayerIdleFrames => playerIdleFrames;
+        public float PlayerIdleFrameRate => Mathf.Max(1f, playerIdleFrameRate);
         public Sprite DefaultEnemySprite => defaultEnemySprite;
         public Color DefaultEnemyTint => defaultEnemyTint;
         public Sprite DefaultWeaponSprite => defaultWeaponSprite;

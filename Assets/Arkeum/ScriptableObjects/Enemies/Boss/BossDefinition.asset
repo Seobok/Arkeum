@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fd7b7060f6900334b8d48f50d9aceeff, type: 3}
+  m_Name: BossDefinition
+  m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Gameplay.Actors.EnemyDefinition
+  enemyId: Boss
+  displayName: "\uACF5\uAC04\uC758 \uC9D1\uD589\uC790"
+  stats:
+    maxHp: 20
+    AttackPower: 2
+    Defense: 1
+    DetectionRange: 99
+    MovementRange: 1
+    AttackPreparationTurns: 1
+    MovePreparationTurns: 1
+  bloodReward: 10
+  attackPattern: {fileID: 0}
+  isBoss: 1
+  spaceCutInterval: 7
+  spaceCutWallDuration: 4
+  chargeStunDuration: 3
+  sprite: {fileID: 21300000, guid: 1aa37d9d2622c1648a302dc9b6eb5f62, type: 3}
+  tint: {r: 0.75, g: 0.22, b: 0.22, a: 1}
+  idleFrames:
+  - {fileID: 5120410236738981136, guid: 1946f0d48853d79408a84c2149e15028, type: 3}
+  - {fileID: 1133040411461804861, guid: 1946f0d48853d79408a84c2149e15028, type: 3}
+  - {fileID: -5096723200824463030, guid: 1946f0d48853d79408a84c2149e15028, type: 3}
+  - {fileID: -2225174341924067898, guid: 1946f0d48853d79408a84c2149e15028, type: 3}
+  - {fileID: -8233152129326895834, guid: 1946f0d48853d79408a84c2149e15028, type: 3}
+  - {fileID: -4010699835880829198, guid: 1946f0d48853d79408a84c2149e15028, type: 3}
+  idleFrameRate: 8

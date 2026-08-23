@@ -7,12 +7,28 @@
     <list default="true" id="21854d10-4486-4f0b-a0de-1ffa86a46fbb" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.arkeum/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.arkeum/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scenes/GameScene.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scenes/GameScene.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/MapAssets/Floor2/Boss.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/MapAssets/Floor2/Boss.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/RunDefinition.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/RunDefinition.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/WorldVisualSet.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/ScriptableObjects/WorldVisualSet.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Core/GameBootstrap.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Core/GameBootstrap.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Core/GameDirector.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Core/GameDirector.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Core/MainMenuController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Core/MainMenuController.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Core/ServiceRegistry.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Core/ServiceRegistry.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Actors/ActorEntity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Actors/ActorEntity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Actors/EnemyActionType.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Actors/EnemyActionType.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Actors/EnemyBehaviorActions.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Actors/EnemyBehaviorActions.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Combat/CombatSystem.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Combat/CombatSystem.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Actors/EnemyBehaviorTreeFactory.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Actors/EnemyBehaviorTreeFactory.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Actors/EnemyDefinition.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Actors/EnemyDefinition.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Combat/EnemyTurnSystem.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Combat/EnemyTurnSystem.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Map/MapService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Map/MapService.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Run/RunState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Run/RunState.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Run/TurnSystem.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Gameplay/Run/TurnSystem.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Infrastructure/Input/InputReader.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Infrastructure/Input/InputReader.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/UI/MobileControlSettingsTarget.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/UI/MobileControlSettingsTarget.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/World/ActorView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/World/ActorView.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/World/WorldVisualSet.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Arkeum/Scripts/Presentation/World/WorldVisualSet.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Docs/input.md" beforeDir="false" afterPath="$PROJECT_DIR$/Docs/input.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -111,6 +127,10 @@
       <workItem from="1781164658698" duration="3080000" />
       <workItem from="1782208708559" duration="786000" />
       <workItem from="1782280202300" duration="3207000" />
+      <workItem from="1782724836991" duration="2249000" />
+      <workItem from="1783496112244" duration="3671000" />
+      <workItem from="1783751179469" duration="3530000" />
+      <workItem from="1784849465927" duration="1036000" />
     </task>
     <servers />
   </component>

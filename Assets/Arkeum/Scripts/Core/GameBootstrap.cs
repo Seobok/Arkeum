@@ -6,6 +6,7 @@ using Arkeum.Production.Gameplay.Progression;
 using Arkeum.Production.Gameplay.Run;
 using Arkeum.Production.Gameplay.Timing;
 using Arkeum.Production.Infrastructure.Input;
+using Arkeum.Production.Infrastructure.Persistence;
 using Arkeum.Production.Infrastructure.Settings;
 using Arkeum.Production.Presentation.Audio;
 using Arkeum.Production.Presentation.UI;
@@ -20,12 +21,15 @@ namespace Arkeum.Production.Core
     [RequireComponent(typeof(WorldPresenter))]
     [RequireComponent(typeof(HudPresenter))]
     [RequireComponent(typeof(TimingPopupPresenter))]
+    [RequireComponent(typeof(ResultScreenPresenter))]
     public sealed class GameBootstrap : MonoBehaviour
     {
         [SerializeField] private GameDirector gameDirector;
         [SerializeField] private WorldPresenter worldPresenter;
         [SerializeField] private HudPresenter hudPresenter;
         [SerializeField] private TimingPopupPresenter timingPopupPresenter;
+        [SerializeField] private ResultScreenPresenter resultScreenPresenter;
+        [SerializeField] private MobileGameplayControls mobileGameplayControls;
         [SerializeField] private InputActionAsset inputActions;
         [Header("Map Assets")]
         [SerializeField] private MapAsset hubMapAsset;
@@ -37,6 +41,8 @@ namespace Arkeum.Production.Core
             worldPresenter = GetComponent<WorldPresenter>();
             hudPresenter = GetComponent<HudPresenter>();
             timingPopupPresenter = GetComponent<TimingPopupPresenter>();
+            resultScreenPresenter = GetComponent<ResultScreenPresenter>();
+            mobileGameplayControls = GetComponent<MobileGameplayControls>();
         }
 
         private void Awake()
@@ -63,6 +69,21 @@ namespace Arkeum.Production.Core
                 timingPopupPresenter = GetComponent<TimingPopupPresenter>();
             }
 
+            if (resultScreenPresenter == null)
+            {
+                resultScreenPresenter = GetComponent<ResultScreenPresenter>();
+            }
+
+            if (mobileGameplayControls == null)
+            {
+                mobileGameplayControls = GetComponent<MobileGameplayControls>();
+            }
+
+            if (mobileGameplayControls == null)
+            {
+                mobileGameplayControls = gameObject.AddComponent<MobileGameplayControls>();
+            }
+
             if (timingPopupPresenter == null)
             {
                 Debug.LogError("[GameBootstrap] TimingPopupPresenter is missing. Add it to GameRoot and wire its UGUI references in the Inspector.", this);
@@ -79,10 +100,21 @@ namespace Arkeum.Production.Core
             //타이밍 기능 팝업 관련 UI 초기화
             timingPopupPresenter.Initialize();
 
+            // 결과 화면 초기화 및 Continue 버튼 연결
+            resultScreenPresenter.Initialize(gameDirector);
+
             //게임 디렉터 초기화 (게임 진입)
             ServiceRegistry services = BuildServices();
-            SaveProfile profile = new SaveProfile();
-            gameDirector.Initialize(services, profile);
+            SaveGameData loadedGame = null;
+            if (SaveGameLaunchContext.TryConsumeLoadRequest(out int slotNumber) &&
+                !services.SaveGameService.TryLoad(slotNumber, out loadedGame, out string loadError))
+            {
+                Debug.LogWarning($"[GameBootstrap] Could not load slot {slotNumber}: {loadError}");
+            }
+
+            SaveProfile profile = loadedGame?.Profile ?? new SaveProfile();
+            gameDirector.Initialize(services, profile, loadedGame);
+            mobileGameplayControls.Initialize(gameDirector, services.InputReader);
         }
 
         private void Start()
@@ -109,6 +141,7 @@ namespace Arkeum.Production.Core
             RunResultBuilder runResultBuilder = new RunResultBuilder();
             TimingService timingService = new TimingService();
             AudioCueService audioCueService = new AudioCueService();
+            SaveGameService saveGameService = new SaveGameService();
 
             return new ServiceRegistry(
                 inputReader,
@@ -125,7 +158,9 @@ namespace Arkeum.Production.Core
                 audioCueService,
                 worldPresenter,
                 hudPresenter,
-                timingPopupPresenter);
+                timingPopupPresenter,
+                resultScreenPresenter,
+                saveGameService);
         }
     }
 }

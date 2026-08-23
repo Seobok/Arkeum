@@ -4,6 +4,7 @@ using Arkeum.Production.Core;
 using Arkeum.Production.Gameplay.Actors;
 using Arkeum.Production.Gameplay.Progression;
 using Arkeum.Production.Gameplay.Run;
+using Arkeum.Production.Presentation.World;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -47,6 +48,9 @@ namespace Arkeum.Production.Presentation.UI
         [SerializeField] private Text resultLostText;
         [SerializeField] private Text resultKeptText;
 
+        [Header("Shop")]
+        [SerializeField] private ShopOfferPopupPresenter shopOfferPopupPresenter;
+
         private readonly List<string> lostLines = new List<string>();
         private readonly List<string> keptLines = new List<string>();
 
@@ -66,6 +70,7 @@ namespace Arkeum.Production.Presentation.UI
         public void Initialize(GameDirector director)
         {
             gameDirector = director;
+            InitializeShopOfferPopup();
             if (preparedTargetToggle != null)
             {
                 preparedTargetToggle.onValueChanged.RemoveListener(OnPreparedTargetToggleChanged);
@@ -229,12 +234,20 @@ namespace Arkeum.Production.Presentation.UI
 
         private void Refresh()
         {
-            if (gameDirector == null || !HasRequiredReferences())
+            if (gameDirector == null)
             {
-                //return;
+                shopOfferPopupPresenter?.Hide();
+                return;
             }
 
+            HasRequiredReferences();
             bool inRun = gameDirector.CurrentState == GameState.InRun || gameDirector.CurrentState == GameState.TimingChallenge;
+            WorldPresenter worldPresenter = gameDirector.Services?.WorldPresenter;
+            shopOfferPopupPresenter?.Refresh(
+                boundRunController,
+                boundProfile != null ? boundProfile.Gold : 0,
+                inRun,
+                worldPresenter);
             if (inRun && boundRun != null && boundRun.Player != null)
             {
                 //BandageCount
@@ -278,6 +291,24 @@ namespace Arkeum.Production.Presentation.UI
             //     resultLostText.text = BuildResultText("Lost", lostLines);
             //     resultKeptText.text = BuildResultText("Kept", keptLines) + "\n\nPress Enter to return to the altar.";
             // }
+        }
+
+        private void InitializeShopOfferPopup()
+        {
+            if (shopOfferPopupPresenter == null)
+            {
+                GameObject popupObject = GameObject.Find("ShopOfferPopup");
+                if (popupObject != null)
+                {
+                    shopOfferPopupPresenter = popupObject.GetComponent<ShopOfferPopupPresenter>();
+                    if (shopOfferPopupPresenter == null)
+                    {
+                        shopOfferPopupPresenter = popupObject.AddComponent<ShopOfferPopupPresenter>();
+                    }
+                }
+            }
+
+            shopOfferPopupPresenter?.Initialize();
         }
 
         private bool HasRequiredReferences()

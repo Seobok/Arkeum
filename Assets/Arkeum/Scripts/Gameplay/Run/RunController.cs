@@ -78,6 +78,11 @@ namespace Arkeum.Production.Gameplay.Run
                 return PlayerActionResultType.NotHandled;
             }
 
+            if (direction != Vector2Int.zero)
+            {
+                CurrentRun.Player.FacingDirection = direction;
+            }
+
             // 상호작용할 Cell 선정
             Vector2Int targetCell = CurrentRun.Player.GridPosition + direction;
 
@@ -115,7 +120,8 @@ namespace Arkeum.Production.Gameplay.Run
             if (!mapService.IsWalkable(targetCell))
             {
                 SetMessage("The path is blocked.");
-                return PlayerActionResultType.NotHandled;
+                LastActionFeedback |= RunActionFeedback.ActionDenied;
+                return PlayerActionResultType.Handled;
             }
 
             // 해당 셀으로 이동
@@ -126,8 +132,7 @@ namespace Arkeum.Production.Gameplay.Run
             bool sealedBossRoom = !teleportedByShopMarker && TrySealBossRoomIfNeeded(); // 보스룸 입장인지 확인
             if (!sealedBossRoom &&
                 !teleportedByShopMarker &&
-                !TryAutoPickupAtPlayerPosition() && // 자리에 있는 아이템 픽업
-                !TryDescribeAdjacentShopOffer()) // 근처에 있는 진열대 정보 표시
+                !TryAutoPickupAtPlayerPosition()) // 자리에 있는 아이템 픽업
             {
                 SetMessage(string.Empty);
             }
@@ -228,12 +233,14 @@ namespace Arkeum.Production.Gameplay.Run
                 if (damage > 0)
                 {
                     damagedEnemyCells.Add(enemy.GridPosition);
+                    LastActionFeedback |= RunActionFeedback.EnemyDamaged;
                 }
 
                 // 공격한 적이 죽었을 때
                 if (!enemy.IsAlive)
                 {
                     activeProfile?.AddGold(enemy.Gold);
+                    LastActionFeedback |= RunActionFeedback.EnemyDefeated;
                 }
             }
 
@@ -342,11 +349,7 @@ namespace Arkeum.Production.Gameplay.Run
                 return;
             }
 
-            if (!TryDescribeAdjacentShopOffer())
-            {
-                SetMessage("You wait and listen.");
-            }
-
+            SetMessage("You wait and listen.");
             ConsumeTurn();
         }
 
@@ -380,6 +383,10 @@ namespace Arkeum.Production.Gameplay.Run
             if (resolution.EndReason != RunEndReason.None)
             {
                 EndRun(resolution.EndReason);
+                if (resolution.EndReason == RunEndReason.FloorClear)
+                {
+                    LastActionFeedback |= RunActionFeedback.FloorCleared;
+                }
             }
 
             if (resolution.ConsumesTurn)
@@ -400,6 +407,7 @@ namespace Arkeum.Production.Gameplay.Run
             if (shopOffer.Weapon == null)
             {
                 SetMessage("This shelf is empty.");
+                LastActionFeedback |= RunActionFeedback.ActionDenied;
                 return true;
             }
 
@@ -408,12 +416,14 @@ namespace Arkeum.Production.Gameplay.Run
             if (activeProfile == null || currentGold < price)
             {
                 SetMessage($"Need {price} gold for {shopOffer.DisplayName}. {shopOffer.Summary}.");
+                LastActionFeedback |= RunActionFeedback.ActionDenied;
                 return true;
             }
 
             if (!mapService.TryBuyShopOffer(targetCell, out ShopOfferDefinition purchasedOffer))
             {
                 SetMessage("The shelf is empty.");
+                LastActionFeedback |= RunActionFeedback.ActionDenied;
                 return true;
             }
 
@@ -426,24 +436,29 @@ namespace Arkeum.Production.Gameplay.Run
             if (hadEquippedWeapon)
             {
                 mapService.DropWeapon(CurrentRun.Player.GridPosition, droppedWeapon);
+                LastActionFeedback |= RunActionFeedback.WeaponDropped;
             }
 
+            LastActionFeedback |= RunActionFeedback.ShopPurchased;
             WeaponPickedUp?.Invoke();
             SetMessage(BuildShopPurchaseMessage(purchasedOffer, price, hadEquippedWeapon, droppedWeapon));
             ConsumeTurn();
             return true;
         }
 
-        private bool TryDescribeAdjacentShopOffer()
+        public bool TryGetAdjacentShopOffer(out ShopOfferDefinition shopOffer)
         {
             if (CurrentRun?.Player == null)
             {
+                shopOffer = null;
                 return false;
             }
 
             Vector2Int playerCell = CurrentRun.Player.GridPosition;
+            Vector2Int facing = CurrentRun.Player.FacingDirection;
             Vector2Int[] directions =
             {
+                facing,
                 Vector2Int.up,
                 Vector2Int.down,
                 Vector2Int.left,
@@ -452,15 +467,29 @@ namespace Arkeum.Production.Gameplay.Run
 
             for (int i = 0; i < directions.Length; i++)
             {
-                if (!mapService.TryGetShopOffer(playerCell + directions[i], out ShopOfferDefinition shopOffer))
+                Vector2Int direction = directions[i];
+                if (direction == Vector2Int.zero)
                 {
                     continue;
                 }
 
-                SetMessage($"{shopOffer.DisplayName}: {shopOffer.Price} gold. {shopOffer.Summary}.");
-                return true;
+                bool alreadyChecked = false;
+                for (int previous = 0; previous < i; previous++)
+                {
+                    if (directions[previous] == direction)
+                    {
+                        alreadyChecked = true;
+                        break;
+                    }
+                }
+
+                if (!alreadyChecked && mapService.TryGetShopOffer(playerCell + direction, out shopOffer))
+                {
+                    return true;
+                }
             }
 
+            shopOffer = null;
             return false;
         }
 
@@ -468,6 +497,7 @@ namespace Arkeum.Production.Gameplay.Run
         {
             turnSystem.ConsumePlayerAction(CurrentRun);
             enemyTurnSystem.ResolveEnemyTurn(CurrentRun, actorRepository.GetAliveEnemies(), mapService, actorRepository);
+            ClearDefeatedBossPatternWalls();
             if (CurrentRun.Player.CurrentHp <= 0 && CurrentRun.EndReason == RunEndReason.None)
             {
                 EndRun(RunEndReason.Death);
@@ -476,6 +506,24 @@ namespace Arkeum.Production.Gameplay.Run
             }
 
             TryClearBossRoomIfNeeded();
+        }
+
+        private void ClearDefeatedBossPatternWalls()
+        {
+            IReadOnlyList<ActorEntity> actors = actorRepository.Actors;
+            for (int i = 0; i < actors.Count; i++)
+            {
+                ActorEntity actor = actors[i];
+                if (actor != null &&
+                    actor.IsEnemy &&
+                    !actor.IsAlive &&
+                    actor.EnemyDefinition != null &&
+                    actor.EnemyDefinition.IsBoss &&
+                    actor.ActiveBossWallCells.Count > 0)
+                {
+                    EnemyBehaviorActions.ClearActiveBossWalls(actor, mapService);
+                }
+            }
         }
 
         private bool TrySealBossRoomIfNeeded()
@@ -495,6 +543,7 @@ namespace Arkeum.Production.Gameplay.Run
             if (sealedAny)
             {
                 SetMessage("The entrance seals behind you.");
+                LastActionFeedback |= RunActionFeedback.BossEncountered;
             }
 
             return sealedAny;
@@ -521,6 +570,7 @@ namespace Arkeum.Production.Gameplay.Run
             if (openedAny)
             {
                 SetMessage("All monsters fall. The sealed entrance opens.");
+                LastActionFeedback |= RunActionFeedback.BossRoomOpened;
             }
 
             return openedAny;
@@ -572,7 +622,12 @@ namespace Arkeum.Production.Gameplay.Run
             {
                 CurrentRun.HasEquippedWeapon = true;
                 CurrentRun.EquippedWeapon = weaponSpawn.Weapon;
-                    
+                LastActionFeedback |= RunActionFeedback.WeaponPickedUp;
+                if (hadEquippedWeapon)
+                {
+                    LastActionFeedback |= RunActionFeedback.WeaponDropped;
+                }
+                     
                 WeaponPickedUp?.Invoke();
                 
                 SetMessage(BuildWeaponPickupMessage(weaponSpawn.Weapon, hadEquippedWeapon, droppedWeapon));

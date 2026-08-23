@@ -6,6 +6,7 @@ using Arkeum.Production.Gameplay.Progression;
 using Arkeum.Production.Gameplay.Run;
 using Arkeum.Production.Gameplay.Timing;
 using Arkeum.Production.Infrastructure.Input;
+using Arkeum.Production.Infrastructure.Persistence;
 using Arkeum.Production.Presentation.Audio;
 using Arkeum.Production.Presentation.UI;
 using Arkeum.Production.Presentation.World;
@@ -29,6 +30,8 @@ namespace Arkeum.Production.Core
         public WorldPresenter WorldPresenter { get; }
         public HudPresenter HudPresenter { get; }
         public TimingPopupPresenter TimingPopupPresenter { get; }
+        public ResultScreenPresenter ResultScreenPresenter { get; }
+        public SaveGameService SaveGameService { get; }
 
         public ServiceRegistry(
             InputReader inputReader,
@@ -45,7 +48,9 @@ namespace Arkeum.Production.Core
             AudioCueService audioCueService,
             WorldPresenter worldPresenter,
             HudPresenter hudPresenter,
-            TimingPopupPresenter timingPopupPresenter)
+            TimingPopupPresenter timingPopupPresenter,
+            ResultScreenPresenter resultScreenPresenter,
+            SaveGameService saveGameService)
         {
             InputReader = inputReader;
             TurnSystem = turnSystem;
@@ -62,6 +67,8 @@ namespace Arkeum.Production.Core
             WorldPresenter = worldPresenter;
             HudPresenter = hudPresenter;
             TimingPopupPresenter = timingPopupPresenter;
+            ResultScreenPresenter = resultScreenPresenter;
+            SaveGameService = saveGameService;
         }
     }
 }

@@ -31,6 +31,7 @@ namespace Arkeum.Production.Gameplay.Timing
 
             return new RadialShrinkTimingChallengeRuntime(
                 DurationSeconds,
+                LateInputGraceSeconds,
                 startRadius,
                 endRadius,
                 successInner,
@@ -57,12 +58,14 @@ namespace Arkeum.Production.Gameplay.Timing
 
             public RadialShrinkTimingChallengeRuntime(
                 float durationSeconds,
+                float lateInputGraceSeconds,
                 float markerStartRadiusNormalized,
                 float markerEndRadiusNormalized,
                 float successInnerRadiusNormalized,
                 float successOuterRadiusNormalized)
             {
                 DurationSeconds = durationSeconds;
+                LateInputGraceSeconds = Mathf.Max(0f, lateInputGraceSeconds);
                 this.markerStartRadiusNormalized = markerStartRadiusNormalized;
                 this.markerEndRadiusNormalized = markerEndRadiusNormalized;
                 SuccessInnerRadiusNormalized = successInnerRadiusNormalized;
@@ -70,6 +73,7 @@ namespace Arkeum.Production.Gameplay.Timing
             }
 
             public float DurationSeconds { get; }
+            private float LateInputGraceSeconds { get; }
             public float ElapsedSeconds { get; private set; }
             public float NormalizedPosition => Mathf.Clamp01(ElapsedSeconds / DurationSeconds);
             public float SuccessZoneMin => SuccessInnerRadiusNormalized;
@@ -86,8 +90,19 @@ namespace Arkeum.Production.Gameplay.Timing
 
             public TimingResultGrade EvaluateAction()
             {
-                float markerRadius = MarkerRadiusNormalized;
-                return markerRadius >= SuccessInnerRadiusNormalized && markerRadius <= SuccessOuterRadiusNormalized
+                float currentRadius = MarkerRadiusNormalized;
+                float graceStartPosition = Mathf.Clamp01(
+                    (ElapsedSeconds - LateInputGraceSeconds) / DurationSeconds);
+                float graceStartRadius = Mathf.Lerp(
+                    markerStartRadiusNormalized,
+                    markerEndRadiusNormalized,
+                    graceStartPosition);
+                float graceWindowMinRadius = Mathf.Min(currentRadius, graceStartRadius);
+                float graceWindowMaxRadius = Mathf.Max(currentRadius, graceStartRadius);
+                bool graceWindowOverlapsSuccessZone =
+                    graceWindowMaxRadius >= SuccessInnerRadiusNormalized &&
+                    graceWindowMinRadius <= SuccessOuterRadiusNormalized;
+                return graceWindowOverlapsSuccessZone
                     ? TimingResultGrade.Success
                     : TimingResultGrade.Failed;
             }

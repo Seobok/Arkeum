@@ -167,6 +167,281 @@ namespace Arkeum.Production.Gameplay.Actors
             return BehaviorTreeStatus.Success;
         }
 
+        public BehaviorTreeStatus TickBoss(EnemyBehaviorContext context)
+        {
+            ActorEntity boss = context.Enemy;
+            EnemyDefinition definition = boss.EnemyDefinition;
+            if (definition == null || !definition.IsBoss)
+            {
+                return BehaviorTreeStatus.Failure;
+            }
+
+            boss.BossTurnCount += 1;
+            AdvanceBossWalls(boss, context.MapService);
+
+            if (boss.BossStunTurnsRemaining > 0)
+            {
+                boss.BossStunTurnsRemaining -= 1;
+                boss.BossAlignedTurnCount = 0;
+                ClearPreparation(boss);
+                return BehaviorTreeStatus.Success;
+            }
+
+            if (IsBossPattern(boss.PendingEnemyAction))
+            {
+                ExecutePreparedBossPattern(context);
+                return BehaviorTreeStatus.Success;
+            }
+
+            if (HasPendingMove(context))
+            {
+                return MoveToPreparedTarget(context);
+            }
+
+            ActorEntity player = context.Player;
+            bool isInCloseAttackArea = IsAdjacentEightWay(boss.GridPosition, player.GridPosition);
+            bool isChargeAlignment = !isInCloseAttackArea &&
+                                     IsSameRowOrColumn(boss.GridPosition, player.GridPosition);
+            boss.BossAlignedTurnCount = isChargeAlignment ? boss.BossAlignedTurnCount + 1 : 0;
+
+            if (isInCloseAttackArea)
+            {
+                PrepareCloseAttack(context);
+                return BehaviorTreeStatus.Running;
+            }
+
+            if (isChargeAlignment && boss.BossAlignedTurnCount >= 2)
+            {
+                PrepareCharge(context);
+                boss.BossAlignedTurnCount = 0;
+                return BehaviorTreeStatus.Running;
+            }
+
+            if (boss.BossTurnCount - boss.LastSpaceCutTurn >= definition.SpaceCutInterval)
+            {
+                PrepareSpaceCut(context);
+                boss.LastSpaceCutTurn = boss.BossTurnCount;
+                return BehaviorTreeStatus.Running;
+            }
+
+            if (isChargeAlignment)
+            {
+                // 첫 정렬 감지 후에는 이동하지 않고, 플레이어가 한 번 더 행동할 때까지 직선을 유지하는지 확인한다.
+                ClearPreparation(boss);
+                return BehaviorTreeStatus.Running;
+            }
+
+            boss.FacingDirection = GetFacingToward(boss.GridPosition, player.GridPosition, boss.FacingDirection);
+            return ChaseMove(context);
+        }
+
+        private void ExecutePreparedBossPattern(EnemyBehaviorContext context)
+        {
+            ActorEntity boss = context.Enemy;
+            switch (boss.PendingEnemyAction)
+            {
+                case EnemyActionType.BossSpaceCut:
+                    ExecuteSpaceCut(context);
+                    break;
+                case EnemyActionType.BossCloseAttack:
+                    if (boss.PendingBossAffectedCells.Contains(context.Player.GridPosition))
+                    {
+                        combatSystem.ResolveEnemyAttack(boss, context.Player);
+                    }
+                    break;
+                case EnemyActionType.BossCharge:
+                    ExecuteCharge(context);
+                    break;
+            }
+
+            ClearPreparation(boss);
+        }
+
+        private static void PrepareSpaceCut(EnemyBehaviorContext context)
+        {
+            ActorEntity boss = context.Enemy;
+            bool vertical = Random.Range(0, 2) == 0;
+            List<Vector2Int> cells = GetBossRoomCells(context);
+            List<Vector2Int> affectedCells = new List<Vector2Int>();
+            for (int i = 0; i < cells.Count; i++)
+            {
+                Vector2Int cell = cells[i];
+                bool isOnCutLine = vertical ? cell.x == boss.GridPosition.x : cell.y == boss.GridPosition.y;
+                if (isOnCutLine && cell != boss.GridPosition)
+                {
+                    affectedCells.Add(cell);
+                }
+            }
+
+            Vector2Int facing = vertical ? Vector2Int.up : Vector2Int.right;
+            PrepareBossPattern(boss, EnemyActionType.BossSpaceCut, affectedCells, facing);
+        }
+
+        private static void PrepareCloseAttack(EnemyBehaviorContext context)
+        {
+            ActorEntity boss = context.Enemy;
+            List<Vector2Int> affectedCells = new List<Vector2Int>();
+            List<Vector2Int> roomCells = GetBossRoomCells(context);
+            for (int i = 0; i < roomCells.Count; i++)
+            {
+                Vector2Int cell = roomCells[i];
+                if (IsAdjacentEightWay(boss.GridPosition, cell))
+                {
+                    affectedCells.Add(cell);
+                }
+            }
+
+            PrepareBossPattern(
+                boss,
+                EnemyActionType.BossCloseAttack,
+                affectedCells,
+                GetFacingToward(boss.GridPosition, context.Player.GridPosition, boss.FacingDirection));
+        }
+
+        private static void PrepareCharge(EnemyBehaviorContext context)
+        {
+            ActorEntity boss = context.Enemy;
+            Vector2Int direction = GetFacingToward(boss.GridPosition, context.Player.GridPosition, boss.FacingDirection);
+            List<Vector2Int> affectedCells = GetChargePath(boss.GridPosition, direction, context.MapService);
+            PrepareBossPattern(boss, EnemyActionType.BossCharge, affectedCells, direction);
+        }
+
+        private static void PrepareBossPattern(
+            ActorEntity boss,
+            EnemyActionType actionType,
+            List<Vector2Int> affectedCells,
+            Vector2Int facing)
+        {
+            boss.PendingEnemyAction = actionType;
+            boss.PendingEnemyActionTurns = 0;
+            boss.PendingEnemyFacingDirection = facing;
+            boss.PendingBossAffectedCells.Clear();
+            boss.PendingBossAffectedCells.AddRange(affectedCells);
+            boss.PendingEnemyTargetCell = affectedCells.Count > 0 ? affectedCells[0] : boss.GridPosition;
+            boss.HasPendingEnemyTargetCell = true;
+        }
+
+        private static void ExecuteSpaceCut(EnemyBehaviorContext context)
+        {
+            ActorEntity boss = context.Enemy;
+            ClearActiveBossWalls(boss, context.MapService);
+            for (int i = 0; i < boss.PendingBossAffectedCells.Count; i++)
+            {
+                Vector2Int cell = boss.PendingBossAffectedCells[i];
+                if (context.MapService.SetRuntimeWall(cell, true))
+                {
+                    boss.ActiveBossWallCells.Add(cell);
+                }
+            }
+
+            boss.BossWallTurnsRemaining = boss.ActiveBossWallCells.Count > 0
+                ? boss.EnemyDefinition.SpaceCutWallDuration
+                : 0;
+        }
+
+        private void ExecuteCharge(EnemyBehaviorContext context)
+        {
+            ActorEntity boss = context.Enemy;
+            Vector2Int direction = boss.PendingEnemyFacingDirection;
+            List<Vector2Int> currentPath = GetChargePath(boss.GridPosition, direction, context.MapService);
+            Vector2Int destination = boss.GridPosition;
+            for (int i = 0; i < currentPath.Count; i++)
+            {
+                Vector2Int cell = currentPath[i];
+                if (cell == context.Player.GridPosition)
+                {
+                    combatSystem.ResolveEnemyAttack(boss, context.Player);
+                    break;
+                }
+
+                if (context.ActorRepository.IsEnemyOccupied(cell))
+                {
+                    break;
+                }
+
+                destination = cell;
+            }
+
+            boss.FacingDirection = direction;
+            boss.GridPosition = destination;
+            boss.BossStunTurnsRemaining = boss.EnemyDefinition.ChargeStunDuration;
+            boss.BossAlignedTurnCount = 0;
+        }
+
+        private static void AdvanceBossWalls(ActorEntity boss, MapService mapService)
+        {
+            if (boss.BossWallTurnsRemaining <= 0)
+            {
+                return;
+            }
+
+            boss.BossWallTurnsRemaining -= 1;
+            if (boss.BossWallTurnsRemaining == 0)
+            {
+                ClearActiveBossWalls(boss, mapService);
+            }
+        }
+
+        public static void ClearActiveBossWalls(ActorEntity boss, MapService mapService)
+        {
+            for (int i = 0; i < boss.ActiveBossWallCells.Count; i++)
+            {
+                mapService.SetRuntimeWall(boss.ActiveBossWallCells[i], false);
+            }
+
+            boss.ActiveBossWallCells.Clear();
+            boss.BossWallTurnsRemaining = 0;
+        }
+
+        private static List<Vector2Int> GetChargePath(Vector2Int origin, Vector2Int direction, MapService mapService)
+        {
+            List<Vector2Int> path = new List<Vector2Int>();
+            Vector2Int cell = origin + direction;
+            while (mapService.IsWalkableCell(cell) && !mapService.BlocksAttack(cell))
+            {
+                path.Add(cell);
+                cell += direction;
+            }
+
+            return path;
+        }
+
+        private static List<Vector2Int> GetBossRoomCells(EnemyBehaviorContext context)
+        {
+            MapDefinition map = context.MapService.CurrentMap;
+            if (map != null)
+            {
+                for (int i = 0; i < map.Rooms.Count; i++)
+                {
+                    DungeonRoomDefinition room = map.Rooms[i];
+                    if (room != null && room.Cells.Contains(context.Enemy.GridPosition))
+                    {
+                        return room.Cells;
+                    }
+                }
+            }
+
+            return map != null ? map.WalkableCells : new List<Vector2Int>();
+        }
+
+        private static bool IsBossPattern(EnemyActionType actionType)
+        {
+            return actionType == EnemyActionType.BossSpaceCut ||
+                   actionType == EnemyActionType.BossCloseAttack ||
+                   actionType == EnemyActionType.BossCharge;
+        }
+
+        private static bool IsSameRowOrColumn(Vector2Int first, Vector2Int second)
+        {
+            return first != second && (first.x == second.x || first.y == second.y);
+        }
+
+        private static bool IsAdjacentEightWay(Vector2Int origin, Vector2Int target)
+        {
+            Vector2Int delta = target - origin;
+            return delta != Vector2Int.zero && Mathf.Abs(delta.x) <= 1 && Mathf.Abs(delta.y) <= 1;
+        }
+
         private static bool TryGetWanderTarget(EnemyBehaviorContext context, out Vector2Int targetCell)
         {
             ActorEntity enemy = context.Enemy;
@@ -230,6 +505,8 @@ namespace Arkeum.Production.Gameplay.Actors
                 if (targetCell == player.GridPosition)
                 {
                     // 이동할 칸에 플레이어가 있으면 고정 데미지
+                    enemy.HasMoveCollisionFeedback = true;
+                    enemy.MoveCollisionTargetCell = targetCell;
                     combatSystem.ApplyFixedDamage(player, EnemyMoveCollisionDamage);
                     ClearPreparation(enemy);
                     return;
@@ -334,6 +611,7 @@ namespace Arkeum.Production.Gameplay.Actors
             enemy.PendingEnemyTargetCell = Vector2Int.zero;
             enemy.PendingEnemyFacingDirection = Vector2Int.up;
             enemy.HasPendingEnemyTargetCell = false;
+            enemy.PendingBossAffectedCells.Clear();
         }
 
         private static bool CanAttack(ActorEntity enemy, Vector2Int target, MapService mapService)

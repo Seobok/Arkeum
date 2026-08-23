@@ -43,8 +43,72 @@ namespace Arkeum.Production.Gameplay.Map
             RoomTemplateSet roomTemplates = CreateRoomTemplates(floorDefinition, floorMapAsset);
             DungeonGenerationSettings settings = DungeonGenerationSettings.From(floorDefinition, floor, roomTemplates.SpecialRoomSlots.Count);
             MapDefinition map = CreateRunMapByMode(floorDefinition, roomTemplates, settings);
+            PopulateShopOffersFromCatalog(map, floorDefinition, new System.Random());
             map.RunFloor = floor;
             return map;
+        }
+
+        private static void PopulateShopOffersFromCatalog(
+            MapDefinition map,
+            RunFloorDefinition floorDefinition,
+            System.Random random)
+        {
+            ShopCatalogDefinition catalog = floorDefinition?.ShopCatalog;
+            if (map?.ShopOffers == null || map.ShopOffers.Count == 0 || catalog?.Entries == null)
+            {
+                return;
+            }
+
+            List<ShopCatalogEntry> candidates = new List<ShopCatalogEntry>();
+            for (int i = 0; i < catalog.Entries.Count; i++)
+            {
+                ShopCatalogEntry entry = catalog.Entries[i];
+                if (entry?.Weapon != null)
+                {
+                    candidates.Add(entry);
+                }
+            }
+
+            if (candidates.Count == 0)
+            {
+                Debug.LogWarning("[MapGenerator] Shop catalog has no valid entries. Existing shop offers are preserved.");
+                return;
+            }
+
+            Shuffle(candidates, random);
+
+            List<Vector2Int> shelfPositions = new List<Vector2Int>();
+            for (int i = 0; i < map.ShopOffers.Count; i++)
+            {
+                ShopOfferDefinition offer = map.ShopOffers[i];
+                if (offer != null && !shelfPositions.Contains(offer.Position))
+                {
+                    shelfPositions.Add(offer.Position);
+                }
+            }
+
+            int requestedCount = Mathf.Max(0, floorDefinition.ShopOfferCount);
+            int selectedCount = Mathf.Min(requestedCount, shelfPositions.Count, candidates.Count);
+            map.ShopOffers.Clear();
+
+            for (int i = 0; i < selectedCount; i++)
+            {
+                ShopCatalogEntry entry = candidates[i];
+                map.ShopOffers.Add(new ShopOfferDefinition
+                {
+                    Position = shelfPositions[i],
+                    Weapon = entry.Weapon,
+                    Price = Mathf.Max(0, entry.Price),
+                    EffectSummary = entry.Description,
+                });
+            }
+
+            if (selectedCount < requestedCount)
+            {
+                Debug.LogWarning(
+                    $"[MapGenerator] Shop generated fewer offers than requested. " +
+                    $"requested={requestedCount}, shelves={shelfPositions.Count}, catalogEntries={candidates.Count}, selected={selectedCount}");
+            }
         }
 
         public MapDefinition CreateHubMap()

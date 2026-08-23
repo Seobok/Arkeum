@@ -38,6 +38,7 @@ namespace Arkeum.Production.Gameplay.Timing
 
             return new ClockHandTimingChallengeRuntime(
                 DurationSeconds,
+                LateInputGraceSeconds,
                 startAngleDegrees,
                 clockwise,
                 rotations,
@@ -75,6 +76,7 @@ namespace Arkeum.Production.Gameplay.Timing
 
             public ClockHandTimingChallengeRuntime(
                 float durationSeconds,
+                float lateInputGraceSeconds,
                 float startAngleDegrees,
                 bool clockwise,
                 float rotations,
@@ -87,6 +89,8 @@ namespace Arkeum.Production.Gameplay.Timing
                 this.startAngleDegrees = Mathf.Repeat(startAngleDegrees, 360f);
                 this.clockwise = clockwise;
                 this.rotations = Mathf.Max(0f, rotations);
+                LateInputGraceAngleDegrees =
+                    360f * this.rotations * Mathf.Max(0f, lateInputGraceSeconds) / DurationSeconds;
                 SuccessCenterAngleDegrees = Mathf.Repeat(successCenterAngleDegrees, 360f);
                 SuccessSweepAngleDegrees = Mathf.Clamp(successSweepAngleDegrees, 1f, 180f);
                 SuccessInnerRadiusNormalized = successInnerRadiusNormalized;
@@ -94,6 +98,7 @@ namespace Arkeum.Production.Gameplay.Timing
             }
 
             public float DurationSeconds { get; }
+            private float LateInputGraceAngleDegrees { get; }
             public float ElapsedSeconds { get; private set; }
             public float NormalizedPosition => Mathf.Clamp01(ElapsedSeconds / DurationSeconds);
             public float SuccessZoneMin => Mathf.Repeat(SuccessCenterAngleDegrees - SuccessSweepAngleDegrees * 0.5f, 360f) / 360f;
@@ -124,8 +129,15 @@ namespace Arkeum.Production.Gameplay.Timing
 
             private bool IsAngleInSuccessZone(float angleDegrees)
             {
-                float delta = Mathf.DeltaAngle(SuccessCenterAngleDegrees, angleDegrees);
-                return Mathf.Abs(delta) <= SuccessSweepAngleDegrees * 0.5f;
+                float direction = clockwise ? -1f : 1f;
+                float evaluationCenter = Mathf.Repeat(
+                    SuccessCenterAngleDegrees + direction * LateInputGraceAngleDegrees * 0.5f,
+                    360f);
+                float evaluationSweep = Mathf.Min(
+                    360f,
+                    SuccessSweepAngleDegrees + LateInputGraceAngleDegrees);
+                float delta = Mathf.DeltaAngle(evaluationCenter, angleDegrees);
+                return Mathf.Abs(delta) <= evaluationSweep * 0.5f;
             }
         }
     }

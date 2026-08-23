@@ -11,7 +11,7 @@ namespace Arkeum.Production.Presentation.UI
         [SerializeField, Min(0.1f)] private float smallScale = 0.8f;
         [SerializeField, Min(0.1f)] private float mediumScale = 1f;
         [SerializeField, Min(0.1f)] private float largeScale = 1.2f;
-        [SerializeField, Min(0f)] private float horizontalPadding = 80f;
+        [SerializeField, Min(0f)] private float horizontalPadding = 50f;
 
         private void Awake()
         {

@@ -16,10 +16,12 @@ namespace Arkeum.Production.Presentation.Audio
             [SerializeField, Range(0f, 1f)] private float volume = 1f;
             [SerializeField, Range(0.1f, 3f)] private float pitch = 1f;
             [SerializeField, Range(0f, 1f)] private float randomPitchRange;
+            [SerializeField, Min(0f)] private float cooldownSeconds;
 
             public string Id => id;
             public AudioClip Clip => clip;
             public float Volume => volume;
+            public float CooldownSeconds => Mathf.Max(0f, cooldownSeconds);
 
             public float GetPitch()
             {
@@ -51,6 +53,7 @@ namespace Arkeum.Production.Presentation.Audio
         [SerializeField] private List<AudioEntry> sfxClips = new List<AudioEntry>();
 
         private readonly List<AudioSource> sfxSources = new List<AudioSource>();
+        private readonly Dictionary<string, float> nextSfxPlayTimes = new Dictionary<string, float>();
         private Coroutine bgmFadeRoutine;
         private AudioClip currentBgmClip;
         private float currentBgmClipVolume = 1f;
@@ -144,6 +147,17 @@ namespace Arkeum.Production.Presentation.Audio
             PlaySfx(id, position, true);
         }
 
+        public void PlaySfxDelayed(string id, float delaySeconds)
+        {
+            if (delaySeconds <= 0f)
+            {
+                PlaySfx(id);
+                return;
+            }
+
+            StartCoroutine(PlaySfxDelayedRoutine(id, delaySeconds));
+        }
+
         public void PlaySfx(AudioClip clip, float clipVolume = 1f, float pitch = 1f)
         {
             PlaySfxInternal(clip, Mathf.Clamp01(clipVolume), pitch, Vector3.zero, false);
@@ -190,6 +204,18 @@ namespace Arkeum.Production.Presentation.Audio
                 return;
             }
 
+            if (entry.CooldownSeconds > 0f &&
+                nextSfxPlayTimes.TryGetValue(id, out float nextPlayTime) &&
+                Time.unscaledTime < nextPlayTime)
+            {
+                return;
+            }
+
+            if (entry.CooldownSeconds > 0f)
+            {
+                nextSfxPlayTimes[id] = Time.unscaledTime + entry.CooldownSeconds;
+            }
+
             PlaySfxInternal(entry.Clip, entry.Volume, entry.GetPitch(), position, usePosition);
         }
 
@@ -218,6 +244,12 @@ namespace Arkeum.Production.Presentation.Audio
             }
 
             bgmFadeRoutine = StartCoroutine(FadeBgmRoutine(nextClip, nextClipVolume, Mathf.Max(0f, fadeDuration)));
+        }
+
+        private IEnumerator PlaySfxDelayedRoutine(string id, float delaySeconds)
+        {
+            yield return new WaitForSecondsRealtime(delaySeconds);
+            PlaySfx(id);
         }
 
         private IEnumerator FadeBgmRoutine(AudioClip nextClip, float nextClipVolume, float fadeDuration)

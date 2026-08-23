@@ -42,6 +42,12 @@ namespace Arkeum.Production.Gameplay.Map
             SetCurrentMap(mapGenerator.CreateHubMap());
         }
 
+        public void RestoreRunMap(MapDefinition mapDefinition, RunFloorDefinition floorDefinition)
+        {
+            CurrentRunFloor = floorDefinition;
+            SetCurrentMap(mapDefinition);
+        }
+
         public bool IsWalkable(Vector2Int cell)
         {
             return walkableCells.Contains(cell) && !wallCells.Contains(cell) && !tileOccupancyService.IsOccupied(cell);

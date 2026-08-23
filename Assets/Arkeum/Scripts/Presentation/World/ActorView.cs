@@ -13,6 +13,10 @@ namespace Arkeum.Production.Presentation.World
         private SpriteRenderer spriteRenderer;
         private Sprite fallbackSprite;
         private Coroutine moveRoutine;
+        private Coroutine idleRoutine;
+        private Sprite[] idleFrames;
+        private float idleFrameRate;
+        private bool hasIdleAnimation;
         private Vector2Int gridPosition;
         private bool hasGridPosition;
         private bool facingLeft;
@@ -32,10 +36,43 @@ namespace Arkeum.Production.Presentation.World
                 spriteRenderer = GetComponent<SpriteRenderer>();
             }
 
-            spriteRenderer.sprite = sprite != null ? sprite : fallbackSprite;
+            if (!hasIdleAnimation)
+            {
+                spriteRenderer.sprite = sprite != null ? sprite : fallbackSprite;
+            }
+
             spriteRenderer.color = tint;
             spriteRenderer.sortingOrder = sortingOrder;
             spriteRenderer.flipX = facingLeft;
+        }
+
+        public void SetIdleAnimation(Sprite[] frames, float frameRate)
+        {
+            float normalizedFrameRate = Mathf.Max(1f, frameRate);
+            if (ReferenceEquals(idleFrames, frames) &&
+                Mathf.Approximately(idleFrameRate, normalizedFrameRate))
+            {
+                return;
+            }
+
+            StopIdleRoutine();
+            idleFrames = frames;
+            idleFrameRate = normalizedFrameRate;
+
+            Sprite firstFrame = GetFirstValidIdleFrame();
+            hasIdleAnimation = firstFrame != null;
+            if (!hasIdleAnimation)
+            {
+                return;
+            }
+
+            if (spriteRenderer == null)
+            {
+                spriteRenderer = GetComponent<SpriteRenderer>();
+            }
+
+            spriteRenderer.sprite = firstFrame;
+            idleRoutine = StartCoroutine(AnimateIdle());
         }
 
         public void SetFacing(Vector2Int direction)
@@ -72,6 +109,23 @@ namespace Arkeum.Production.Presentation.World
             Vector3 to = ToWorldPosition(cell);
             gridPosition = cell;
             moveRoutine = StartCoroutine(AnimateMove(from, to, isPlayer));
+        }
+
+        public void PlayMoveCollision(Vector2Int targetCell)
+        {
+            if (!hasGridPosition || targetCell == gridPosition)
+            {
+                return;
+            }
+
+            Vector2Int direction = targetCell - gridPosition;
+            ApplyFacing(direction);
+            StopMoveRoutine();
+
+            Vector3 origin = ToWorldPosition(gridPosition);
+            Vector3 target = ToWorldPosition(targetCell);
+            transform.position = origin;
+            moveRoutine = StartCoroutine(AnimateMoveCollision(origin, target));
         }
 
         private void ApplyFacing(Vector2Int direction)
@@ -114,6 +168,44 @@ namespace Arkeum.Production.Presentation.World
             moveRoutine = null;
         }
 
+        private IEnumerator AnimateMoveCollision(Vector3 origin, Vector3 target)
+        {
+            Vector3 midpoint = Vector3.Lerp(origin, target, 0.5f);
+            float elapsed = 0f;
+            while (elapsed < EnemyMoveDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / EnemyMoveDuration);
+                float horizontalT = 1f - Mathf.Abs((t * 2f) - 1f);
+                float easedHorizontalT = Mathf.SmoothStep(0f, 1f, horizontalT);
+
+                Vector3 position = Vector3.Lerp(origin, midpoint, easedHorizontalT);
+                position.y += Mathf.Sin(t * Mathf.PI) * EnemyJumpHeight;
+                transform.position = position;
+                yield return null;
+            }
+
+            transform.position = origin;
+            moveRoutine = null;
+        }
+
+        private IEnumerator AnimateIdle()
+        {
+            int frameIndex = 0;
+            WaitForSeconds frameDelay = new WaitForSeconds(1f / idleFrameRate);
+            while (true)
+            {
+                Sprite frame = idleFrames[frameIndex];
+                if (frame != null)
+                {
+                    spriteRenderer.sprite = frame;
+                }
+
+                frameIndex = (frameIndex + 1) % idleFrames.Length;
+                yield return frameDelay;
+            }
+        }
+
         private void StopMoveRoutine()
         {
             if (moveRoutine == null)
@@ -123,6 +215,35 @@ namespace Arkeum.Production.Presentation.World
 
             StopCoroutine(moveRoutine);
             moveRoutine = null;
+        }
+
+        private void StopIdleRoutine()
+        {
+            if (idleRoutine != null)
+            {
+                StopCoroutine(idleRoutine);
+                idleRoutine = null;
+            }
+
+            hasIdleAnimation = false;
+        }
+
+        private Sprite GetFirstValidIdleFrame()
+        {
+            if (idleFrames == null)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < idleFrames.Length; i++)
+            {
+                if (idleFrames[i] != null)
+                {
+                    return idleFrames[i];
+                }
+            }
+
+            return null;
         }
 
         private static Vector3 ToWorldPosition(Vector2Int cell)

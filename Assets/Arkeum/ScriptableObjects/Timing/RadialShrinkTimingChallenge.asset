@@ -14,6 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Gameplay.Timing.RadialShrinkTimingChallengeDefinition
   displayName: Radial Timing
   presenterPrefab: {fileID: 3915270687284301003, guid: 7c58abdf2f4a4b278041733e21bda91f, type: 3}
+  startDelaySeconds: 0.8
+  lateInputGraceSeconds: 0.06
   durationSeconds: 1.2
   successDamageMultiplier: 2
   failedFlatDamageBonus: 0

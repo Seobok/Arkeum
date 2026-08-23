@@ -14,6 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Arkeum.Production.Gameplay.Timing.ClockHandTimingChallengeDefinition
   displayName: Clock Hand Timing
   presenterPrefab: {fileID: 1000000000000000003, guid: a84d2bcb6eb149f0881ef58d4fd78cb1, type: 3}
+  startDelaySeconds: 0.8
+  lateInputGraceSeconds: 0.06
   durationSeconds: 1.2
   successDamageMultiplier: 2
   failedFlatDamageBonus: 0

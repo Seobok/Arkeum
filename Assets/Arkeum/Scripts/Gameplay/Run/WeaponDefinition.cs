@@ -10,6 +10,7 @@ namespace Arkeum.Production.Gameplay.Run
         [SerializeField] private string id = "weapon";
         [SerializeField] private string displayName = "Weapon";
         [SerializeField] private Sprite sprite;
+        [SerializeField] private Sprite shopDescriptionSprite;
         [SerializeField] private Color tint = new Color(0.75f, 0.43f, 0.18f);
         [SerializeField] private int attackBonus = 1;
         [SerializeField] private Vector2Int attackEditorMin = new Vector2Int(-3, -3);
@@ -25,6 +26,7 @@ namespace Arkeum.Production.Gameplay.Run
         public string Id => id;
         public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? name : displayName;
         public Sprite Sprite => sprite;
+        public Sprite ShopDescriptionSprite => shopDescriptionSprite;
         public Color Tint => tint;
         public int AttackBonus => attackBonus;
         public Vector2Int AttackEditorMin

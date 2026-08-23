@@ -8,6 +8,8 @@ namespace Arkeum.Production.Gameplay.Timing
     {
         [SerializeField] private string displayName = "Timing";
         [SerializeField] private TimingChallengePresenterBase presenterPrefab;
+        [SerializeField, Min(0f)] private float startDelaySeconds = 0.8f;
+        [SerializeField, Min(0f)] private float lateInputGraceSeconds = 0.06f;
         [SerializeField] private float durationSeconds = 1.2f;
         [FormerlySerializedAs("goodDamageMultiplier")]
         [SerializeField] private float successDamageMultiplier = 2f;
@@ -17,6 +19,8 @@ namespace Arkeum.Production.Gameplay.Timing
 
         public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? name : displayName;
         public TimingChallengePresenterBase PresenterPrefab => presenterPrefab;
+        public float StartDelaySeconds => Mathf.Max(0f, startDelaySeconds);
+        public float LateInputGraceSeconds => Mathf.Max(0f, lateInputGraceSeconds);
         public float DurationSeconds => Mathf.Max(0.1f, durationSeconds);
         public float SuccessDamageMultiplier => Mathf.Max(0f, successDamageMultiplier);
         public int FailedFlatDamageBonus => failedFlatDamageBonus;

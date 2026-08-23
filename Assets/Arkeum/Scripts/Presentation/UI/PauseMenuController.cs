@@ -1,4 +1,5 @@
 using System;
+using Arkeum.Production.Presentation.Audio;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -79,6 +80,7 @@ namespace Arkeum.Production.Presentation.UI
             settingsCanvas?.SetActive(false);
             pauseMenuCanvas?.SetActive(true);
             continueButton?.Select();
+            PlayMenuSfx("Pause");
         }
 
         public void ResumeGame()
@@ -90,6 +92,7 @@ namespace Arkeum.Production.Presentation.UI
 
             CloseMenusAndRestoreTimeScale();
             pauseButton?.Select();
+            PlayMenuSfx("Unpause");
         }
 
         public void LeaveToStartScene()
@@ -219,6 +222,14 @@ namespace Arkeum.Production.Presentation.UI
             }
 
             return null;
+        }
+
+        private static void PlayMenuSfx(string id)
+        {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySfx(id);
+            }
         }
     }
 }

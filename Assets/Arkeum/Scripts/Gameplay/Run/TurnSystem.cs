@@ -9,6 +9,8 @@
             {
                 return;
             }
+
+            runState.PlayerTurnCount += 1;
         }
     }
 }

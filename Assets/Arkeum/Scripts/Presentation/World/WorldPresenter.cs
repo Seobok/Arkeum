@@ -16,11 +16,13 @@ namespace Arkeum.Production.Presentation.World
         private const int ExploredFogSortingOrder = 99;
 
         [SerializeField] private WorldVisualSet visualSet;
+        [SerializeField] private GameObject shopShelfViewPrefab;
 
         private readonly List<GameObject> floorViews = new List<GameObject>();
         private readonly List<GameObject> markerViews = new List<GameObject>();
         private readonly List<GameObject> fogViews = new List<GameObject>();
         private readonly Dictionary<Vector2Int, SpriteRenderer> fogRenderers = new Dictionary<Vector2Int, SpriteRenderer>();
+        private readonly Dictionary<Vector2Int, Transform> shopPopupAnchors = new Dictionary<Vector2Int, Transform>();
         private readonly Dictionary<string, ActorView> actorViews = new Dictionary<string, ActorView>();
         private readonly HashSet<string> activeActorIds = new HashSet<string>();
         private readonly HashSet<Vector2Int> exploredCells = new HashSet<Vector2Int>();
@@ -45,6 +47,19 @@ namespace Arkeum.Production.Presentation.World
         public RunState CurrentRun { get; private set; }
         public Vector2Int HubPlayerPosition { get; private set; }
         public bool ShowEnemyPreparedTargetMarkers { get; private set; } = true;
+        public Camera WorldCamera => mainCamera != null ? mainCamera : Camera.main;
+
+        public bool TryGetShopPopupAnchor(Vector2Int shopPosition, out Vector3 worldPosition)
+        {
+            if (shopPopupAnchors.TryGetValue(shopPosition, out Transform anchor) && anchor != null)
+            {
+                worldPosition = anchor.position;
+                return true;
+            }
+
+            worldPosition = default;
+            return false;
+        }
 
         public void Initialize()
         {
@@ -175,8 +190,14 @@ namespace Arkeum.Production.Presentation.World
 
             if (playedAnyEffect)
             {
-                PlayEnemyDamageScreenShake();
+                PlayDamageScreenShake();
             }
+        }
+
+        public void PlayPlayerDamageFeedback()
+        {
+            PlayDamageScreenShake();
+            GameSettingsService.TryVibrate();
         }
 
         private void RefreshFloor(MapDefinition map)
@@ -254,13 +275,7 @@ namespace Arkeum.Production.Presentation.World
                     continue;
                 }
 
-                markerViews.Add(viewFactory.CreateCell(
-                    markerRoot,
-                    shopOffer.Position,
-                    GetWeaponSprite(shopOffer.Weapon),
-                    GetShopOfferTint(shopOffer.Weapon),
-                    $"ShopOffer_{i}",
-                    5));
+                markerViews.Add(CreateShopShelfView(shopOffer, i));
             }
 
             DrawShopTeleportMarker(map.ShopEntrancePosition, "ShopEntranceMarker");
@@ -323,6 +338,8 @@ namespace Arkeum.Production.Presentation.World
                 true,
                 GetPlayerSprite(),
                 GetPlayerTint(),
+                GetPlayerIdleFrames(),
+                GetPlayerIdleFrameRate(),
                 20);
             RemoveInactiveActorViews();
         }
@@ -337,7 +354,16 @@ namespace Arkeum.Production.Presentation.World
             {
                 // 살아있는 액터 순회
                 ActorEntity actor = actors[i];
-                if (actor == null || !actor.IsAlive)
+                if (actor == null)
+                {
+                    continue;
+                }
+
+                bool playMoveCollision = actor.IsEnemy && actor.HasMoveCollisionFeedback;
+                Vector2Int moveCollisionTargetCell = actor.MoveCollisionTargetCell;
+                actor.HasMoveCollisionFeedback = false;
+
+                if (!actor.IsAlive)
                 {
                     continue;
                 }
@@ -349,17 +375,23 @@ namespace Arkeum.Production.Presentation.World
 
                 Sprite sprite;
                 Color tint;
+                Sprite[] idleFrames;
+                float idleFrameRate;
                 int sortingOrder;
                 if (actor.IsPlayer)
                 {
                     sprite = GetPlayerSprite();
                     tint = GetPlayerTint();
+                    idleFrames = GetPlayerIdleFrames();
+                    idleFrameRate = GetPlayerIdleFrameRate();
                     sortingOrder = 20;
                 }
                 else
                 {
                     sprite = GetEnemySprite(actor);
                     tint = GetEnemyTint(actor);
+                    idleFrames = GetEnemyIdleFrames(actor);
+                    idleFrameRate = GetEnemyIdleFrameRate(actor);
                     sortingOrder = 10;
                 }
 
@@ -372,7 +404,16 @@ namespace Arkeum.Production.Presentation.World
                     actor.IsPlayer,
                     sprite,
                     tint,
+                    idleFrames,
+                    idleFrameRate,
                     sortingOrder);
+
+                if (playMoveCollision &&
+                    actorViews.TryGetValue(actor.Id, out ActorView actorView) &&
+                    actorView != null)
+                {
+                    actorView.PlayMoveCollision(moveCollisionTargetCell);
+                }
             }
 
             // 비활성화 액터 제거
@@ -387,6 +428,8 @@ namespace Arkeum.Production.Presentation.World
             bool isPlayer,
             Sprite sprite,
             Color tint,
+            Sprite[] idleFrames,
+            float idleFrameRate,
             int sortingOrder)
         {
             if (string.IsNullOrEmpty(actorId))
@@ -399,12 +442,14 @@ namespace Arkeum.Production.Presentation.World
             {
                 // 기존에 있는 액터는 재생성 X
                 actorView = viewFactory.CreateActor(actorRoot, displayName, position, sprite, tint, sortingOrder);
+                actorView.SetIdleAnimation(idleFrames, idleFrameRate);
                 actorView.SetFacing(facingDirection);
                 actorViews[actorId] = actorView;
                 return;
             }
 
             actorView.name = displayName;
+            actorView.SetIdleAnimation(idleFrames, idleFrameRate);
             actorView.SetVisual(sprite, tint, sortingOrder);
             actorView.SetFacing(facingDirection);
             actorView.MoveTo(position, isPlayer);
@@ -435,6 +480,11 @@ namespace Arkeum.Production.Presentation.World
                 {
                     case EnemyActionType.Attack:
                         DrawEnemyPreparedAttackMarkers(actor);
+                        break;
+                    case EnemyActionType.BossSpaceCut:
+                    case EnemyActionType.BossCloseAttack:
+                    case EnemyActionType.BossCharge:
+                        DrawBossPreparedMarkers(actor);
                         break;
                     case EnemyActionType.WanderMove:
                     case EnemyActionType.ChaseMove:
@@ -515,6 +565,18 @@ namespace Arkeum.Production.Presentation.World
             visibleCells.Clear();
             if (CurrentRun?.Player == null || CurrentMap == null)
             {
+                return;
+            }
+
+            if (CurrentRun.BossRoomEntered)
+            {
+                for (int i = 0; i < CurrentMap.WalkableCells.Count; i++)
+                {
+                    Vector2Int cell = CurrentMap.WalkableCells[i];
+                    visibleCells.Add(cell);
+                    exploredCells.Add(cell);
+                }
+
                 return;
             }
 
@@ -702,7 +764,74 @@ namespace Arkeum.Production.Presentation.World
             }
         }
 
-        private void PlayEnemyDamageScreenShake()
+        private GameObject CreateShopShelfView(ShopOfferDefinition shopOffer, int index)
+        {
+            if (shopShelfViewPrefab == null)
+            {
+                return viewFactory.CreateCell(
+                    markerRoot,
+                    shopOffer.Position,
+                    GetWeaponSprite(shopOffer.Weapon),
+                    GetShopOfferTint(shopOffer.Weapon),
+                    $"ShopOffer_{index}",
+                    5);
+            }
+
+            GameObject shelfView = Instantiate(shopShelfViewPrefab, markerRoot);
+            shelfView.name = $"ShopOffer_{index}";
+            shelfView.transform.position = new Vector3(shopOffer.Position.x, shopOffer.Position.y, 0f);
+
+            Transform shelfTransform = shelfView.transform.Find("ShelfRenderer");
+            SpriteRenderer shelfRenderer = shelfTransform != null
+                ? shelfTransform.GetComponent<SpriteRenderer>()
+                : null;
+            if (shelfRenderer != null)
+            {
+                shelfRenderer.sortingOrder = 4;
+            }
+
+            Transform itemTransform = shelfView.transform.Find("ItemIconRenderer");
+            SpriteRenderer itemRenderer = itemTransform != null
+                ? itemTransform.GetComponent<SpriteRenderer>()
+                : null;
+            if (itemRenderer != null)
+            {
+                itemRenderer.sprite = GetWeaponSprite(shopOffer.Weapon);
+                itemRenderer.color = GetShopOfferTint(shopOffer.Weapon);
+                itemRenderer.sortingOrder = 5;
+            }
+
+            Transform popupAnchor = shelfView.transform.Find("PopupAnchor");
+            shopPopupAnchors[shopOffer.Position] = popupAnchor != null
+                ? popupAnchor
+                : shelfView.transform;
+
+            return shelfView;
+        }
+
+        private void DrawBossPreparedMarkers(ActorEntity actor)
+        {
+            HashSet<Vector2Int> markedCells = new HashSet<Vector2Int>();
+            for (int i = 0; i < actor.PendingBossAffectedCells.Count; i++)
+            {
+                Vector2Int markerCell = actor.PendingBossAffectedCells[i];
+                if (!markedCells.Add(markerCell) || !IsRunCellVisible(markerCell))
+                {
+                    continue;
+                }
+
+                string markerName = $"Pending_{actor.PendingEnemyAction}_{actor.Id}_{markerCell.x}_{markerCell.y}";
+                markerViews.Add(viewFactory.CreateCell(
+                    markerRoot,
+                    markerCell,
+                    GetEnemyAttackMarkerSprite(),
+                    GetEnemyAttackMarkerTint(),
+                    markerName,
+                    6));
+            }
+        }
+
+        private void PlayDamageScreenShake()
         {
             if (!GameSettingsService.ScreenShakeEnabled ||
                 mainCamera == null ||
@@ -766,6 +895,7 @@ namespace Arkeum.Production.Presentation.World
 
         private void ClearMarkerViews()
         {
+            shopPopupAnchors.Clear();
             DestroyViews(markerViews);
         }
 
@@ -883,6 +1013,16 @@ namespace Arkeum.Production.Presentation.World
             return visualSet != null ? visualSet.PlayerTint : new Color(0.91f, 0.86f, 0.78f);
         }
 
+        private Sprite[] GetPlayerIdleFrames()
+        {
+            return visualSet != null ? visualSet.PlayerIdleFrames : null;
+        }
+
+        private float GetPlayerIdleFrameRate()
+        {
+            return visualSet != null ? visualSet.PlayerIdleFrameRate : 8f;
+        }
+
         private Sprite GetEnemySprite(ActorEntity actor)
         {
             if (actor?.EnemyDefinition != null && actor.EnemyDefinition.Sprite != null)
@@ -901,6 +1041,20 @@ namespace Arkeum.Production.Presentation.World
             }
 
             return visualSet != null ? visualSet.DefaultEnemyTint : new Color(0.63f, 0.25f, 0.21f);
+        }
+
+        private static Sprite[] GetEnemyIdleFrames(ActorEntity actor)
+        {
+            return actor?.EnemyDefinition != null
+                ? actor.EnemyDefinition.IdleFrames
+                : null;
+        }
+
+        private static float GetEnemyIdleFrameRate(ActorEntity actor)
+        {
+            return actor?.EnemyDefinition != null
+                ? actor.EnemyDefinition.IdleFrameRate
+                : 8f;
         }
 
         private Sprite GetWeaponSprite(WeaponDefinition weapon)

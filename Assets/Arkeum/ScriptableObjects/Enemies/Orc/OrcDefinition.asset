@@ -26,3 +26,11 @@ MonoBehaviour:
   attackPattern: {fileID: 11400000, guid: b4ad50a72da48f042bada5606eaba7bd, type: 2}
   sprite: {fileID: 21300000, guid: 1aa37d9d2622c1648a302dc9b6eb5f62, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
+  idleFrames:
+  - {fileID: 5120410236738981136, guid: 1946f0d48853d79408a84c2149e15028, type: 3}
+  - {fileID: 1133040411461804861, guid: 1946f0d48853d79408a84c2149e15028, type: 3}
+  - {fileID: -5096723200824463030, guid: 1946f0d48853d79408a84c2149e15028, type: 3}
+  - {fileID: -2225174341924067898, guid: 1946f0d48853d79408a84c2149e15028, type: 3}
+  - {fileID: -8233152129326895834, guid: 1946f0d48853d79408a84c2149e15028, type: 3}
+  - {fileID: -4010699835880829198, guid: 1946f0d48853d79408a84c2149e15028, type: 3}
+  idleFrameRate: 8

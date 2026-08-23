@@ -67,34 +67,148 @@ MonoBehaviour:
   sfxClips:
   - id: ButtonHover
     clip: {fileID: 8300000, guid: cf6c0e7fbef9449c98a0cdb5ea0c4d9f, type: 3}
-    volume: 1
-    pitch: 3
-    randomPitchRange: 0
+    volume: 0.65
+    pitch: 1.15
+    randomPitchRange: 0.03
+    cooldownSeconds: 0.04
   - id: ButtonClick
     clip: {fileID: 8300000, guid: 29bde6326b4c34ad8a12da475f79b50a, type: 3}
-    volume: 1
-    pitch: 3
-    randomPitchRange: 0
+    volume: 0.8
+    pitch: 1.05
+    randomPitchRange: 0.02
+    cooldownSeconds: 0.04
   - id: PlayerMove
     clip: {fileID: 8300000, guid: 023ea3ddeaa8dd146b7633a0800e5a0e, type: 3}
-    volume: 1
-    pitch: 3
-    randomPitchRange: 0
+    volume: 0.55
+    pitch: 1.08
+    randomPitchRange: 0.08
+    cooldownSeconds: 0.04
   - id: PlayerAttack
     clip: {fileID: 8300000, guid: fd25a15f9797641458336cccfb445343, type: 3}
-    volume: 1
-    pitch: 3
-    randomPitchRange: 0
+    volume: 0.85
+    pitch: 1
+    randomPitchRange: 0.04
+    cooldownSeconds: 0
   - id: PlayerHit
-    clip: {fileID: 8300000, guid: 1ed8fb76fc64e4e46847348138782234, type: 3}
-    volume: 1
-    pitch: 3
-    randomPitchRange: 0
+    clip: {fileID: 8300000, guid: 8b23b175a78d6b5458322e3a6c9905d0, type: 3}
+    volume: 0.9
+    pitch: 0.95
+    randomPitchRange: 0.04
+    cooldownSeconds: 0.08
   - id: Teleport
     clip: {fileID: 8300000, guid: ba39bf8baf6d13046889b2d64822381a, type: 3}
-    volume: 1
-    pitch: 3
+    volume: 0.85
+    pitch: 1
     randomPitchRange: 0
+    cooldownSeconds: 0
+  - id: TimingStart
+    clip: {fileID: 8300000, guid: c5cb2ac29e89dbf43a9b644caaad45e6, type: 3}
+    volume: 0.8
+    pitch: 1
+    randomPitchRange: 0
+    cooldownSeconds: 0
+  - id: TimingSuccess
+    clip: {fileID: 8300000, guid: b0e62ed71b1538648b719821f4f63b4c, type: 3}
+    volume: 0.8
+    pitch: 1
+    randomPitchRange: 0
+    cooldownSeconds: 0
+  - id: TimingFailed
+    clip: {fileID: 8300000, guid: 7cc057bed53baf34799f52aab3c84800, type: 3}
+    volume: 0.8
+    pitch: 1
+    randomPitchRange: 0
+    cooldownSeconds: 0
+  - id: EnemyHit
+    clip: {fileID: 8300000, guid: 7c47b20bb9874304a809dc5580d403ba, type: 3}
+    volume: 0.8
+    pitch: 1
+    randomPitchRange: 0.06
+    cooldownSeconds: 0.04
+  - id: EnemyDefeated
+    clip: {fileID: 8300000, guid: 566d2ea6240b489479a6e9fd608c2621, type: 3}
+    volume: 0.9
+    pitch: 1
+    randomPitchRange: 0.04
+    cooldownSeconds: 0.05
+  - id: WeaponEquip
+    clip: {fileID: 8300000, guid: 490bfbc72255342408984f60044487de, type: 3}
+    volume: 0.8
+    pitch: 1
+    randomPitchRange: 0.03
+    cooldownSeconds: 0.05
+  - id: WeaponUnequip
+    clip: {fileID: 8300000, guid: 78ad99fd0a0a5144280b07bbdba84815, type: 3}
+    volume: 0.65
+    pitch: 0.95
+    randomPitchRange: 0.03
+    cooldownSeconds: 0.05
+  - id: ShopPurchase
+    clip: {fileID: 8300000, guid: abdbbfd33a46f4549987385f85c536b5, type: 3}
+    volume: 0.85
+    pitch: 1
+    randomPitchRange: 0
+    cooldownSeconds: 0.1
+  - id: ActionDenied
+    clip: {fileID: 8300000, guid: 1ed8fb76fc64e4e46847348138782234, type: 3}
+    volume: 0.55
+    pitch: 0.9
+    randomPitchRange: 0
+    cooldownSeconds: 0.15
+  - id: BossEncounter
+    clip: {fileID: 8300000, guid: 21c4a490b24ba2045bc815f7626a40ef, type: 3}
+    volume: 0.95
+    pitch: 0.95
+    randomPitchRange: 0
+    cooldownSeconds: 0
+  - id: BossRoomSeal
+    clip: {fileID: 8300000, guid: b7b5a6156961bac44a67504d42ce6fcf, type: 3}
+    volume: 0.8
+    pitch: 0.8
+    randomPitchRange: 0
+    cooldownSeconds: 0
+  - id: BossRoomOpen
+    clip: {fileID: 8300000, guid: 7a9de5c4d998126449cf964a6b27a8b0, type: 3}
+    volume: 0.85
+    pitch: 0.9
+    randomPitchRange: 0
+    cooldownSeconds: 0
+  - id: FloorClear
+    clip: {fileID: 8300000, guid: 7a9de5c4d998126449cf964a6b27a8b0, type: 3}
+    volume: 0.85
+    pitch: 1.05
+    randomPitchRange: 0
+    cooldownSeconds: 0
+  - id: FloorDescend
+    clip: {fileID: 8300000, guid: eaae8fe8d600e1f459f34aa5757fa3b8, type: 3}
+    volume: 0.75
+    pitch: 0.9
+    randomPitchRange: 0
+    cooldownSeconds: 0
+  - id: PlayerDeath
+    clip: {fileID: 8300000, guid: c458b6714dab015479d507b21fd2cead, type: 3}
+    volume: 0.95
+    pitch: 0.8
+    randomPitchRange: 0
+    cooldownSeconds: 0
+  - id: RunClear
+    clip: {fileID: 8300000, guid: d654174ef194bd7479bf4b8d8f753318, type: 3}
+    volume: 0.95
+    pitch: 1
+    randomPitchRange: 0
+    cooldownSeconds: 0
+  - id: Pause
+    clip: {fileID: 8300000, guid: b83bf8726a7fac349a54389f0c57cda6, type: 3}
+    volume: 0.7
+    pitch: 1
+    randomPitchRange: 0
+    cooldownSeconds: 0.08
+  - id: Unpause
+    clip: {fileID: 8300000, guid: e58d8bd078f188a4ba314e933b98528b, type: 3}
+    volume: 0.7
+    pitch: 1
+    randomPitchRange: 0
+    cooldownSeconds: 0.08
 --- !u!82 &685343940801459560
 AudioSource:
   m_ObjectHideFlags: 0

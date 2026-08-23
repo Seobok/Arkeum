@@ -8,6 +8,7 @@ namespace Arkeum.Production.Gameplay.Run
     {
         public int RunIndex;
         public int CurrentFloor;
+        public int PlayerTurnCount;
         public RunFloorDefinition CurrentFloorDefinition;
         public bool FloorExitUsed;
         public bool BossRoomEntered;

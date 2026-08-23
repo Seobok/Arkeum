@@ -29,7 +29,7 @@ namespace Arkeum.Production.Gameplay.Actors
         public IBehaviorTreeNode CreateBossTree()
         {
             return new BehaviorTreeSequenceNode(
-                );
+                new BehaviorTreeActionNode(context => context.Actions.TickBoss(context)));
         }
     }
 }

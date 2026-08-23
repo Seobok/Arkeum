@@ -12,6 +12,8 @@ namespace Arkeum.Production.Gameplay.Run
         public MapAsset MapAsset;
         public List<MapAsset> RoomAssets = new List<MapAsset>();
         public List<RunSpecialRoomDefinition> SpecialRooms = new List<RunSpecialRoomDefinition>();
+        public ShopCatalogDefinition ShopCatalog;
+        [UnityEngine.Min(0)] public int ShopOfferCount = 3;
         public int MinimumRoomCount = 6;
         public int RoomGap = 5;
         public int PlacementAttempts = 300;

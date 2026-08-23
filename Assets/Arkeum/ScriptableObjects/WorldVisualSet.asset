@@ -18,6 +18,14 @@ MonoBehaviour:
   wallTint: {r: 0.08, g: 0.08, b: 0.09, a: 1}
   playerSprite: {fileID: -7978735674136817684, guid: 510fb8782b4339344bde7862dbfbfa81, type: 3}
   playerTint: {r: 1, g: 1, b: 1, a: 1}
+  playerIdleFrames:
+  - {fileID: -7978735674136817684, guid: 510fb8782b4339344bde7862dbfbfa81, type: 3}
+  - {fileID: 8849163925938299382, guid: 510fb8782b4339344bde7862dbfbfa81, type: 3}
+  - {fileID: -3697785639171859907, guid: 510fb8782b4339344bde7862dbfbfa81, type: 3}
+  - {fileID: -1830650023417107544, guid: 510fb8782b4339344bde7862dbfbfa81, type: 3}
+  - {fileID: 5344081390441601760, guid: 510fb8782b4339344bde7862dbfbfa81, type: 3}
+  - {fileID: 1830586431241935133, guid: 510fb8782b4339344bde7862dbfbfa81, type: 3}
+  playerIdleFrameRate: 8
   defaultEnemySprite: {fileID: 0}
   defaultEnemyTint: {r: 0.63, g: 0.25, b: 0.21, a: 1}
   defaultWeaponSprite: {fileID: 0}

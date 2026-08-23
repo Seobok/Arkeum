@@ -6,5 +6,8 @@ namespace Arkeum.Production.Gameplay.Actors
         WanderMove,
         ChaseMove,
         Attack,
+        BossSpaceCut,
+        BossCloseAttack,
+        BossCharge,
     }
 }

@@ -1858,3 +1858,997 @@
 ### 확인하지 못한 사항 또는 후속 점검 사항
 - Unity Play Mode에서 Exit 버튼의 실제 StartScene 전환과 QuitGame 버튼의 Play Mode 종료는 직접 클릭해 확인하지 못했다.
 - 플랫폼 빌드에서 `Application.Quit()`의 실제 종료 동작은 확인하지 못했다.
+
+## 2026-07-14 보스 몬스터 3종 패턴 구현
+
+### 사용자의 요청 개요
+- 1턴의 공격 준비와 위험 타일 표시를 공통 규칙으로 사용하는 보스 몬스터 구현 요청.
+- 공간 절단, 근거리 범위 공격, 직선 돌진의 3개 패턴과 우선순위, 지속시간, 기절 규칙 반영 요청.
+
+### 핵심 요구사항
+- 공간 절단은 7턴마다 보스 기준 가로 또는 세로 방향의 보스방 전체에 벽을 만들고 2턴 동안 유지한다.
+- 플레이어가 보스 기준 맨해튼 거리 2 이내이면 해당 범위 공격을 1턴 준비한 뒤 실행한다.
+- 플레이어가 근거리 밖에서 같은 행 또는 열을 1턴 이상 유지하면 경로를 예고한 뒤 벽 앞까지 돌진한다.
+- 돌진 경로에 플레이어가 남아 있으면 플레이어 앞에서 멈춰 피해를 주고, 돌진 후 3턴 동안 기절한다.
+- 기절, 준비 중인 패턴, 돌진 등 특수 상태에서는 다른 패턴을 새로 선택하지 않는다.
+
+### 이번 작업 범위
+- 기존 일반 몬스터 행동 트리와 분리된 보스 행동 트리 및 보스 패턴 실행 로직 추가.
+- 보스 전용 준비 상태, 영향 셀, 임시 벽, 정렬 유지, 기절 상태 추가.
+- 보스 패턴 위험 타일 표시와 런타임 벽 생성/해제 연결.
+- 보스 정의 에셋 추가 및 2층 보스방의 기존 일반 몬스터 3마리를 보스 1마리로 교체.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Actors/EnemyActionType.cs`
+  - 공간 절단, 근거리 범위 공격, 직선 돌진 행동 타입 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Actors/ActorEntity.cs`
+  - 보스 준비 셀, 활성 임시 벽, 턴 주기, 정렬 유지, 기절 지속시간 런타임 상태 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Actors/EnemyDefinition.cs`
+  - 보스 여부와 공간 절단 주기/지속시간, 근거리 범위, 돌진 기절시간 설정 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Actors/EnemyBehaviorActions.cs`
+  - 3종 패턴의 선택, 준비, 실행, 피해, 이동, 임시 벽 및 기절 처리 구현.
+- `Assets/Arkeum/Scripts/Gameplay/Actors/EnemyBehaviorTreeFactory.cs`
+  - 보스 전용 행동 트리 구성.
+- `Assets/Arkeum/Scripts/Gameplay/Combat/EnemyTurnSystem.cs`
+  - 보스 정의 여부에 따라 일반/보스 행동 트리를 선택하도록 변경.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs`
+  - 보스 사망 시 남아 있는 공간 절단 임시 벽을 즉시 제거하도록 처리.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 보스 패턴별 영향 셀 전체를 공격 예정 타일로 표시.
+- `Assets/Arkeum/ScriptableObjects/Enemies/Boss/BossDefinition.asset`
+  - 보스 기본 능력치와 패턴 설정을 가진 신규 보스 정의 추가.
+- `Assets/Arkeum/ScriptableObjects/Enemies/Boss.meta`, `Assets/Arkeum/ScriptableObjects/Enemies/Boss/BossDefinition.asset.meta`
+  - 신규 Unity 에셋 메타데이터 추가.
+- `Assets/Arkeum/ScriptableObjects/MapAssets/Floor2/Boss.asset`
+  - 기존 오크/박쥐/스켈레톤 배치를 신규 보스 1마리 배치로 교체.
+- `Docs/input.md`
+  - 이번 작업 요청, 구현 범위, 검증 결과 및 후속 점검 사항 기록.
+
+### 실제 수행한 작업 요약
+- 공간 절단은 보스 턴 누적값 기준 7턴마다 우선 선택하고, 보스가 속한 방의 같은 X 또는 Y 좌표 셀을 무작위 방향으로 예고한다.
+- 다음 보스 턴에 예고 셀을 런타임 벽으로 전환하며, 생성에 성공한 벽만 추적해 2턴 후 안전하게 제거한다.
+- 근거리 공격은 보스방 안에서 맨해튼 거리 2 이하인 셀을 예고하고, 실행 시 플레이어가 예고 범위에 남아 있을 때 보스 공격력으로 피해를 적용한다.
+- 직선 돌진은 근거리 밖의 같은 행/열 상태가 연속 확인되면 벽까지의 경로를 예고하고, 실행 시 현재 벽을 다시 검사해 이동한다.
+- 돌진 경로에 플레이어가 있으면 해당 셀 직전에서 멈추고 피해를 적용하며, 이후 3번의 보스 턴 동안 이동·공격·패턴 선택을 중단한다.
+- 보스 패턴이 준비 중이면 새 패턴을 선택하지 않고 기존 예고 패턴을 먼저 실행하도록 우선순위를 구성했다.
+- 신규 보스는 체력 20, 공격력 2, 방어력 1, 처치 보상 10으로 설정하고 기존 오크 스프라이트에 붉은 틴트를 적용했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+- `git diff --check` 실행 결과 공백 오류 없음. 기존 파일의 LF/CRLF 변환 안내만 출력됨.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 패턴 선택 순서, 위험 타일 표시, 임시 벽 충돌 및 제거, 돌진 위치와 3턴 기절 체감은 직접 확인하지 못했다.
+- 보스 전용 스프라이트가 없어 현재는 오크 스프라이트와 붉은 틴트를 사용한다. 전용 아트가 준비되면 `BossDefinition.asset`의 Sprite를 교체해야 한다.
+- 체력 20, 공격력 2, 방어력 1, 보상 10은 초기값이므로 실제 플레이 난이도에 맞춘 밸런스 조정이 필요할 수 있다.
+
+## 2026-07-14 보스방 진입 전 보스 행동 정지
+
+### 사용자의 요청 개요
+- 플레이어가 보스방에 들어가 임시 봉쇄벽이 생성되기 전까지 보스가 행동하지 않도록 수정 요청.
+
+### 핵심 요구사항
+- 보스방 진입 전에는 보스가 이동, 공격, 패턴 준비를 하지 않는다.
+- 보스 턴 카운트와 직선 정렬 유지 카운트도 진입 전에는 증가하지 않는다.
+- 플레이어 진입으로 임시 봉쇄벽이 생성된 뒤부터 기존 보스 행동을 시작한다.
+
+### 이번 작업 범위
+- 적 턴 처리에서 보스방 진입 상태를 확인하는 보스 전용 행동 게이트 추가.
+- 일반 몬스터의 기존 행동에는 영향을 주지 않도록 보스 정의에만 조건 적용.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Combat/EnemyTurnSystem.cs`
+  - 보스이면서 `RunState.BossRoomEntered`가 false인 경우 행동 트리를 실행하지 않도록 변경.
+- `Docs/input.md`
+  - 이번 후속 요청과 변경 및 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 기존 보스방 진입 흐름이 `플레이어 이동 → 임시 봉쇄벽 생성 → BossRoomEntered 설정 → 적 턴` 순서임을 확인했다.
+- 보스방 진입 전에는 보스 행동 트리 자체를 호출하지 않으므로 이동, 공격, 위험 타일 준비, 턴 주기 및 기절/벽 지속시간 갱신이 모두 발생하지 않는다.
+- 임시벽 생성과 함께 `BossRoomEntered`가 true가 된 첫 적 턴부터 보스가 정상적으로 행동한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 보스방 밖에서 여러 턴을 소비해도 보스가 정지 상태를 유지하는지 직접 확인하지 못했다.
+- 보스방 첫 진입 시 임시벽 표시와 같은 턴에 보스의 첫 행동 예고 또는 추적 이동이 시작되는 화면 흐름은 Play Mode 점검이 필요하다.
+
+## 2026-07-14 보스 근거리 공격 범위 및 돌진 조건 변경
+
+### 사용자의 요청 개요
+- 보스 근거리 공격을 맨해튼 거리 2 범위에서 보스와 인접한 상하좌우 및 대각선 8칸 공격으로 변경 요청.
+- 돌진 패턴의 거리 3 이상 조건을 제거하고 같은 행 또는 열 조건을 중심으로 발동하도록 변경 요청.
+
+### 핵심 요구사항
+- 근거리 공격 범위는 보스 기준 8방향 인접 셀로 고정한다.
+- 맨해튼 거리 2에 해당하지만 인접하지 않은 셀은 근거리 공격 범위에서 제외한다.
+- 돌진 정렬 조건에서 플레이어와 보스 사이의 거리 비교를 제거한다.
+- 기존 패턴 우선순위를 유지해 상하좌우 인접 상태에서는 근거리 공격을 먼저 선택한다.
+
+### 이번 작업 범위
+- 근거리 공격 선택 조건과 공격 예정 셀 생성 방식을 8방향 인접 판정으로 변경.
+- 돌진 정렬 조건에서 기존 `distance > CloseAttackRange` 비교 제거.
+- 더 이상 필요하지 않은 근거리 거리 설정을 보스 정의 코드와 에셋에서 제거.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Actors/EnemyBehaviorActions.cs`
+  - 근거리 공격 조건과 범위를 8방향 인접 판정으로 변경하고 돌진 거리 조건 제거.
+- `Assets/Arkeum/Scripts/Gameplay/Actors/EnemyDefinition.cs`
+  - 고정된 8칸 범위에서 사용하지 않는 `closeAttackRange` 설정과 프로퍼티 제거.
+- `Assets/Arkeum/ScriptableObjects/Enemies/Boss/BossDefinition.asset`
+  - 사용하지 않는 `closeAttackRange` 직렬화 값 제거.
+- `Docs/input.md`
+  - 이번 후속 요청, 변경 범위, 빌드 결과 및 미확인 사항 기록.
+
+### 실제 수행한 작업 요약
+- 두 좌표의 X/Y 차이가 각각 1 이하이고 같은 좌표가 아닌지를 검사하는 8방향 인접 판정을 추가했다.
+- 보스 주변 상하좌우 4칸과 대각선 4칸만 근거리 공격 예정 타일로 등록한다.
+- 돌진 조건은 근거리 공격 우선 범위가 아니면서 플레이어와 보스가 같은 행 또는 열인지로 판정한다.
+- 이에 따라 거리 2 이상의 같은 행/열에서도 기존 정렬 유지 규칙을 만족하면 돌진을 준비한다.
+- 첫 정렬 감지 턴에는 보스가 추적 이동으로 거리를 좁히지 않고 제자리에서 직선 유지 여부를 확인해, 거리 2에서도 근거리 공격으로 전환되지 않고 돌진을 준비할 수 있게 했다.
+- 상하좌우 바로 옆은 같은 행/열이지만 근거리 공격 우선순위가 적용되며, 대각선 바로 옆도 근거리 공격 대상이 된다.
+
+### 빌드/테스트 여부
+- 최초 샌드박스 빌드는 로컬 Microsoft SDK 경로 접근 제한으로 실행되지 못했다.
+- 승인된 환경에서 `dotnet build Assembly-CSharp.csproj -nologo` 재실행 성공.
+- 승인된 환경에서 `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 8개 인접 타일의 위험 표시와 실제 피격 범위는 직접 확인하지 못했다.
+- 거리 2인 같은 행/열에서 돌진 준비가 시작되는 타이밍과 근거리 공격 우선순위는 Play Mode 점검이 필요하다.
+
+## 2026-07-14 보스 패턴 선택 우선순위 변경
+
+### 사용자의 요청 개요
+- 보스가 새 패턴을 선택할 때 `8칸 근거리 공격 → 돌진 → 공간 절단` 순서로 조건을 확인하도록 변경 요청.
+
+### 핵심 요구사항
+- 인접 8칸 공격 조건이 가장 높은 우선순위를 가진다.
+- 돌진 조건은 인접 8칸 공격 다음으로 확인한다.
+- 공간 절단 주기가 도달했더라도 두 공격 패턴 조건이 충족되면 공간 절단보다 해당 공격을 우선한다.
+
+### 이번 작업 범위
+- 보스 행동 선택 분기의 조건 확인 순서 변경.
+- 기본 추적 이동 준비 중에도 상위 보스 패턴 조건을 먼저 재평가하도록 순서 조정.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Actors/EnemyBehaviorActions.cs`
+  - 보스 패턴 조건을 근거리 공격, 돌진, 공간 절단 순으로 재배치.
+- `Docs/input.md`
+  - 이번 후속 요청과 변경 및 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 이미 준비된 보스 패턴과 기절 상태는 기존처럼 우선 처리한다.
+- 새 패턴 선택 단계에서는 인접 8칸 공격 조건을 가장 먼저 확인한다.
+- 직선 정렬이 요구 턴 수를 충족하면 돌진을 두 번째로 준비한다.
+- 두 공격 조건이 모두 충족되지 않을 때만 공간 절단의 7턴 주기를 확인한다.
+- 첫 직선 정렬 감지 상태에서는 돌진 조건이 아직 완성되지 않았으므로, 공간 절단 주기가 도달했다면 공간 절단을 선택하고 그렇지 않으면 제자리에서 정렬 유지를 기다린다.
+- 준비 중인 기본 추적 이동이 있어도 상위 보스 패턴 조건이 충족되면 해당 이동을 덮어쓰고 패턴을 준비한다.
+
+### 빌드/테스트 여부
+- 승인된 환경에서 `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 승인된 환경에서 `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 공간 절단 주기와 근거리/돌진 조건이 동시에 충족될 때 실제로 요청한 우선순위대로 표시되는지는 직접 확인하지 못했다.
+
+## 2026-07-14 보스 이동 준비 상태 우선 처리
+
+### 사용자의 요청 개요
+- 보스가 이동 준비 상태일 때 새 패턴 조건이 충족되더라도 무시하고 다음 턴에 준비된 이동을 실행하도록 변경 요청.
+
+### 핵심 요구사항
+- 이동 준비가 시작된 뒤에는 근거리 공격, 돌진, 공간 절단 조건이 이동을 취소하지 않는다.
+- 다음 보스 턴에 준비된 목표 위치로 이동한다.
+- 이동 완료 후 다음 턴부터 기존 패턴 우선순위를 다시 확인한다.
+
+### 이번 작업 범위
+- 보스 행동 처리에서 준비된 이동 실행을 새 패턴 조건 검사보다 앞에 배치.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Actors/EnemyBehaviorActions.cs`
+  - 이동 준비 상태를 먼저 처리하여 새 패턴이 준비된 이동을 덮어쓰지 못하도록 변경.
+- `Docs/input.md`
+  - 이번 후속 요청과 변경 및 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 보스 처리 순서를 `기절 → 준비된 보스 패턴 실행 → 준비된 이동 실행 → 새 패턴 선택`으로 구성했다.
+- `WanderMove` 또는 `ChaseMove` 준비 상태이면 플레이어 위치로 인해 새 패턴 조건이 생겨도 조건 계산 전에 `MoveToPreparedTarget()`을 실행한다.
+- 이동 실행 과정에서 기존 준비 상태가 해제되며, 그다음 보스 턴부터 `8칸 공격 → 돌진 → 공간 절단` 순서로 새 패턴을 선택한다.
+
+### 빌드/테스트 여부
+- 승인된 환경에서 `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 승인된 환경에서 `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 이동 예고 중 플레이어가 인접하거나 직선상에 진입했을 때 실제로 이동 예고가 유지되고 다음 턴 이동하는지는 직접 확인하지 못했다.
+
+## 2026-07-22 GameScene Result-Canvas 결과창 연결
+
+### 사용자의 요청 개요
+- `GameScene`의 `Result-Canvas`를 플레이어 사망 또는 최종 층 클리어 시 결과창으로 사용하도록 연결 스크립트 구현 요청.
+
+### 핵심 요구사항
+- 일반 플레이 중에는 `Result-Canvas`를 숨긴다.
+- 플레이어 사망 시 패배 결과를, 마지막 층 클리어 시 클리어 결과를 표시한다.
+- 기존 결과창의 제목, 턴 수, 최고 도달 층, 총 골드 UI를 실제 런 데이터와 연결한다.
+- 결과창 버튼 또는 확인 입력으로 허브에 복귀할 수 있게 한다.
+
+### 이번 작업 범위
+- 결과 화면 프레젠터 추가 및 `GameBootstrap`/`ServiceRegistry`/`GameDirector` 연결.
+- 실제 플레이어 행동 턴 수 누적 데이터 추가.
+- `GameScene`의 기존 `Result-Canvas`와 자식 UI 참조 연결.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/UI/ResultScreenPresenter.cs`
+  - 결과창 표시/숨김, 결과 텍스트 갱신, 허브 복귀 버튼 처리.
+- `Assets/Arkeum/Scripts/Presentation/UI/ResultScreenPresenter.cs.meta`
+  - 신규 Unity 스크립트 에셋 메타데이터.
+- `Assets/Arkeum/Scripts/Core/GameBootstrap.cs`
+  - 결과 화면 프레젠터 초기화 및 서비스 등록.
+- `Assets/Arkeum/Scripts/Core/ServiceRegistry.cs`
+  - 결과 화면 프레젠터 서비스 제공.
+- `Assets/Arkeum/Scripts/Core/GameDirector.cs`
+  - 허브/런 시작 시 결과창 숨김, 사망/최종 클리어 시 결과창 표시.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunState.cs`
+  - 런 단위 플레이어 행동 턴 수 저장 필드 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Run/TurnSystem.cs`
+  - 플레이어 행동 소비 시 턴 수 누적.
+- `Assets/Arkeum/Scenes/GameScene.unity`
+  - `GameRoot`에 결과 화면 프레젠터를 추가하고 기존 `Result-Canvas` UI 참조 연결.
+  - 결과창 루트 스케일을 정상화하고 HUD 위에 표시되도록 캔버스 정렬 순서 조정.
+- `Docs/input.md`
+  - 이번 요청, 구현 범위, 검증 결과 및 후속 점검 사항 기록.
+
+### 실제 수행한 작업 요약
+- 사망 결과는 `DEFEAT`, 마지막 층 클리어 결과는 `CLEAR`로 표시한다.
+- 결과창에 플레이어 행동 턴 수, 프로필 최고 도달 층, 현재 총 골드를 표시한다.
+- 기존 결과 버튼을 누르면 허브로 복귀하며, 기존 확인 키 복귀 동작도 유지한다.
+- 다음 층이 존재하는 중간 층 클리어에서는 결과창을 띄우지 않고 기존처럼 다음 층으로 진행한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 사망 및 마지막 층 클리어 시 결과창의 시각적 배치와 버튼 클릭 동작은 직접 확인하지 못했다.
+- 기존 UI의 `TotalScore` 오브젝트에는 프로젝트에 별도 점수 시스템이 없어 임의 점수 대신 `Total Gold`를 표시하도록 연결했다.
+
+## 2026-07-22 Result-Canvas 현재 층 표시 변경
+
+### 사용자의 요청 개요
+- 결과창의 `HighFloor` 항목에 프로필 최고 기록이 아닌 플레이어가 죽은 현재 층을 표시하도록 수정 요청.
+
+### 핵심 요구사항
+- 런 종료 시 `RunState.CurrentFloor` 값을 결과창에 표시한다.
+
+### 이번 작업 범위
+- 결과 화면의 층 표시 데이터와 라벨 변경.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/UI/ResultScreenPresenter.cs`
+  - `HighFloor` UI가 프로필 최고 층 대신 현재 런 종료 층을 표시하도록 변경.
+- `Docs/input.md`
+  - 이번 후속 요청과 변경 및 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 기존 `Highest Floor: {profile.HighestFloor}` 표시를 `Current Floor: {runState.CurrentFloor}`로 변경했다.
+- 사망 시 플레이어가 사망한 층이 그대로 표시되며, 최종 클리어 시에도 런이 종료된 현재 층을 표시한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 사망 결과창에 현재 층 숫자가 표시되는지는 직접 확인하지 못했다.
+
+## 2026-07-22 보스방 진입 시 전장 안개 제거
+
+### 사용자의 요청 개요
+- 플레이어가 보스방에 들어가면 전장의 안개를 모두 제거하도록 수정 요청.
+
+### 핵심 요구사항
+- `BossRoomEntered` 상태가 된 순간 현재 층의 모든 이동 가능 타일을 공개한다.
+- 보스방 진입 후 해당 층이 끝날 때까지 안개가 다시 표시되지 않게 한다.
+
+### 이번 작업 범위
+- 런 안개 가시성 계산에 보스방 진입 상태 처리 추가.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 보스방 진입 후 현재 맵 전체를 가시·탐색 완료 상태로 처리.
+- `Docs/input.md`
+  - 이번 요청과 변경 및 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- `UpdateRunFog()`에서 `CurrentRun.BossRoomEntered`를 확인한다.
+- 보스방에 진입했다면 `CurrentMap.WalkableCells` 전체를 `visibleCells`와 `exploredCells`에 추가하고 일반 시야 거리 계산을 생략한다.
+- 기존 보스방 진입 처리 직후 호출되는 `WorldPresenter.Refresh()`에서 전장 안개가 제거된다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 보스방 첫 진입 직후 전장 전체 안개가 실제로 사라지는지는 직접 확인하지 못했다.
+
+## 2026-07-22 3슬롯 세이브/로드 기능 구현
+
+### 사용자의 요청 개요
+- 게임 진행 상태를 저장하고 불러오는 기능을 구현하고, 저장 슬롯은 3개로 구성 요청.
+- 아직 로드 슬롯 버튼 3개는 없으므로 추후 Unity Inspector에서 연결할 수 있는 공개 스크립트 API 제공 요청.
+
+### 핵심 요구사항
+- 1~3번 슬롯을 각각 독립된 저장 파일로 관리한다.
+- 프로필 진행도와 현재 런의 맵, 액터, 장비 및 전투 상태를 함께 복원한다.
+- 추후 저장/로드 버튼의 `OnClick(int)`에 슬롯 번호를 전달해 연결할 수 있어야 한다.
+- 빈 슬롯 여부와 슬롯 표시용 메타데이터를 조회할 수 있어야 한다.
+
+### 이번 작업 범위
+- JSON 기반 3슬롯 저장소와 저장 데이터 모델 추가.
+- 게임 런타임 상태 캡처 및 복원 로직 추가.
+- 메인 메뉴에서 최근 슬롯 계속하기 및 지정 슬롯 로드 진입 흐름 연결.
+- `GameDirector`에 슬롯 저장/로드 공개 API 추가.
+- 실제 슬롯 버튼 및 슬롯 선택 UI 생성은 제외.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Infrastructure/Persistence/SaveGameData.cs`
+  - 프로필, 런, 맵, 액터, 무기/상점/적 배치와 슬롯 메타데이터 DTO 정의.
+- `Assets/Arkeum/Scripts/Infrastructure/Persistence/SaveGameService.cs`
+  - 3슬롯 JSON 저장/로드/삭제/조회, 런 상태 캡처 및 복원 구현.
+- `Assets/Arkeum/Scripts/Infrastructure/Persistence.meta`
+- `Assets/Arkeum/Scripts/Infrastructure/Persistence/SaveGameData.cs.meta`
+- `Assets/Arkeum/Scripts/Infrastructure/Persistence/SaveGameService.cs.meta`
+  - 신규 Unity 폴더 및 스크립트 에셋 메타데이터.
+- `Assets/Arkeum/Scripts/Core/ServiceRegistry.cs`
+  - `SaveGameService` 등록 및 제공.
+- `Assets/Arkeum/Scripts/Core/GameBootstrap.cs`
+  - 메인 메뉴의 슬롯 로드 요청을 소비하고 저장 프로필/런을 복원하여 게임 시작.
+- `Assets/Arkeum/Scripts/Core/GameDirector.cs`
+  - `SaveToSlot(int)`, `TrySaveToSlot(int, out string)`, `LoadFromSlot(int)` 공개 API 및 런 복원 흐름 추가.
+- `Assets/Arkeum/Scripts/Core/MainMenuController.cs`
+  - `LoadGameFromSlot(int)`, `HasSaveSlot(int)`, `GetSaveSlotMetadata(int)` 공개 API와 최근 슬롯 Continue 연결.
+- `Assets/Arkeum/Scripts/Gameplay/Map/MapService.cs`
+  - 저장된 맵을 현재 런 맵으로 주입하는 복원 API 추가.
+- `Docs/input.md`
+  - 이번 요청, 구현 범위와 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 저장 파일은 `Application.persistentDataPath/Saves/slot_1.json`부터 `slot_3.json`까지 생성한다.
+- 임시 파일에 JSON을 먼저 기록한 후 슬롯 파일로 교체해 기록 도중 손상 가능성을 줄였다.
+- 프로필 골드/퀘스트 진행도, 현재 층/턴/장비, 생성된 맵 구조와 런타임 벽, 남은 무기/상점 상품, 플레이어와 적의 HP·위치·행동 준비·보스 상태를 저장한다.
+- 로드 시 저장된 에셋 ID로 무기와 적 정의를 다시 연결하고 월드/HUD/상호작용을 갱신한다.
+- 허브 또는 런의 액션 사이에서만 저장할 수 있고, 타이밍 액션/결과 처리 같은 중간 상태에서는 저장을 거부한다.
+- 추후 저장 버튼에는 `GameDirector.SaveToSlot(1~3)`, 로드 버튼에는 `MainMenuController.LoadGameFromSlot(1~3)`을 연결할 수 있다.
+- 기존 Continue 버튼은 저장된 슬롯 중 가장 최근 슬롯을 불러오며, 저장 파일이 없으면 비활성화된다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 슬롯 저장 후 앱 재실행, 같은 맵/액터/장비 상태 복원까지의 통합 동작은 직접 확인하지 못했다.
+- 저장/로드 슬롯 버튼 3개와 슬롯 정보 텍스트 UI는 아직 생성·연결하지 않았다.
+- 저장 데이터는 현재 버전 1이며, 이후 데이터 구조 변경 시 버전 마이그레이션 로직을 추가해야 한다.
+
+## 2026-07-22 GameScene 모바일 이동/타이밍 버튼 연결
+
+### 사용자의 요청 개요
+- `GameScene`에 새로 만든 `Timing-Button`과 `MoveButton` 방향 버튼들을 각각 기존 게임 기능에 연결 요청.
+
+### 핵심 요구사항
+- 상/하/좌/우 버튼으로 키보드 이동과 동일한 허브 및 런 이동을 수행한다.
+- `Timing-Button`은 런 진행 중 타이밍 모드를 전환한다.
+- 타이밍 챌린지 진행 중에는 같은 `Timing-Button`을 타이밍 판정 입력으로 사용한다.
+- 씬의 버튼 참조를 추후 별도로 Inspector에서 연결하지 않아도 동작하게 한다.
+
+### 이번 작업 범위
+- 기존 `InputReader`에 UI 입력 큐 추가.
+- 버튼 이름을 기준으로 자동 탐색하고 입력 큐에 전달하는 모바일 컨트롤 브리지 추가.
+- `GameBootstrap`에서 모바일 컨트롤 브리지를 자동 생성·초기화하도록 연결.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Infrastructure/Input/InputReader.cs`
+  - UI 방향 이동, 타이밍 모드 전환, 타이밍 판정 입력 큐 추가.
+- `Assets/Arkeum/Scripts/Presentation/UI/MobileGameplayControls.cs`
+  - `Timing-Button`, `Up-Button`, `Down-Button`, `Left-Button`, `Right-Button` 자동 탐색 및 클릭 이벤트 연결.
+- `Assets/Arkeum/Scripts/Presentation/UI/MobileGameplayControls.cs.meta`
+  - 신규 Unity 스크립트 에셋 메타데이터.
+- `Assets/Arkeum/Scripts/Core/GameBootstrap.cs`
+  - 모바일 컨트롤 컴포넌트를 자동 생성하고 `GameDirector`와 `InputReader` 주입.
+- `Docs/input.md`
+  - 이번 요청, 구현 범위와 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 방향 버튼 클릭을 기존 키보드 이동과 같은 `InputReader.TryGetMoveDirection()` 흐름으로 전달한다.
+- 이동 버튼은 허브와 일반 런 상태에서만 활성화되고, 타이밍 챌린지 및 결과 처리 중에는 비활성화된다.
+- `Timing-Button`은 일반 런에서 타이밍 모드 ON/OFF를 요청하고, 타이밍 챌린지에서는 현재 판정 입력을 요청한다.
+- 기존 `Timing-Button`의 비활성화된 루트 이미지는 화면에 표시되지 않는 투명 레이캐스트 영역으로 활성화해 클릭을 받을 수 있게 했다.
+- 버튼은 이름으로 자동 탐색하므로 씬의 `OnClick` 수동 등록 없이 동작한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 각 버튼을 직접 클릭해 이동 방향, 타이밍 모드 전환, 타이밍 챌린지 판정까지의 실제 UI 입력은 확인하지 못했다.
+- 버튼 이름이 변경되면 `MobileGameplayControls`의 자동 탐색 이름도 함께 변경하거나 Inspector 참조를 직접 지정해야 한다.
+
+## 2026-07-22 타이밍 챌린지 전체 게임 버튼 판정 입력
+
+### 사용자의 요청 개요
+- 타이밍 챌린지 중에는 특정 타이밍 버튼뿐 아니라 어떤 게임 조작 버튼을 눌러도 판정 입력이 되도록 수정 요청.
+
+### 핵심 요구사항
+- 타이밍 챌린지 중 상/하/좌/우 방향 버튼과 `Timing-Button`을 모두 판정 입력으로 처리한다.
+- 방향 버튼을 눌렀을 때 플레이어가 이동하지 않아야 한다.
+- 기존 키보드 아무 키 판정 입력은 유지한다.
+
+### 이번 작업 범위
+- 모바일 방향 버튼의 타이밍 챌린지 상태 처리와 활성 조건 변경.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/UI/MobileGameplayControls.cs`
+  - 타이밍 챌린지 중 방향 버튼 입력을 이동 대신 타이밍 판정으로 전달하고 버튼 활성 상태 유지.
+- `Docs/input.md`
+  - 이번 후속 요청과 변경 및 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- `QueueMove()`에서 현재 상태가 `TimingChallenge`이면 방향을 사용하지 않고 `QueueTimingAction()`을 호출한다.
+- 타이밍 챌린지 중에도 네 방향 버튼을 누를 수 있도록 활성 조건을 확장했다.
+- 따라서 `Timing-Button`과 네 방향 버튼 중 어느 것을 눌러도 동일한 타이밍 판정이 한 번 실행된다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 각 방향 버튼과 타이밍 버튼을 눌러 판정이 한 번씩 실행되는지는 직접 확인하지 못했다.
+
+## 2026-07-22 타이밍 판정 후 챌린지 재시작 중복 입력 수정
+
+### 사용자의 요청 개요
+- 타이밍 챌린지에서 우측 UI 버튼으로 판정하면 기존 챌린지가 완료되는 동시에 같은 방향 공격이 다시 실행되어 새 챌린지가 시작되는 문제 수정 요청.
+
+### 핵심 요구사항
+- UI 방향 버튼 클릭을 타이밍 판정과 일반 공격 입력으로 중복 처리하지 않는다.
+- 타이밍 챌린지 중 UI 버튼 입력은 판정 한 번만 실행한다.
+- UI 밖 마우스 입력과 키보드·게임패드 입력은 기존 동작을 유지한다.
+
+### 이번 작업 범위
+- 타이밍 판정 입력에서 UI 위 마우스 왼쪽 클릭과 `Player/Attack` 바인딩의 중복 처리 차단.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Infrastructure/Input/InputReader.cs`
+  - 포인터가 UI 위에 있을 때 마우스 왼쪽 `Attack` 입력을 타이밍 판정에서 제외.
+- `Docs/input.md`
+  - 문제 원인, 수정 범위와 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 기존에는 마우스 버튼을 누르는 순간 `Player/Attack`이 챌린지를 먼저 완료하고, 버튼을 놓을 때 UI `onClick`이 일반 이동으로 다시 큐에 들어갔다.
+- `WasTimingActionPressed()`에서 마우스 왼쪽 버튼이 눌렸고 현재 포인터가 UI 위라면 `Attack` 판정 입력을 무시하도록 변경했다.
+- UI 버튼의 `onClick`에서 생성되는 `QueueTimingAction()`만 남으므로 챌린지가 한 번만 완료되고 방향 이동 큐가 추가되지 않는다.
+- UI 밖의 마우스 클릭, 키보드 아무 키, 게임패드 판정 입력은 기존처럼 사용할 수 있다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 실행 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 실행 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 방향 UI 버튼을 눌러 기존 챌린지만 완료되고 새 챌린지가 시작되지 않는지는 직접 확인하지 못했다.
+## 2026-07-22 이동 버튼 패널 좌우 배치 설정 연결
+
+### 사용자의 요청 개요
+- 설정 패널의 `LeftButton-Toggle`, `RightButton-Toggle` 선택에 맞춰 `MoveButtonPanel` 위치가 좌우로 변경되도록 연결 요청.
+
+### 핵심 요구사항
+- 현재 `MoveButtonPanel` 위치를 우측 배치 기준으로 유지한다.
+- 왼쪽 토글 선택 시 패널을 화면 좌측의 대칭 위치로 옮긴다.
+- 오른쪽 토글 선택 시 기존 우측 위치로 되돌린다.
+
+### 이번 작업 범위
+- 기존 이동 버튼 방향 설정 이벤트를 실제 `GameScene`의 `MoveButtonPanel`에 연결.
+- 현재 씬 배치와 이동 버튼 패널의 가로 여백을 일치시킴.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/UI/MobileControlSettingsTarget.cs`
+  - 기본 가로 여백을 현재 우측 배치값인 50으로 조정.
+- `Assets/Arkeum/Scenes/GameScene.unity`
+  - `MoveButtonPanel`에 `MobileControlSettingsTarget`을 추가하고 패널의 `RectTransform`을 연결.
+- `Docs/input.md`
+  - 이번 요청, 변경 범위와 검증 결과를 기록.
+
+### 실제 수행한 작업 요약
+- `GameSettingsService.MovementSide` 변경 이벤트가 발생하면 이동 버튼 패널의 앵커와 피벗을 좌/우 하단으로 전환하도록 기존 적용 컴포넌트를 씬에 연결했다.
+- 왼쪽 배치는 `(x: 50, y: 50)`, 오른쪽 배치는 `(x: -50, y: 50)`의 하단 여백을 사용한다.
+- 저장된 설정도 게임 씬 활성화 시 즉시 적용된다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 성공 (경고 0개, 오류 0개).
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 성공 (경고 0개, 오류 0개).
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 두 토글을 직접 눌렀을 때의 실제 화면 전환은 확인하지 못했다.
+
+## 2026-07-24 플레이어 Idle 애니메이션 추가
+
+### 사용자의 요청 개요
+- 플레이어 캐릭터가 정지 상태에서도 Idle 스프라이트 애니메이션을 반복 재생하도록 구현 요청.
+
+### 핵심 요구사항
+- 기존 런타임 액터 생성 구조를 유지한다.
+- 허브와 던전의 플레이어 캐릭터에 같은 Idle 애니메이션을 적용한다.
+- 기존 이동 보간과 좌우 방향 전환을 유지한다.
+- 적 캐릭터의 기존 표시 동작에는 영향을 주지 않는다.
+
+### 이번 작업 범위
+- `ActorView`에 스프라이트 프레임 기반 Idle 반복 재생 기능 추가.
+- `WorldVisualSet`에 플레이어 Idle 프레임과 재생 속도 설정 추가.
+- `WorldPresenter`에서 플레이어 View에만 Idle 설정 연결.
+- 기존 Soldier Idle 스프라이트 6개를 `WorldVisualSet.asset`에 등록.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/World/ActorView.cs`
+  - Idle 프레임을 지정된 속도로 반복 재생하는 코루틴과 설정 API 추가.
+  - Idle 재생 중 일반 새로고침이 현재 애니메이션 프레임을 덮어쓰지 않도록 처리.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldVisualSet.cs`
+  - 플레이어 Idle 프레임 배열과 초당 프레임 수 설정 추가.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 허브 및 런 플레이어 View 생성·새로고침 시 Idle 설정 전달.
+- `Assets/Arkeum/ScriptableObjects/WorldVisualSet.asset`
+  - `Soldier-Idle_0`부터 `Soldier-Idle_5`까지 6프레임과 8 FPS 설정 등록.
+- `Docs/input.md`
+  - 이번 요청, 구현 범위와 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 플레이어 액터가 생성되면 첫 유효 Idle 프레임을 즉시 표시하고 6개 프레임을 8 FPS로 반복 재생한다.
+- 같은 Idle 설정이 반복 전달될 때 코루틴을 재시작하지 않아 액터 새로고침 중 애니메이션이 매번 처음으로 돌아가지 않게 했다.
+- 기존 `SpriteRenderer.flipX` 기반 좌우 방향 전환과 위치 이동 코루틴은 그대로 유지된다.
+- Idle 프레임이 없거나 모두 비어 있으면 기존 정지 스프라이트 표시 방식으로 동작한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 성공 (경고 0개, 오류 0개).
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 성공 (경고 0개, 오류 0개).
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 허브와 던전 플레이어의 실제 Idle 반복 재생 모습은 직접 확인하지 못했다.
+- 프레임별 잘린 영역 차이로 캐릭터가 미세하게 흔들려 보일 경우 Sprite Editor에서 여섯 프레임의 Pivot을 같은 위치로 맞출 필요가 있다.
+
+## 2026-07-24 적 이동 충돌 데미지 왕복 애니메이션
+
+### 사용자의 요청 개요
+- 적이 이동하려는 타일에 플레이어가 있어 이동 충돌 데미지를 줄 때, 일반 이동과 구분되는 왕복 점프 애니메이션 추가 요청.
+
+### 핵심 요구사항
+- 적이 플레이어 타일로 이동 충돌 데미지를 준 경우에만 실행한다.
+- 적의 실제 격자 위치는 기존 타일에 유지한다.
+- 플레이어 방향으로 타일 간 거리의 절반만 이동한다.
+- 전진 중 높이 `0.5`까지 상승하고, 원래 타일로 돌아오면서 하강한다.
+- 기존 일반 적 이동 애니메이션에는 영향을 주지 않는다.
+
+### 이번 작업 범위
+- 이동 충돌 데미지 발생 적과 목표 칸을 일회성 피드백으로 기록.
+- 월드 화면 갱신 시 해당 피드백을 소비해 충돌 적 View에 왕복 애니메이션 실행.
+- `ActorView`에 논리 위치를 변경하지 않는 충돌 이동 애니메이션 추가.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Actors/ActorEntity.cs`
+  - 저장 대상에서 제외되는 이동 충돌 화면 피드백 필드 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Actors/EnemyBehaviorActions.cs`
+  - 적의 준비된 이동 목표가 플레이어 위치일 때 충돌 피드백 기록.
+- `Assets/Arkeum/Scripts/Gameplay/Combat/EnemyTurnSystem.cs`
+  - 적 턴 시작 시 이전 이동 충돌 피드백 초기화.
+- `Assets/Arkeum/Scripts/Presentation/World/ActorView.cs`
+  - 목표 타일까지 절반 전진 후 원위치로 돌아오는 점프 코루틴 추가.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 보이는 적의 이동 충돌 피드백을 한 번 소비해 해당 View 애니메이션 실행.
+- `Docs/input.md`
+  - 이번 요청, 구현 범위와 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 이동 충돌 데미지가 발생하면 적 ID에 해당하는 View만 왕복 점프한다.
+- 애니메이션 전체 시간은 기존 적 이동과 같은 `0.16초`를 사용한다.
+- 전반부에는 원래 위치에서 목표 타일의 50% 지점까지 이동하며 높이 `+0.5`까지 상승한다.
+- 후반부에는 같은 경로를 되돌아오며 높이가 감소하고 원래 월드 위치에 정확히 복귀한다.
+- 애니메이션 중에도 적의 `GridPosition`은 변경하지 않아 게임 판정과 후속 턴에는 영향을 주지 않는다.
+- 피드백은 화면 갱신 시 한 번만 소비되므로 이후 새로고침에서 반복 재생되지 않는다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 성공 (경고 0개, 오류 0개).
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 성공 (경고 0개, 오류 0개).
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 이동 충돌 데미지 발생 시 전진 거리, 최고 높이와 복귀 타이밍은 직접 확인하지 못했다.
+- 체감상 너무 빠르거나 느리면 `ActorView.EnemyMoveDuration`, 충돌 높이가 과하면 `EnemyJumpHeight` 값을 조정할 수 있다.
+
+## 2026-07-24 플레이어 피격 화면 흔들림 및 모바일 진동 연결
+
+### 사용자의 요청 개요
+- 플레이어가 데미지를 받으면 화면 흔들림과 모바일 진동을 실행하고 Settings의 각 토글에 연결 요청.
+
+### 핵심 요구사항
+- 플레이어 HP가 실제로 감소한 경우에만 피격 피드백을 실행한다.
+- ScreenShake 설정이 켜져 있을 때만 카메라를 흔든다.
+- Vibration 설정이 켜져 있고 모바일 플랫폼일 때만 진동을 실행한다.
+- 기존 Settings 저장 및 UI 갱신 흐름을 유지한다.
+
+### 이번 작업 범위
+- 플레이어 데미지 감지 결과를 한 번 계산해 피격 사운드와 시각·진동 피드백에 공통 사용.
+- 기존 카메라 흔들림 기능을 플레이어 피격에서도 호출할 수 있도록 일반화.
+- 기존 `GameSettingsService.TryVibrate()`를 플레이어 피격 흐름에 연결.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Core/GameDirector.cs`
+  - 처리 전후 플레이어 HP 비교 결과를 저장하고, HP 감소 시 플레이어 피격 피드백 호출.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 화면 흔들림과 모바일 진동을 함께 실행하는 `PlayPlayerDamageFeedback()` 추가.
+  - 기존 적 데미지 화면 흔들림 메서드를 공용 데미지 화면 흔들림 메서드로 이름 변경.
+- `Docs/input.md`
+  - 이번 요청, 구현 범위와 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 플레이어 행동과 이어지는 적 턴 처리가 끝난 뒤 HP가 행동 시작 전보다 낮아졌는지 확인한다.
+- HP가 감소하면 기존 피격 사운드에 더해 월드 새로고침 후 플레이어 피격 피드백을 실행한다.
+- 화면 흔들림은 `GameSettingsService.ScreenShakeEnabled`가 켜진 경우에만 실행된다.
+- 화면 흔들림 시간과 강도는 기존 `WorldVisualSet` 설정인 `0.12초`, `0.12`를 사용한다.
+- 진동은 `GameSettingsService.TryVibrate()`를 통해 `Application.isMobilePlatform`과 `VibrationEnabled`가 모두 참일 때만 `Handheld.Vibrate()`를 호출한다.
+- `OptionPanel.prefab`의 `Vibration-Toggle`과 `ScreenShake-Toggle`은 기존 `SettingsMenuBinder`에 이미 연결되어 있어 씬 및 프리팹 수정 없이 저장된 설정이 즉시 반영된다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 성공 (경고 0개, 오류 0개).
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 성공 (경고 0개, 오류 0개).
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 플레이어 피격 시 실제 카메라 흔들림은 직접 확인하지 못했다.
+- 모바일 실기기에서 진동 작동과 Settings 토글 OFF 시 진동이 차단되는지는 확인하지 못했다.
+- Unity Editor와 일반 데스크톱 빌드에서는 `Application.isMobilePlatform`이 거짓이므로 진동이 실행되지 않는다.
+
+## 2026-07-24 적 캐릭터 Idle 애니메이션 추가
+
+### 사용자의 요청 개요
+- 플레이어와 동일한 스프라이트 프레임 방식의 Idle 애니메이션을 적 캐릭터에도 추가 요청.
+
+### 핵심 요구사항
+- 적 종류마다 서로 다른 Idle 프레임과 재생 속도를 설정할 수 있어야 한다.
+- 기존 플레이어 Idle 애니메이션을 유지한다.
+- 적 이동, 좌우 방향 전환과 이동 충돌 왕복 애니메이션을 유지한다.
+- Idle 프레임이 없는 적은 기존 정지 스프라이트로 표시한다.
+
+### 이번 작업 범위
+- `EnemyDefinition`에 적별 Idle 프레임 배열과 FPS 설정 추가.
+- `WorldPresenter`가 플레이어와 적의 Idle 설정을 각각 `ActorView`에 전달하도록 확장.
+- Orc, Skeleton, Boss 정의 에셋에 기존 Idle 리소스 등록.
+- Bat 정의에는 추후 프레임 등록이 가능한 빈 설정 추가.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Actors/EnemyDefinition.cs`
+  - 적별 `idleFrames`, `idleFrameRate` 직렬화 필드와 읽기 프로퍼티 추가.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 액터 View 생성·새로고침 시 액터 종류에 맞는 Idle 프레임과 FPS 전달.
+- `Assets/Arkeum/ScriptableObjects/Enemies/Orc/OrcDefinition.asset`
+  - Orc Idle 6프레임과 8 FPS 등록.
+- `Assets/Arkeum/ScriptableObjects/Enemies/Skeleton/SkeletonDefinition.asset`
+  - Skeleton Idle 6프레임과 8 FPS 등록.
+- `Assets/Arkeum/ScriptableObjects/Enemies/Boss/BossDefinition.asset`
+  - 기존 붉은 Orc 계열 외형에 맞춰 Orc Idle 6프레임과 8 FPS 등록.
+- `Assets/Arkeum/ScriptableObjects/Enemies/Bat/BatDefinition.asset`
+  - 빈 Idle 프레임 배열과 8 FPS 기본 설정 추가.
+- `Docs/input.md`
+  - 이번 요청, 구현 범위와 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 적 View도 기존 `ActorView.SetIdleAnimation()`을 사용해 프레임을 반복 재생한다.
+- Orc와 Boss는 `Orc-Idle_0`부터 `Orc-Idle_5`까지, Skeleton은 `enemies-skeleton1_idle_0`부터 `_5`까지 재생한다.
+- 적별 프레임 속도는 현재 모두 8 FPS로 설정했으며 각 `EnemyDefinition` Inspector에서 독립적으로 변경할 수 있다.
+- 같은 설정이 반복 전달될 때 기존 코루틴을 유지하므로 월드 새로고침마다 애니메이션이 첫 프레임으로 돌아가지 않는다.
+- 프레임 배열이 비어 있거나 유효한 프레임이 없으면 기존 `sprite`를 계속 사용한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 성공 (경고 0개, 오류 0개).
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 성공 (경고 0개, 오류 0개).
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 Orc, Skeleton, Boss의 실제 Idle 재생 크기, Pivot과 색상 적용 결과는 직접 확인하지 못했다.
+- 현재 Bat에는 `Bat.png` 단일 이미지밖에 없어 실제 Idle 애니메이션은 적용되지 않았다. Bat용 분할 프레임을 추가한 뒤 `BatDefinition.Idle Frames`에 등록해야 한다.
+- 프레임별 Pivot 차이로 적이 흔들려 보이면 해당 스프라이트 시트의 Pivot을 동일하게 맞출 필요가 있다.
+
+## 2026-07-27 상점 랜덤 상품·진열대 프리팹·근접 설명 팝업 연결
+
+### 사용자의 요청 개요
+- 사용자가 제작한 `ShopShelfView` 프리팹을 상점 진열대 월드 표시에 사용하도록 요청.
+- 별도 상품 목록에서 중복 없이 무작위 상품 3개를 골라 진열대에 배치하도록 요청.
+- `GameScene/HUD-Canvas`에 배치한 `ShopOfferPopup`을 플레이어가 진열대에 접근했을 때 표시하고 멀어지면 숨기도록 요청.
+- 팝업의 `ItemNameText`, `ItemDescImage`, `DescriptionText`, `PriceText`에 상품 정보를 연결하도록 요청.
+
+### 핵심 요구사항
+- 기존 `Shop.asset`의 진열대 좌표와 구매·저장 흐름을 유지한다.
+- 새 런의 맵 생성 시 상품을 한 번만 무작위 선정하고 저장 데이터를 불러올 때는 재추첨하지 않는다.
+- 판매 상품은 중복 없이 최대 3개를 선정한다.
+- 여러 진열대와 인접하면 플레이어가 바라보는 방향의 진열대를 우선 표시한다.
+- 구매 완료, 거리 이탈, 상점 퇴장 또는 런 종료 시 팝업을 숨긴다.
+- 골드가 부족하면 가격을 다른 색으로 표시한다.
+
+### 이번 작업 범위
+- 상점 상품 카탈로그 ScriptableObject와 1층용 기본 카탈로그 에셋 추가.
+- 기존 상점 진열대 데이터를 위치 슬롯으로 사용하고 카탈로그 상품을 런타임에 배정.
+- `ShopShelfView.prefab`을 `WorldPresenter`에 연결해 진열대와 상품 아이콘을 함께 표시.
+- `ShopOfferPopupPresenter`를 팝업 프리팹과 `GameScene` 오브젝트에 연결.
+- 무기별 상점 설명 이미지 설정 필드 추가.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Run/ShopCatalogDefinition.cs`
+  - 판매 무기, 가격, 설명 목록을 보관하는 상점 카탈로그 데이터 추가.
+- `Assets/Arkeum/ScriptableObjects/ShopCatalog.asset`
+  - 창, 단검, 대검 기본 상품 3개 등록.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunFloorDefinition.cs`
+  - 층별 `ShopCatalog`, `ShopOfferCount` 설정 추가.
+- `Assets/Arkeum/ScriptableObjects/RunDefinition.asset`
+  - 1층에 기본 카탈로그와 상품 수 3개 설정.
+- `Assets/Arkeum/Scripts/Gameplay/Map/MapGenerator.cs`
+  - 맵 생성 완료 후 유효 카탈로그 상품을 섞고, 진열대 위치에 중복 없이 최대 지정 개수 배정.
+- `Assets/Arkeum/Scripts/Gameplay/Run/WeaponDefinition.cs`
+  - 팝업 `ItemDescImage`용 `shopDescriptionSprite` 설정 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs`
+  - 인접 상품 조회 API 추가, 바라보는 방향 우선 처리, 기존 인접 상품 HUD 로그 제거.
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - `ShopShelfView.prefab` 인스턴스 생성 및 `ShelfRenderer`/`ItemIconRenderer` 설정.
+- `Assets/Arkeum/Scripts/Presentation/UI/ShopOfferPopupPresenter.cs`
+  - 팝업 자식 UI 자동 탐색, 상품 정보 표시, 접근·이탈 및 가격 색상 처리.
+- `Assets/Arkeum/Scripts/Presentation/UI/HudPresenter.cs`
+  - 현재 런과 플레이어 위치를 기준으로 상점 팝업을 지속 갱신.
+- `Assets/Arkeum/Prefabs/ShopOfferPopup.prefab`
+  - `ShopOfferPopupPresenter` 컴포넌트 추가.
+- `Assets/Arkeum/Scenes/GameScene.unity`
+  - 씬 팝업에 Presenter를 연결하고 `WorldPresenter`에 `ShopShelfView.prefab` 참조 설정.
+- `Assembly-CSharp.csproj`
+  - 신규 런타임 스크립트 컴파일 항목 추가.
+- 신규 스크립트와 에셋의 `.meta`
+  - Unity GUID 및 임포터 정보 추가.
+- `Docs/input.md`
+  - 이번 요청, 구현 범위와 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- `Shop.asset.ShopOffers`에 등록된 세 좌표는 진열대 위치 슬롯으로 유지하고, 새 런 맵이 생성된 뒤 해당 위치의 상품 데이터만 카탈로그 결과로 교체한다.
+- 카탈로그의 유효한 상품을 섞어 중복 없이 최대 `ShopOfferCount`개를 선택한다.
+- 선정 결과는 기존 런타임 `MapDefinition.ShopOffers`에 들어가므로 기존 저장/불러오기에서 무기, 가격, 설명이 그대로 유지된다.
+- 현재 기본 카탈로그에는 창 3 Gold, 단검 1 Gold, 대검 3 Gold를 등록했다.
+- 월드 진열대는 사용자가 만든 `ShopShelfView.prefab`을 생성하고 `ItemIconRenderer`에 실제 선정 무기 스프라이트와 색상을 적용한다.
+- 팝업은 자식 이름으로 네 UI 요소를 찾아 이름, 설명 이미지, 설명, 가격을 설정한다.
+- `ItemDescImage`는 무기의 `Shop Description Sprite`를 우선 사용하고, 미설정 시 기존 무기 스프라이트를 임시 이미지로 사용한다.
+- 플레이어가 상하좌우 한 칸 안에 있는 동안 팝업을 표시하고, 여러 상품이 인접하면 `FacingDirection`의 상품을 먼저 선택한다.
+- 현재 골드가 가격보다 적으면 가격 글자를 붉은색으로 표시한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 랜덤 상품 표시, 프리팹 크기·정렬, 팝업 접근·이탈과 구매 후 숨김은 직접 확인하지 못했다.
+- 현재 카탈로그 상품이 정확히 3개이므로 구성은 항상 세 무기이며 배치 순서만 무작위다. 서로 다른 조합을 만들려면 `ShopCatalog.asset`에 네 번째 이상의 상품을 추가해야 한다.
+- 전용 작동 설명 이미지는 아직 지정되지 않았다. 각 `WeaponDefinition`의 `Shop Description Sprite`에 이미지를 지정하기 전까지 `ItemDescImage`에는 무기 아이콘이 표시된다.
+- `ShopOfferPopup`의 실제 모바일 화면 배치와 텍스트 넘침은 Unity Game View에서 확인 후 RectTransform 및 폰트 크기 조정이 필요할 수 있다.
+
+## 2026-07-27 상점 설명 팝업을 진열대 PopupAnchor에 연결
+
+### 사용자의 요청 개요
+- `ShopOfferPopup`이 고정된 HUD 위치가 아니라 현재 선택된 `ShopShelfView`의 `PopupAnchor` 위치에 나타나도록 요청.
+
+### 핵심 요구사항
+- 인접 상품 선택 규칙과 팝업 표시·숨김 조건은 기존대로 유지한다.
+- 실제 생성된 진열대 프리팹의 `PopupAnchor` 위치를 사용한다.
+- 월드 좌표를 `HUD-Canvas` 좌표로 변환해 화면 공간 팝업을 배치한다.
+- 카메라 이동 시 팝업 위치도 계속 갱신한다.
+
+### 이번 작업 범위
+- `WorldPresenter`가 상품 좌표별 진열대 `PopupAnchor`를 추적하도록 확장.
+- `HudPresenter`가 현재 `WorldPresenter`를 상점 팝업 갱신에 전달.
+- `ShopOfferPopupPresenter`가 앵커 월드 좌표를 화면 및 Canvas 로컬 좌표로 변환하도록 확장.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Presentation/World/WorldPresenter.cs`
+  - 생성된 `ShopShelfView`의 `PopupAnchor`를 상품 좌표별로 저장하고 월드 위치 조회 API 제공.
+  - 마커 재생성 시 이전 앵커 참조 제거.
+- `Assets/Arkeum/Scripts/Presentation/UI/HudPresenter.cs`
+  - 팝업 갱신 시 `WorldPresenter` 전달.
+- `Assets/Arkeum/Scripts/Presentation/UI/ShopOfferPopupPresenter.cs`
+  - `Camera.WorldToScreenPoint()`와 `RectTransformUtility.ScreenPointToLocalPointInRectangle()`을 사용한 HUD 좌표 변환 추가.
+- `Docs/input.md`
+  - 이번 요청, 변경 범위와 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 진열대 프리팹 생성 시 `PopupAnchor` 자식을 찾아 해당 상품의 격자 좌표와 연결한다.
+- 플레이어와 인접한 상품이 선택되면 연결된 앵커의 실제 월드 위치를 조회한다.
+- 현재 월드 카메라로 앵커를 화면 좌표로 변환하고, `HUD-Canvas`가 Screen Space Overlay인지 Camera 방식인지에 맞춰 팝업 `RectTransform.anchoredPosition`을 설정한다.
+- 앵커가 없거나 카메라 뒤에 있으면 팝업을 숨긴다.
+- 기존 접근, 이탈, 구매, 런 종료 및 바라보는 방향 우선 규칙은 유지한다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 성공.
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 성공.
+- 최종 빌드 결과: 경고 0개, 오류 0개.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 `PopupAnchor`와 팝업 중심점의 시각적 일치, 화면 가장자리에서의 잘림 여부는 직접 확인하지 못했다.
+- 팝업은 자신의 Pivot을 기준으로 앵커 위치에 정렬된다. 앵커를 팝업의 모서리에 맞추려면 `ShopOfferPopup`의 Pivot 또는 `ShopShelfView/PopupAnchor` 위치를 Inspector에서 조정해야 한다.
+- 화면 가장자리에서 팝업 전체를 화면 안으로 제한하는 Clamp 처리는 현재 포함하지 않았다.
+
+## 2026-07-29 타이밍 팝업 준비 시간 및 시작·성공·실패 효과음 추가
+
+### 사용자의 요청 개요
+- 타이밍 팝업이 표시되자마자 판정이 진행되는 부담을 줄이기 위해 시작 전 대기 시간을 추가하고, 시작·성공·실패 상황별 효과음을 연결해 달라는 요청.
+
+### 핵심 요구사항
+- 팝업을 먼저 표시한 뒤 0.8초 동안 타이밍 런타임을 정지한다.
+- 준비 시간이 끝나는 시점에 시작 효과음을 재생한다.
+- 준비 시간 중 입력은 판정에 사용하거나 이후 프레임으로 넘기지 않는다.
+- 타이밍 판정 결과에 따라 서로 다른 성공·실패 효과음을 재생한다.
+- 기존 SFX 볼륨 및 음소거 설정을 그대로 적용한다.
+
+### 이번 작업 범위
+- 타이밍 정의별로 조절 가능한 시작 대기 시간 설정 추가.
+- 타이밍 세션에 준비 상태와 남은 준비 시간 관리 추가.
+- 게임 진행 루프에서 준비 중 입력 폐기, 시작음 및 결과음 호출 연결.
+- 기존 프로젝트 오디오 클립을 활용한 타이밍 SFX 세 종류 등록.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Timing/TimingChallengeDefinition.cs`
+  - 타이밍 종류별 `Start Delay Seconds` 설정과 읽기 프로퍼티 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Timing/TimingSession.cs`
+  - 준비 시간, 시작 상태와 준비 시간 갱신 로직 추가.
+- `Assets/Arkeum/Scripts/Core/GameDirector.cs`
+  - 준비 중 런타임 정지 및 입력 폐기, 시작·결과 효과음 호출 연결.
+- `Assets/Arkeum/Scripts/Presentation/Audio/AudioCueService.cs`
+  - 타이밍 시작·성공·실패 SFX 호출 API 추가.
+- `Assets/Arkeum/ScriptableObjects/Timing/ClockHandTimingChallenge.asset`
+  - 시작 대기 시간을 0.8초로 설정.
+- `Assets/Arkeum/ScriptableObjects/Timing/RadialShrinkTimingChallenge.asset`
+  - 시작 대기 시간을 0.8초로 설정.
+- `Assets/Arkeum/ScriptableObjects/Timing/SinglePressTimingChallenge.asset`
+  - 시작 대기 시간을 0.8초로 설정.
+- `Assets/Arkeum/Prefabs/AudioManager.prefab`
+  - `TimingStart`, `TimingSuccess`, `TimingFailed` SFX 항목과 기존 오디오 클립 연결.
+- `Docs/input.md`
+  - 이번 요청, 변경 범위와 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 타이밍 세션 생성 시 정의에 설정된 준비 시간을 저장하고, 준비 시간이 끝나기 전에는 기존 타이밍 런타임의 `Tick()`을 호출하지 않는다.
+- 준비 시간 동안 키보드 및 모바일 타이밍 입력을 매 프레임 소비하여 시작 직후 의도하지 않은 판정으로 이어지지 않게 했다.
+- 0.8초가 지나 세션이 시작 상태로 바뀌는 순간 `TimingStart` 효과음을 재생한다.
+- 성공 판정에는 `TimingSuccess`, 실패 입력 및 시간 초과에는 `TimingFailed` 효과음을 재생한다.
+- 시작음에는 `013_Confirm_03`, 성공음에는 `16_Atk_buff_04`, 실패음에는 `029_Decline_09` 기존 클립을 사용했다.
+- 세 효과음은 `AudioManager`의 기존 SFX 경로를 사용하므로 저장된 SFX 볼륨과 음소거 설정을 따른다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 성공 (경고 0개, 오류 0개).
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 성공 (경고 0개, 오류 0개).
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 0.8초 준비 시간의 실제 체감과 시작음·움직임의 시청각 동기화는 직접 확인하지 못했다.
+- 시작·성공·실패 효과음의 음량과 음색이 전투 BGM 및 공격음과 잘 구분되는지는 실제 재생 후 조정할 수 있다.
+
+## 2026-07-29 게임 진행 주요 상황 효과음 확장
+
+### 사용자의 요청 개요
+- 사운드 점검 결과에서 제안한 적 명중·처치, 장비·상점, 보스방, 층 전환·런 결과, 막힘 및 일시정지 효과음을 실제 게임 흐름에 적용해 달라는 요청.
+
+### 핵심 요구사항
+- 플레이어 공격음과 별도로 적 명중 및 처치 결과를 소리로 구분한다.
+- 무기 획득·교체, 상점 구매 성공 및 구매 불가 상황에 맞는 효과음을 재생한다.
+- 보스방 진입·봉인·개방을 소리로 강조한다.
+- 층 클리어·다음 층 이동, 플레이어 사망·최종 클리어 결과를 구분한다.
+- 벽 충돌 및 상점 거절음의 과도한 반복 재생을 제한한다.
+- 기존에 3으로 설정된 SFX 피치를 정상 범위로 조정한다.
+
+### 이번 작업 범위
+- 런 액션 피드백 플래그를 주요 전투·아이템·진행 이벤트까지 확장.
+- 게임 진행 결과에 따라 중앙 오디오 큐 서비스를 통해 SFX 호출.
+- 프리팹에 기존 프로젝트 오디오 클립 기반 신규 SFX 항목 등록.
+- SFX별 재생 간격과 지연 재생 기능 추가.
+- 일시정지·재개 및 허브 벽 충돌 피드백 연결.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunActionFeedback.cs`
+  - 적 명중·처치, 장비 획득·해제, 구매, 거절, 보스방 및 층 클리어 피드백 플래그 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Run/RunController.cs`
+  - 실제 전투, 획득, 구매, 보스방 봉인·개방 및 출구 사용 결과에 피드백 플래그 설정.
+  - 막힌 길도 턴을 소비하지 않는 처리 결과로 반환해 거절음을 재생하도록 연결.
+- `Assets/Arkeum/Scripts/Presentation/Audio/AudioCueService.cs`
+  - 확장된 액션 피드백을 SFX ID로 변환.
+  - 층 이동, 런 사망·클리어 및 허브 거절음 호출 API 추가.
+  - 동시에 발생하는 보스 봉인·층 이동·결과음을 짧게 지연해 겹침 완화.
+- `Assets/Arkeum/Scripts/Presentation/Audio/AudioManager.cs`
+  - SFX 항목별 재생 간격 설정과 unscaled time 기반 지연 재생 지원.
+- `Assets/Arkeum/Scripts/Core/GameDirector.cs`
+  - 허브 벽 충돌, 다음 층 이동, 런 결과 표시 시 해당 효과음 호출.
+- `Assets/Arkeum/Scripts/Presentation/UI/PauseMenuController.cs`
+  - 일시정지 및 재개 효과음 연결.
+- `Assets/Arkeum/Prefabs/AudioManager.prefab`
+  - 적 명중·처치, 장비, 상점, 거절, 보스방, 층 전환, 결과, 일시정지 SFX 등록.
+  - 기존 SFX 피치를 0.8~1.15 범위로 조정하고 상황별 음량·랜덤 피치·재생 간격 설정.
+- `Docs/input.md`
+  - 이번 요청, 구현 범위와 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 공격 시 기존 휘두르기 소리 뒤에 명중 여부와 처치 여부에 따라 `EnemyHit`, `EnemyDefeated`가 추가로 재생된다.
+- 다중 타격은 한 액션당 명중음과 처치음을 각각 한 번만 재생해 과도한 중첩을 방지한다.
+- 바닥 무기 획득은 장착음, 기존 무기를 내려놓으면 해제음, 상점 구매는 구매음으로 구분했다.
+- 골드 부족, 빈 진열대와 벽 충돌에는 `ActionDenied`를 사용하고 0.15초 재생 제한을 적용했다.
+- 보스방 진입 시 조우음 후 0.18초 뒤 봉인음을 재생하며, 전멸 후에는 개방음을 재생한다.
+- 출구 사용 시 층 클리어음, 다음 층 생성 후 0.25초 뒤 착지 계열 이동음을 재생한다.
+- 최종 결과는 피격·층 클리어음과 겹치지 않도록 사망은 0.2초, 클리어는 0.3초 뒤 별도 결과음을 재생한다.
+- Escape 키와 UI 버튼 양쪽의 일시정지·재개 흐름에 전용 효과음을 연결했다.
+- 기존 `PlayerHit`가 거절음과 같은 클립을 사용하던 설정을 실제 피격 클립 `61_Hit_03`으로 교체했다.
+- 신규 클립은 모두 기존 `Assets/Arkeum/Audio/SFX` 리소스를 재사용했다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 성공 (경고 0개, 오류 0개).
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 성공 (경고 0개, 오류 0개).
+- `AudioManager.prefab`에서 참조하는 오디오 GUID가 모두 프로젝트 `.meta`에 존재하는지 확인했다.
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 BGM과 함께 들었을 때의 실제 음량, 피치와 지연 간격은 직접 확인하지 못했다.
+- 보스방 진입, 마지막 적 처치, 다음 층 이동과 최종 결과처럼 여러 큐가 이어지는 구간은 실제 재생 후 간격 조정이 필요할 수 있다.
+- 이번 효과음은 화면 전체에 일관되게 들리는 2D SFX로 연결했다. 적 위치 기반 공간 음향은 현재 카메라·AudioListener 거리 감쇠 설정을 먼저 확인한 뒤 별도로 적용하는 것이 안전하다.
+
+## 2026-07-29 타이밍 판정 후행 여유 범위 추가
+
+### 사용자의 요청 개요
+- 화면에 보이는 타이밍 마커보다 실제 판정이 앞서 진행되는 것처럼 느껴져, 초록색 성공 범위 안에서 조금 늦게 입력했을 때 실패하는 현상을 완화해 달라는 요청.
+
+### 핵심 요구사항
+- 화면에 표시되는 성공 범위와 기존 난이도 인상은 유지한다.
+- 타이밍 진행 방향의 뒤쪽에만 실제 성공 판정 범위를 조금 더 제공한다.
+- 아직 성공 범위에 도달하지 않은 빠른 입력에는 추가 보정을 적용하지 않는다.
+- 선형, 시계 회전, 원형 축소 타이밍 모두 같은 시간 기준의 체감 여유를 사용한다.
+
+### 이번 작업 범위
+- 모든 타이밍 정의에 조절 가능한 늦은 입력 허용 시간 추가.
+- 타이밍 방식별 이동 방향에 맞춘 후행 판정 범위 계산 적용.
+- 세 타이밍 에셋에 기본 0.06초 허용 시간 설정.
+
+### 변경된 파일과 변경 목적
+- `Assets/Arkeum/Scripts/Gameplay/Timing/TimingChallengeDefinition.cs`
+  - 공통 `Late Input Grace Seconds` 설정과 읽기 프로퍼티 추가.
+- `Assets/Arkeum/Scripts/Gameplay/Timing/SinglePressTimingChallengeDefinition.cs`
+  - 오른쪽으로 이동하는 마커의 성공 구간 뒤쪽에 시간 기준 판정 여유 적용.
+- `Assets/Arkeum/Scripts/Gameplay/Timing/ClockHandTimingChallengeDefinition.cs`
+  - 시계바늘의 실제 회전 방향 뒤쪽으로 성공 각도 확장.
+- `Assets/Arkeum/Scripts/Gameplay/Timing/RadialShrinkTimingChallengeDefinition.cs`
+  - 축소 마커가 최근 허용 시간 동안 성공 링을 통과했는지 판정.
+- `Assets/Arkeum/ScriptableObjects/Timing/ClockHandTimingChallenge.asset`
+  - 늦은 입력 허용 시간을 0.06초로 설정.
+- `Assets/Arkeum/ScriptableObjects/Timing/RadialShrinkTimingChallenge.asset`
+  - 늦은 입력 허용 시간을 0.06초로 설정.
+- `Assets/Arkeum/ScriptableObjects/Timing/SinglePressTimingChallenge.asset`
+  - 늦은 입력 허용 시간을 0.06초로 설정.
+- `Docs/input.md`
+  - 이번 요청, 구현 방식과 검증 결과 기록.
+
+### 실제 수행한 작업 요약
+- 성공 영역을 시각적으로 넓히지 않고 판정에만 0.06초의 후행 여유를 추가했다.
+- 선형 타이밍은 현재 마커 위치부터 0.06초 전 위치까지의 구간이 성공 영역과 겹치면 성공으로 판정한다.
+- 시계 타이밍은 회전 속도를 기준으로 0.06초에 해당하는 각도를 계산해 시계방향 또는 반시계방향의 뒤쪽 경계만 확장한다.
+- 원형 축소 타이밍은 현재 반지름과 0.06초 전 반지름 사이가 성공 링을 통과하거나 겹치면 성공으로 판정한다.
+- 성공 영역에 도달하기 전의 빠른 입력에는 여유 범위가 추가되지 않는다.
+
+### 빌드/테스트 여부
+- `dotnet build Assembly-CSharp.csproj -nologo` 성공 (경고 0개, 오류 0개).
+- `dotnet build Assembly-CSharp-Editor.csproj -nologo` 성공 (경고 0개, 오류 0개).
+
+### 확인하지 못한 사항 또는 후속 점검 사항
+- Unity Play Mode에서 실제 표시 위치와 입력 판정의 체감 일치는 직접 확인하지 못했다.
+- 0.06초가 여전히 짧거나 지나치게 관대하면 각 타이밍 에셋의 `Late Input Grace Seconds`를 조정할 수 있다.

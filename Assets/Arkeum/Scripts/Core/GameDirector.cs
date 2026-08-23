@@ -6,6 +6,7 @@ using Arkeum.Production.Gameplay.Progression;
 using Arkeum.Production.Gameplay.Run;
 using Arkeum.Production.Gameplay.Timing;
 using Arkeum.Production.Presentation.Audio;
+using Arkeum.Production.Infrastructure.Persistence;
 using UnityEngine;
 
 namespace Arkeum.Production.Core
@@ -52,10 +53,23 @@ namespace Arkeum.Production.Core
             }
         }
 
-        public void Initialize(ServiceRegistry services, SaveProfile profile)
+        public void Initialize(ServiceRegistry services, SaveProfile profile, SaveGameData loadedGame = null)
         {
             Services = services;
             ActiveProfile = profile;
+
+            if (loadedGame != null)
+            {
+                if (loadedGame.Run != null && RestoreRun(loadedGame.Run))
+                {
+                    return;
+                }
+
+                CurrentState = GameState.Hub;
+                EnterHub("Save loaded. The return altar receives you once more.");
+                return;
+            }
+
             CurrentState = startingState;
 
             switch(startingState)
@@ -94,6 +108,7 @@ namespace Arkeum.Production.Core
             Services.HudPresenter.ClearRunResult();
             Services.HudPresenter.SetDialogue(string.Empty);
             Services.HudPresenter.SetMessage(message ?? "The embers of the return altar flicker quietly.");
+            Services.ResultScreenPresenter.Hide();
 
             CurrentRunController = null;
             CurrentState = GameState.Hub;
@@ -146,6 +161,7 @@ namespace Arkeum.Production.Core
             Services.HudPresenter.BindRun(runState);
             Services.HudPresenter.SetDialogue(string.Empty);
             Services.HudPresenter.SetMessage("You descend into the ash corridor. Enemies react after every action.");
+            Services.ResultScreenPresenter.Hide();
             CurrentState = GameState.InRun;
             
             Services.AudioCueService.PlayRunBgm();
@@ -174,6 +190,8 @@ namespace Arkeum.Production.Core
             Services.HudPresenter.SetMessage(CurrentRunController.CurrentRun.EndReason == RunEndReason.Death
                 ? "Death is not the end, only the start of reckoning."
                 : "The recovered light returns to the altar.");
+            Services.ResultScreenPresenter.Show(CurrentRunController.CurrentRun, ActiveProfile);
+            Services.AudioCueService.PlayRunResult(CurrentRunController.CurrentRun.EndReason);
 
             Services.WorldPresenter.Refresh();
             CurrentState = GameState.RunResult;
@@ -202,6 +220,7 @@ namespace Arkeum.Production.Core
             if (!Services.MapService.IsWalkableCell(target))
             {
                 Services.HudPresenter.SetMessage("The path is blocked.");
+                Services.AudioCueService.PlayActionDenied();
                 return;
             }
 
@@ -246,8 +265,14 @@ namespace Arkeum.Production.Core
             // 타이밍 공격
             if (actionResult == PlayerActionResultType.TimingChallengeStarted)
             {
+                TimingSession session = Services.TimingService.CurrentSession;
                 Services.WorldPresenter.Refresh();
-                Services.TimingPopupPresenter.Show(Services.TimingService.CurrentSession);
+                Services.TimingPopupPresenter.Show(session);
+                if (session != null && session.HasStarted)
+                {
+                    Services.AudioCueService.PlayTimingStart();
+                }
+
                 Services.HudPresenter.SetMessage(CurrentRunController.LastMessage);
                 CurrentState = GameState.TimingChallenge;
                 return;
@@ -263,6 +288,18 @@ namespace Arkeum.Production.Core
             {
                 Services.TimingPopupPresenter.Hide();
                 CurrentState = GameState.InRun;
+                return;
+            }
+
+            if (!session.HasStarted)
+            {
+                // 준비 시간 동안 발생한 키보드 및 모바일 입력은 다음 프레임으로 넘기지 않는다.
+                Services.InputReader.WasTimingActionPressed();
+                if (session.TickStartDelay(Time.deltaTime))
+                {
+                    Services.AudioCueService.PlayTimingStart();
+                }
+
                 return;
             }
 
@@ -282,6 +319,7 @@ namespace Arkeum.Production.Core
 
         private void CompleteTimingChallenge(TimingSession session, TimingResultGrade grade)
         {
+            Services.AudioCueService.PlayTimingResult(grade);
             TimingAttackResult result = session.BuildResult(grade);
             int playerHpBeforeAction = GetCurrentRunPlayerHp();
             CurrentRunController.ResolveTimedAttack(result);
@@ -293,13 +331,19 @@ namespace Arkeum.Production.Core
         private void CompleteHandledRunAction(int playerHpBeforeAction)
         {
             Services.AudioCueService.PlayRunActionFeedback(CurrentRunController.LastActionFeedback);
-            if (DidCurrentRunPlayerHpDecrease(playerHpBeforeAction))
+            bool playerDamaged = DidCurrentRunPlayerHpDecrease(playerHpBeforeAction);
+            if (playerDamaged)
             {
                 Services.AudioCueService.PlayPlayerHit();
             }
 
             Services.WorldPresenter.Refresh();
             Services.WorldPresenter.PlayEnemyDamageEffects(CurrentRunController.DamagedEnemyCells);
+            if (playerDamaged)
+            {
+                Services.WorldPresenter.PlayPlayerDamageFeedback();
+            }
+
             Services.HudPresenter.SetMessage(CurrentRunController.LastMessage);
 
             if (CurrentRunController.CurrentRun.EndReason != RunEndReason.None)
@@ -311,6 +355,122 @@ namespace Arkeum.Production.Core
 
                 ShowRunResult();
             }
+        }
+
+        // 추후 저장 슬롯 버튼의 OnClick(int)에 1, 2, 3을 전달하면 된다.
+        public void SaveToSlot(int slotNumber)
+        {
+            if (!TrySaveToSlot(slotNumber, out string error))
+            {
+                Debug.LogWarning($"[GameDirector] Could not save slot {slotNumber}: {error}", this);
+                Services?.HudPresenter?.SetMessage($"Save failed: {error}");
+                return;
+            }
+
+            Services.HudPresenter.SetMessage($"Game saved to slot {slotNumber}.");
+        }
+
+        public bool TrySaveToSlot(int slotNumber, out string error)
+        {
+            if (Services?.SaveGameService == null)
+            {
+                error = "Save service is not initialized.";
+                return false;
+            }
+
+            if (CurrentState != GameState.Hub && CurrentState != GameState.InRun)
+            {
+                error = "Saving is only available in the hub or during a run between actions.";
+                return false;
+            }
+
+            RunState runState = CurrentRunController?.CurrentRun;
+            MapDefinition map = runState != null ? Services.MapService.CurrentMap : null;
+            IReadOnlyList<ActorEntity> actors = runState != null ? Services.ActorRepository.Actors : null;
+            return Services.SaveGameService.TrySave(
+                slotNumber,
+                CurrentState,
+                ActiveProfile,
+                runState,
+                map,
+                actors,
+                out error);
+        }
+
+        public void LoadFromSlot(int slotNumber)
+        {
+            if (Services?.SaveGameService == null)
+            {
+                Debug.LogWarning("[GameDirector] Save service is not initialized.", this);
+                return;
+            }
+
+            if (!Services.SaveGameService.TryLoad(slotNumber, out SaveGameData data, out string error))
+            {
+                Debug.LogWarning($"[GameDirector] Could not load slot {slotNumber}: {error}", this);
+                return;
+            }
+
+            ActiveProfile = data.Profile ?? new SaveProfile();
+            if (data.Run != null && RestoreRun(data.Run))
+            {
+                return;
+            }
+
+            EnterHub($"Save slot {slotNumber} loaded.");
+        }
+
+        private bool RestoreRun(RunSaveData savedRun)
+        {
+            if (Services?.SaveGameService == null || savedRun?.Map == null)
+            {
+                return false;
+            }
+
+            RunFloorDefinition floorDefinition = Services.MapService.GetRunFloor(savedRun.CurrentFloor);
+            MapDefinition map = Services.SaveGameService.RestoreMap(savedRun.Map);
+            if (map == null)
+            {
+                return false;
+            }
+
+            Services.MapService.RestoreRunMap(map, floorDefinition);
+            List<ActorEntity> actors = Services.SaveGameService.RestoreActors(savedRun.Actors);
+            Services.ActorRepository.SetActors(actors);
+            ActorEntity player = Services.ActorRepository.Player;
+            if (player == null)
+            {
+                Debug.LogError("[GameDirector] The save file does not contain a player actor.", this);
+                return false;
+            }
+
+            RunState runState = Services.SaveGameService.RestoreRunState(savedRun, floorDefinition, player);
+            RunController runController = new RunController(
+                Services.TurnSystem,
+                Services.CombatSystem,
+                Services.EnemyTurnSystem,
+                Services.InteractionSystem,
+                Services.MapService,
+                Services.ActorRepository,
+                Services.TimingService,
+                ActiveProfile);
+            runController.Begin(runState);
+            CurrentRunController = runController;
+            BuildRunInteractables();
+
+            Services.TimingPopupPresenter.Hide();
+            Services.TimingService.CancelCurrent();
+            Services.WorldPresenter.SetActorRepository(Services.ActorRepository);
+            Services.WorldPresenter.BindRun(runState, map);
+            Services.WorldPresenter.Refresh();
+            Services.HudPresenter.BindRun(runState);
+            Services.HudPresenter.ClearRunResult();
+            Services.HudPresenter.SetDialogue(string.Empty);
+            Services.HudPresenter.SetMessage($"Save loaded: floor {runState.CurrentFloor}.");
+            Services.ResultScreenPresenter.Hide();
+            CurrentState = GameState.InRun;
+            Services.AudioCueService.PlayRunBgm();
+            return true;
         }
 
         private int GetCurrentRunPlayerHp()
@@ -376,6 +536,7 @@ namespace Arkeum.Production.Core
             Services.WorldPresenter.Refresh();
             Services.HudPresenter.BindRun(runState);
             Services.HudPresenter.SetMessage($"You descend to floor {nextFloor}.");
+            Services.AudioCueService.PlayFloorDescend();
             CurrentState = GameState.InRun;
             return true;
         }

@@ -20,6 +20,7 @@ namespace Arkeum.Production.Gameplay.Timing
 
             return new SinglePressTimingChallengeRuntime(
                 DurationSeconds,
+                LateInputGraceSeconds,
                 normalizedSuccessMin,
                 normalizedSuccessMax);
         }
@@ -41,15 +42,18 @@ namespace Arkeum.Production.Gameplay.Timing
         {
             public SinglePressTimingChallengeRuntime(
                 float durationSeconds,
+                float lateInputGraceSeconds,
                 float successZoneMin,
                 float successZoneMax)
             {
                 DurationSeconds = durationSeconds;
+                LateInputGraceSeconds = Mathf.Max(0f, lateInputGraceSeconds);
                 SuccessZoneMin = successZoneMin;
                 SuccessZoneMax = successZoneMax;
             }
 
             public float DurationSeconds { get; }
+            private float LateInputGraceSeconds { get; }
             public float ElapsedSeconds { get; private set; }
             public float NormalizedPosition => Mathf.Clamp01(ElapsedSeconds / DurationSeconds);
             public float SuccessZoneMin { get; }
@@ -63,8 +67,13 @@ namespace Arkeum.Production.Gameplay.Timing
 
             public TimingResultGrade EvaluateAction()
             {
-                float position = NormalizedPosition;
-                if (position >= SuccessZoneMin && position <= SuccessZoneMax)
+                float currentPosition = NormalizedPosition;
+                float graceStartPosition = Mathf.Clamp01(
+                    (ElapsedSeconds - LateInputGraceSeconds) / DurationSeconds);
+                bool graceWindowOverlapsSuccessZone =
+                    currentPosition >= SuccessZoneMin &&
+                    graceStartPosition <= SuccessZoneMax;
+                if (graceWindowOverlapsSuccessZone)
                 {
                     return TimingResultGrade.Success;
                 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -24,6 +25,15 @@ namespace Arkeum.Production.Gameplay.Actors
         public bool HasPendingEnemyTargetCell;
         public Vector2Int PendingEnemyTargetCell;
         public Vector2Int PendingEnemyFacingDirection = Vector2Int.up;
+        public List<Vector2Int> PendingBossAffectedCells = new List<Vector2Int>();
+        public List<Vector2Int> ActiveBossWallCells = new List<Vector2Int>();
+        public int BossTurnCount;
+        public int LastSpaceCutTurn;
+        public int BossAlignedTurnCount;
+        public int BossStunTurnsRemaining;
+        public int BossWallTurnsRemaining;
+        [NonSerialized] public bool HasMoveCollisionFeedback;
+        [NonSerialized] public Vector2Int MoveCollisionTargetCell;
 
         public int CurrentHp => currentHp;
         public bool IsAlive => CurrentHp > 0;
